@@ -484,7 +484,7 @@ function resetGame() {
   tracers.length = 0;
   for (const p of particles) scene.remove(p.mesh);
   particles.length = 0;
-  for (const rag of ragdolls) scene.remove(rag.mesh);
+  for (const rag of ragdolls) scene.remove(rag.group);
   ragdolls.length = 0;
   for (const shell of shellCasings) scene.remove(shell.mesh);
   shellCasings.length = 0;
