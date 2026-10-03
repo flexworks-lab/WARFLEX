@@ -711,14 +711,24 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
     ? new THREE.Vector3(-direction.z, 0, direction.x).multiplyScalar((Math.random() - .5) * 2.4)
     : new THREE.Vector3();
 
+  const ragHips = ragGroup.getObjectByName('RagdollHips');
+  if (ragHips) {
+    ragHips.rotation.x = 0;
+    ragHips.rotation.y = 0;
+    ragHips.rotation.z = 0;
+  }
+
   ragdolls.push({
     group: ragGroup,
     velocity: rootVelocity.add(side),
     angularVelocity: new THREE.Vector3(
-      (Math.random() - .5) * (headshot ? 9 : 7),
-      (Math.random() - .5) * 12,
-      (Math.random() - .5) * (headshot ? 9 : 7)
+      (Math.random() - .5) * (headshot ? 7 : 5),
+      (Math.random() - .5) * 10,
+      0
     ),
+    fallAngle: 0,
+    fallVelocity: 0,
+    fallTarget: Math.PI * .5,
     joints,
     impact,
     life: 12 + Math.random() * 3.5,
@@ -1018,11 +1028,21 @@ function enemyShoot(enemy) {
   if (!sight.clear) return false;
 
   enemy.attackTimer = enemy.attackCooldown * (.75 + Math.random() * .5);
+
   const direction = new THREE.Vector3().subVectors(sight.target, sight.origin).normalize();
-  const spread = enemy.role === 'heavy' ? .025 : .045;
-  direction.x += (Math.random() - .5) * spread;
-  direction.y += (Math.random() - .5) * spread;
-  direction.z += (Math.random() - .5) * spread;
+  const accuracy = enemy.role === 'heavy' ? .80 : .68;
+  const spread = enemy.role === 'heavy' ? .018 : .035;
+
+  // Every soldier has a real chance to miss instead of laser-locking the player.
+  if (Math.random() > accuracy) {
+    direction.x += (Math.random() - .5) * .22;
+    direction.y += (Math.random() - .5) * .16;
+    direction.z += (Math.random() - .5) * .22;
+  } else {
+    direction.x += (Math.random() - .5) * spread;
+    direction.y += (Math.random() - .5) * spread;
+    direction.z += (Math.random() - .5) * spread;
+  }
   direction.normalize();
 
   const shotEnd = sight.origin.clone().addScaledVector(direction, CONFIG.enemyShootRange);
@@ -1030,13 +1050,17 @@ function enemyShoot(enemy) {
   const wall = raycaster.intersectObjects(obstacles, false)[0];
   if (wall && wall.distance < CONFIG.enemyShootRange) shotEnd.copy(wall.point);
 
-  if (shotEnd.distanceTo(sight.target) < 1.35 && sight.clear) {
+  if (shotEnd.distanceTo(sight.target) < 1.1 && sight.clear) {
     damagePlayer(enemy.damage);
   }
 
   spawnBurst(sight.origin, enemy.role === 'heavy' ? 0xffb052 : 0xff5666, enemy.role === 'heavy' ? 5 : 3);
   addTracer(sight.origin, shotEnd, enemy.role === 'heavy' ? 0xffb052 : 0xff5666, .065);
   return true;
+}
+
+function hitStrengthToLean(strength, kick) {
+  return strength * .45 * kick;
 }
 
 function updateEnemies(dt) {
@@ -1091,7 +1115,11 @@ function updateEnemies(dt) {
 
     enemy.group.position.x = THREE.MathUtils.clamp(enemy.group.position.x, -51, 51);
     enemy.group.position.z = THREE.MathUtils.clamp(enemy.group.position.z, -51, 51);
-    enemy.group.lookAt(player.position.x, enemy.group.position.y + 1.05, player.position.z);
+
+    // The soldier model faces local -Z, so explicitly aim that front side at the player.
+    const faceX = player.position.x - enemy.group.position.x;
+    const faceZ = player.position.z - enemy.group.position.z;
+    enemy.group.rotation.y = Math.atan2(faceX, faceZ) + Math.PI;
 
     const parts = enemy.group.userData.parts;
     const swing = Math.sin(enemy.walkTime + enemy.phase) * (dist > 2.2 ? .6 : .12);
@@ -1102,14 +1130,15 @@ function updateEnemies(dt) {
     parts.hips.position.y = 1.42 + Math.abs(Math.sin(enemy.walkTime * .5)) * .04;
     parts.head.rotation.y = Math.sin(enemy.walkTime * .25) * .05;
 
-    if (enemy.hitReact > 0) {
-      const kick = enemy.hitReact / .24;
-      parts.hips.rotation.z = enemy.hitSide * enemy.hitStrength * kick;
-      parts.hips.rotation.x = -enemy.hitStrength * .45 * kick;
-    } else {
-      parts.hips.rotation.z = 0;
-      parts.hips.rotation.x = 0;
-    }
+    const closeLean = THREE.MathUtils.clamp((6.5 - dist) / 6.5, 0, 1);
+    const hitKick = enemy.hitReact > 0 ? enemy.hitReact / .24 : 0;
+
+    // When the player gets dangerously close, the soldier recoils backward.
+    parts.hips.rotation.x = -closeLean * .48 - hitStrengthToLean(enemy.hitStrength, hitKick);
+    parts.hips.rotation.z = enemy.hitSide * enemy.hitStrength * hitKick;
+    parts.head.rotation.x = closeLean * .22;
+    parts.leftArm.rotation.x += closeLean * .35;
+    parts.rightArm.rotation.x += closeLean * .35;
 
     enemy.walkTime += dt * (enemy.role === 'rusher' ? 11 : 7);
   }
@@ -1123,10 +1152,16 @@ function updateRagdolls(dt) {
     rag.velocity.y -= CONFIG.ragdollGravity * dt;
     rag.group.position.addScaledVector(rag.velocity, dt);
 
-    rag.angularVelocity.multiplyScalar(Math.exp(-0.72 * dt));
+    rag.angularVelocity.x *= Math.exp(-0.8 * dt);
+    rag.angularVelocity.y *= Math.exp(-0.8 * dt);
     rag.group.rotation.x += rag.angularVelocity.x * dt;
     rag.group.rotation.y += rag.angularVelocity.y * dt;
-    rag.group.rotation.z += rag.angularVelocity.z * dt;
+
+    // Force a complete right-side fall instead of leaving the corpse upright.
+    rag.fallVelocity += ((rag.fallTarget - rag.fallAngle) * 18 - rag.fallVelocity * 4.5) * dt;
+    rag.fallAngle += rag.fallVelocity * dt;
+    rag.fallAngle = THREE.MathUtils.clamp(rag.fallAngle, 0, rag.fallTarget);
+    rag.group.rotation.z = rag.fallAngle;
 
     for (const joint of rag.joints) {
       joint.upperVelocity += (
