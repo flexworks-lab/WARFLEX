@@ -667,13 +667,22 @@ function spawnEnemy(index = 0) {
 function createRagdoll(enemy, impactPoint, direction, headshot = false) {
   enemy.group.updateMatrixWorld(true);
 
-  const ragGroup = enemy.group.clone(true);
-  ragGroup.name = 'ConnectedEnemyRagdoll';
-  ragGroup.visible = true;
-  ragGroup.position.copy(enemy.group.position);
-  ragGroup.quaternion.copy(enemy.group.quaternion);
-  ragGroup.scale.setScalar(enemy.baseScale || enemy.group.userData.baseScale || .78);
-  scene.add(ragGroup);
+  const model = enemy.group.clone(true);
+  model.name = 'ConnectedEnemyRagdoll';
+  model.visible = true;
+  model.scale.setScalar(enemy.baseScale || enemy.group.userData.baseScale || .54);
+
+  // Rotate around the soldier's hips, not the feet, so the body can actually fall onto the floor.
+  const fallPivot = new THREE.Group();
+  fallPivot.name = 'RagdollFallPivot';
+  fallPivot.position.copy(enemy.group.position);
+  fallPivot.position.y += 1.42 * model.scale.x;
+  fallPivot.quaternion.copy(enemy.group.quaternion);
+  scene.add(fallPivot);
+
+  model.position.set(0, -(1.42 * model.scale.x), 0);
+  model.rotation.set(0, 0, 0);
+  fallPivot.add(model);
 
   const jointConfigs = [
     ['RagdollLeftArm', 'RagdollLeftElbow', 1.25, .95],
@@ -683,8 +692,8 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
   ];
 
   const joints = jointConfigs.map(([upperName, lowerName, upperLimit, lowerLimit]) => {
-    const upper = ragGroup.getObjectByName(upperName);
-    const lower = ragGroup.getObjectByName(lowerName);
+    const upper = model.getObjectByName(upperName);
+    const lower = model.getObjectByName(lowerName);
     return {
       upper,
       lower,
@@ -692,11 +701,11 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
       lowerAngle: 0,
       upperVelocity: (Math.random() - .5) * 8,
       lowerVelocity: (Math.random() - .5) * 10,
-      upperTarget: (Math.random() - .5) * .35,
-      lowerTarget: (Math.random() - .5) * .28,
+      upperTarget: (Math.random() - .5) * .45,
+      lowerTarget: (Math.random() - .5) * .35,
       upperLimit,
       lowerLimit,
-      damping: 2.15,
+      damping: 2.05,
     };
   }).filter(j => j.upper && j.lower);
 
@@ -704,38 +713,31 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
   const rootVelocity = direction
     ? direction.clone().multiplyScalar(kick)
     : new THREE.Vector3();
-  rootVelocity.y = headshot ? 4.2 : 2.8;
+  rootVelocity.y = headshot ? 3.6 : 2.2;
 
-  const impact = impactPoint ? impactPoint.clone() : enemy.group.position.clone().add(new THREE.Vector3(0, 1.1, 0));
   const side = direction
     ? new THREE.Vector3(-direction.z, 0, direction.x).multiplyScalar((Math.random() - .5) * 2.4)
     : new THREE.Vector3();
 
-  const ragHips = ragGroup.getObjectByName('RagdollHips');
-  if (ragHips) {
-    ragHips.rotation.x = 0;
-    ragHips.rotation.y = 0;
-    ragHips.rotation.z = 0;
-  }
-
   ragdolls.push({
-    group: ragGroup,
+    group: fallPivot,
+    model,
     velocity: rootVelocity.add(side),
     angularVelocity: new THREE.Vector3(
-      (Math.random() - .5) * (headshot ? 7 : 5),
-      (Math.random() - .5) * 10,
+      (Math.random() - .5) * (headshot ? 5 : 4),
+      (Math.random() - .5) * 8,
       0
     ),
     fallAngle: 0,
     fallVelocity: 0,
-    fallTarget: Math.PI * .5,
+    fallTarget: -Math.PI * .5,
     joints,
-    impact,
     life: 12 + Math.random() * 3.5,
   });
 
   scene.remove(enemy.group);
 }
+
 function removeEnemy(enemy, headshot = false, hitPoint = null, direction = null) {
   if (enemy.dying) return;
   enemy.dying = true;
@@ -1133,12 +1135,15 @@ function updateEnemies(dt) {
     const closeLean = THREE.MathUtils.clamp((6.5 - dist) / 6.5, 0, 1);
     const hitKick = enemy.hitReact > 0 ? enemy.hitReact / .24 : 0;
 
-    // When the player gets dangerously close, the soldier recoils backward.
-    parts.hips.rotation.x = -closeLean * .48 - hitStrengthToLean(enemy.hitStrength, hitKick);
+    // Strong backward recoil when the player gets close.
+    enemy.group.rotation.order = 'YXZ';
+    enemy.group.rotation.x = closeLean * .62;
+
+    parts.hips.rotation.x = closeLean * .18 - hitStrengthToLean(enemy.hitStrength, hitKick);
     parts.hips.rotation.z = enemy.hitSide * enemy.hitStrength * hitKick;
-    parts.head.rotation.x = closeLean * .22;
-    parts.leftArm.rotation.x += closeLean * .35;
-    parts.rightArm.rotation.x += closeLean * .35;
+    parts.head.rotation.x = closeLean * .28;
+    parts.leftArm.rotation.x += closeLean * .5;
+    parts.rightArm.rotation.x += closeLean * .5;
 
     enemy.walkTime += dt * (enemy.role === 'rusher' ? 11 : 7);
   }
@@ -1157,10 +1162,10 @@ function updateRagdolls(dt) {
     rag.group.rotation.x += rag.angularVelocity.x * dt;
     rag.group.rotation.y += rag.angularVelocity.y * dt;
 
-    // Force a complete right-side fall instead of leaving the corpse upright.
-    rag.fallVelocity += ((rag.fallTarget - rag.fallAngle) * 18 - rag.fallVelocity * 4.5) * dt;
+    // Force a full right-side fall around the hips.
+    rag.fallVelocity += ((rag.fallTarget - rag.fallAngle) * 20 - rag.fallVelocity * 5.2) * dt;
     rag.fallAngle += rag.fallVelocity * dt;
-    rag.fallAngle = THREE.MathUtils.clamp(rag.fallAngle, 0, rag.fallTarget);
+    rag.fallAngle = THREE.MathUtils.clamp(rag.fallAngle, rag.fallTarget, 0);
     rag.group.rotation.z = rag.fallAngle;
 
     for (const joint of rag.joints) {
@@ -1184,8 +1189,8 @@ function updateRagdolls(dt) {
       joint.lower.rotation.z = Math.sin(joint.lowerAngle * 1.4) * .08;
     }
 
-    if (rag.group.position.y < .10) {
-      rag.group.position.y = .10;
+    if (rag.group.position.y < .18) {
+      rag.group.position.y = .18;
       if (Math.abs(rag.velocity.y) > .7) {
         rag.velocity.y *= -.18;
         rag.velocity.x *= .82;
