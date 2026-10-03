@@ -541,17 +541,35 @@ function spawnEnemyModel() {
   box([.34, .62, .36], [0, -.31, 0], armor, rightKnee, 'RightShin');
   box([.42, .25, .64], [0, -.66, -.08], rubber, rightKnee, 'RightBoot');
 
-  // Upper body gets its own spine pivot so aiming, breathing, and ragdoll collapse
-  // can move independently from the pelvis and legs.
+  // Split the soldier around the waist so the upper and lower body can
+  // move independently during animation and ragdoll collapse.
+  const lowerBody = new THREE.Group();
+  lowerBody.name = 'RagdollLowerBody';
+  hips.add(lowerBody);
+
   const upperBody = new THREE.Group();
-  upperBody.name = 'RagdollSpine';
+  upperBody.name = 'RagdollUpperBody';
   hips.add(upperBody);
+
   for (const child of [...hips.children]) {
-    if (child !== upperBody && child !== leftLeg && child !== rightLeg) upperBody.add(child);
+    if (child === lowerBody || child === upperBody) continue;
+
+    // Legs and pelvis/belt equipment belong to the lower body.
+    const isLower =
+      child === leftLeg ||
+      child === rightLeg ||
+      child.name === 'BattleBelt' ||
+      child.name === 'LeftHipPouch' ||
+      child.name === 'RightHipPouch';
+
+    (isLower ? lowerBody : upperBody).add(child);
   }
+
+  upperBody.userData.isSpine = true;
 
   group.userData.parts = {
     hips,
+    lowerBody,
     upperBody,
     leftArm,
     rightArm,
@@ -702,7 +720,8 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
 
   const ragParts = {
     hips: model.getObjectByName('RagdollHips'),
-    upperBody: model.getObjectByName('RagdollSpine'),
+    upperBody: model.getObjectByName('RagdollUpperBody'),
+    lowerBody: model.getObjectByName('RagdollLowerBody'),
     leftArm: model.getObjectByName('RagdollLeftArm'),
     rightArm: model.getObjectByName('RagdollRightArm'),
     leftLeg: model.getObjectByName('RagdollLeftLeg'),
@@ -757,6 +776,14 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
     velocityZ: impactSide * .6 + (Math.random() - .5) * 1.8,
     targetX: THREE.MathUtils.clamp(-impactBack * .22, -.55, .55),
     targetZ: THREE.MathUtils.clamp(impactSide * .18, -.45, .45),
+  };
+
+  const lowerBody = {
+    object: ragParts.lowerBody,
+    angleX: 0,
+    angleZ: 0,
+    velocityX: (Math.random() - .5) * 1.5,
+    velocityZ: (Math.random() - .5) * 1.2,
   };
 
   const neck = {
@@ -820,6 +847,7 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
     fallTarget: -Math.PI * .5 + THREE.MathUtils.clamp(impactSide * .10 + (Math.random() - .5) * .14, -.24, .12),
     joints,
     spine,
+    lowerBody,
     neck,
     bounds: new THREE.Box3(),
     age: 0,
@@ -1294,6 +1322,20 @@ function updateRagdolls(dt) {
     spine.angleZ = THREE.MathUtils.clamp(spine.angleZ, -.65, .65);
     spine.object.rotation.x = spine.angleX;
     spine.object.rotation.z = spine.angleZ;
+
+    // The lower body gets its own subtle counter-rotation so the waist
+    // visibly separates the pelvis from the chest during a fold.
+    const lower = rag.lowerBody;
+    const lowerTargetX = foldEase * -.12;
+    const lowerTargetZ = foldEase * -.08;
+    lower.velocityX += ((lowerTargetX - lower.angleX) * 5.2 - lower.velocityX * 2.2) * dt;
+    lower.velocityZ += ((lowerTargetZ - lower.angleZ) * 5.0 - lower.velocityZ * 2.0) * dt;
+    lower.angleX += lower.velocityX * dt;
+    lower.angleZ += lower.velocityZ * dt;
+    lower.angleX = THREE.MathUtils.clamp(lower.angleX, -.3, .3);
+    lower.angleZ = THREE.MathUtils.clamp(lower.angleZ, -.22, .22);
+    lower.object.rotation.x = lower.angleX;
+    lower.object.rotation.z = lower.angleZ;
 
     // The head follows the torso and tucks inward.
     const neck = rag.neck;
