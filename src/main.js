@@ -594,17 +594,48 @@ function removeEnemy(enemy, headshot = false, hitPoint = null, direction = null)
   if (index !== -1) enemies.splice(index, 1);
   updateHud();
 }
-function spawnBurst(position, color) {
-  for (let i = 0; i < 8; i += 1) {
+function spawnBurst(position, color, count = 12) {
+  for (let i = 0; i < count; i += 1) {
+    const size = .04 + Math.random() * .08;
     const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(.08, .08, .08),
-      new THREE.MeshBasicMaterial({ color })
+      new THREE.BoxGeometry(size, size, size),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .95 })
     );
-    mesh.position.copy(position).add(new THREE.Vector3(0, 1.3, 0));
+    mesh.position.copy(position).add(new THREE.Vector3(
+      (Math.random()-.5) * .18,
+      (Math.random()-.5) * .18,
+      (Math.random()-.5) * .18
+    ));
     scene.add(mesh);
-    const vel = new THREE.Vector3((Math.random()-.5)*5, Math.random()*5, (Math.random()-.5)*5);
-    particles.push({ mesh, vel, life: .4 + Math.random() * .3 });
+    const vel = new THREE.Vector3(
+      (Math.random()-.5) * 8,
+      Math.random() * 7 + 1,
+      (Math.random()-.5) * 8
+    );
+    particles.push({ mesh, vel, life: .25 + Math.random() * .6 });
   }
+}
+function spawnMuzzleVfx() {
+  const muzzleWorld = new THREE.Vector3();
+  weapon.userData.muzzle.getWorldPosition(muzzleWorld);
+  spawnBurst(muzzleWorld, 0xffd36b, 7);
+
+  for (let i = 0; i < 2; i += 1) {
+    const shell = new THREE.Mesh(
+      new THREE.CylinderGeometry(.025, .025, .16, 8),
+      createMaterial(0xb8a06b, .7, .32)
+    );
+    shell.position.copy(muzzleWorld).add(new THREE.Vector3(.08 + Math.random()*.06, .02, .02));
+    shell.rotation.set(Math.random()*3, Math.random()*3, Math.random()*3);
+    scene.add(shell);
+    shellCasings.push({
+      mesh: shell,
+      velocity: new THREE.Vector3(.9 + Math.random(), 1.3 + Math.random()*1.5, (Math.random()-.5)*1.2),
+      angularVelocity: new THREE.Vector3((Math.random()-.5)*18, (Math.random()-.5)*18, (Math.random()-.5)*18),
+      life: 2.4,
+    });
+  }
+  state.shake = Math.max(state.shake, .055);
 }
 
 function addTracer(from, to) {
@@ -695,7 +726,8 @@ function shoot() {
   state.ammo -= 1;
   state.fireTimer = CONFIG.fireInterval;
   state.weaponKick = 1;
-  state.muzzleFlash = .055;
+  state.muzzleFlash = .075;
+  spawnMuzzleVfx();
 
   const origin = camera.position.clone();
   const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
@@ -726,9 +758,10 @@ function shoot() {
       enemy.health -= headshot ? 70 : 34;
       enemy.hurtFlash = .08;
       hitPoint = enemyHit.point;
+      spawnBurst(hitPoint, headshot ? 0xff8b93 : 0xcbd6df, headshot ? 14 : 8);
       state.score += headshot ? 25 : 10;
       showHitmarker(headshot);
-      if (enemy.health <= 0) removeEnemy(enemy, headshot);
+      if (enemy.health <= 0) removeEnemy(enemy, headshot, hitPoint, direction);
     }
   } else if (wallHits[0]) {
     hitPoint = wallHits[0].point;
