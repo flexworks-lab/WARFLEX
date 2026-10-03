@@ -141,6 +141,80 @@ const player = {
 const UPDATE_STORAGE_KEY = 'warfex:lastSeenUpdate';
 let pendingUpdate = null;
 
+const DEBUG_MODE = new URLSearchParams(location.search).has('debug');
+
+function showRuntimeError(error, context = 'Runtime error') {
+  console.error('[WARFLEX]', context, error);
+
+  if (!DEBUG_MODE) return;
+
+  const existing = document.querySelector('#warfex-debug-error');
+  const panel = existing || document.createElement('pre');
+  panel.id = 'warfex-debug-error';
+  panel.textContent =
+    'WARFLEX ERROR\\n\\n' +
+    context + '\\n' +
+    (error?.stack || error?.message || String(error));
+  Object.assign(panel.style, {
+    position: 'fixed',
+    left: '12px',
+    right: '12px',
+    bottom: '12px',
+    maxHeight: '45vh',
+    overflow: 'auto',
+    zIndex: '100000',
+    margin: '0',
+    padding: '12px',
+    background: 'rgba(80,0,0,.94)',
+    color: '#fff',
+    font: '12px/1.45 monospace',
+    whiteSpace: 'pre-wrap',
+    pointerEvents: 'auto',
+  });
+  if (!existing) document.body.appendChild(panel);
+}
+
+window.addEventListener('error', (event) => {
+  showRuntimeError(event.error || event.message, 'Uncaught error');
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  showRuntimeError(event.reason, 'Unhandled promise rejection');
+});
+
+window.WARFLEX_DEBUG = {
+  get state() { return state; },
+  get enemies() { return enemies; },
+  get ragdolls() { return ragdolls; },
+  get droppedGuns() { return droppedGuns; },
+  get scene() { return scene; },
+  get renderer() { return renderer; },
+};
+
+function assertBootIntegrity() {
+  const requiredElements = [
+    ['start button', els.startButton],
+    ['start screen', els.start],
+    ['hud', els.hud],
+    ['wave menu', els.waveMenu],
+    ['options menu', els.optionsMenu],
+  ];
+
+  const missing = requiredElements
+    .filter(([, element]) => !element)
+    .map(([name]) => name);
+
+  if (missing.length) {
+    throw new Error('Missing required DOM elements: ' + missing.join(', '));
+  }
+
+  if (!renderer || !camera || !scene) {
+    throw new Error('Three.js renderer, camera, or scene failed to initialize.');
+  }
+}
+
+assertBootIntegrity();
+
 function showUpdateNotification(info, live = false) {
   pendingUpdate = info;
   els.updateTitle.textContent = 'UPDATE AVAILABLE';
