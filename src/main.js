@@ -251,123 +251,159 @@ function createWeapon() {
   const weapon = new THREE.Group();
   weapon.name = 'MK-01_3D_RIFLE';
 
-  const dark = createMaterial(0x151a20, .7, .32);
-  const bodyMat = createMaterial(0x303943, .75, .35);
-  const accent = createMaterial(0xd6dde4, .45, .28);
-  const rubber = createMaterial(0x111418, .05, .85);
+  const dark = createMaterial(0x11151a, .82, .28);
+  const bodyMat = createMaterial(0x303943, .76, .32);
+  const bodyDark = createMaterial(0x20262d, .78, .3);
+  const metal = createMaterial(0x9da8b2, .72, .25);
+  const accent = createMaterial(0xd6dde4, .52, .24);
+  const rubber = createMaterial(0x0c1014, .05, .88);
+  const polymer = createMaterial(0x242b32, .18, .58);
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0x071116,
+    emissive: 0x2f9abf,
+    emissiveIntensity: 2.2,
+    metalness: .85,
+    roughness: .1,
+  });
 
-  const body = new THREE.Mesh(new THREE.BoxGeometry(.42, .28, 1.65), bodyMat);
-  body.position.set(0, 0, -.68);
-  body.castShadow = true;
-  weapon.add(body);
+  const addBox = (size, position, material, rotation = [0,0,0], name = '') => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    if (name) mesh.name = name;
+    weapon.add(mesh);
+    return mesh;
+  };
 
-  const receiver = new THREE.Mesh(new THREE.BoxGeometry(.48, .22, .66), dark);
-  receiver.position.set(0, .15, -.08);
-  receiver.castShadow = true;
-  weapon.add(receiver);
+  const addCyl = (rt, rb, height, position, material, rotation = [0,0,0], radial = 12, name = '') => {
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(rt, rb, height, radial, 1),
+      material
+    );
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    if (name) mesh.name = name;
+    weapon.add(mesh);
+    return mesh;
+  };
 
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(.045, .055, 1.45, 12), accent);
-  barrel.rotation.x = Math.PI / 2;
-  barrel.position.set(0, .05, -1.58);
-  barrel.castShadow = true;
-  weapon.add(barrel);
+  // Receiver / action.
+  addBox([.46, .28, 1.64], [0, 0, -.72], bodyMat, [0,0,0], 'RifleBody');
+  addBox([.52, .18, .58], [0, .14, -.02], dark);
+  addBox([.38, .11, .48], [0, .24, -.18], bodyDark);
+  addBox([.21, .08, .32], [.14, .13, -.12], metal, [0,0,0], 'EjectionPort');
+  addBox([.10, .045, .28], [.17, .22, -.12], dark);
+  addBox([.07, .035, .24], [-.17, .22, -.16], metal);
+  addBox([.055, .055, .22], [.20, -.01, -.16], metal, [0,0,0], 'ChargingHandle');
 
-  const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(.085, .085, .16, 12), dark);
-  muzzle.rotation.x = Math.PI / 2;
-  muzzle.position.set(0, .05, -2.3);
-  weapon.add(muzzle);
+  // Muzzle, gas system, and handguard.
+  addCyl(.056, .062, 1.46, [0, .035, -1.62], metal, [Math.PI/2,0,0], 14, 'Barrel');
+  addCyl(.11, .10, .17, [0, .035, -2.35], dark, [Math.PI/2,0,0], 14, 'MuzzleDevice');
+  addCyl(.087, .09, .26, [0, .035, -2.18], bodyDark, [Math.PI/2,0,0], 14);
+  addBox([.28, .25, .86], [0, .025, -1.05], polymer, [0,0,0], 'Handguard');
 
-  const stock = new THREE.Mesh(new THREE.BoxGeometry(.34, .22, .7), rubber);
-  stock.position.set(0, -.02, .44);
-  stock.rotation.x = -.08;
-  weapon.add(stock);
+  for (let i = -2; i <= 2; i += 1) {
+    const z = -1.03 + i * .15;
+    addBox([.34, .055, .06], [0, .17, z], dark);
+    addBox([.05, .12, .06], [.19, .02, z], dark);
+    addBox([.05, .12, .06], [-.19, .02, z], dark);
+  }
 
-  const magazine = new THREE.Mesh(new THREE.BoxGeometry(.16, .45, .32), dark);
-  magazine.position.set(0, -.3, -.35);
-  magazine.rotation.x = -.18;
-  weapon.add(magazine);
+  // Rail / optic stack.
+  addBox([.22, .07, .92], [0, .20, -.42], dark, [0,0,0], 'TopRail');
+  addBox([.19, .11, .26], [0, .31, -.30], bodyDark, [0,0,0], 'OpticBase');
+  addBox([.14, .10, .20], [0, .40, -.28], glass, [0,0,0], 'OpticGlass');
+  addBox([.07, .13, .12], [0, .42, -.48], dark);
+  addBox([.06, .11, .10], [0, .42, -.08], dark);
+  addCyl(.018, .018, .15, [.12, .34, -.28], accent, [0,0,Math.PI/2], 8);
+  addCyl(.018, .018, .15, [-.12, .34, -.28], accent, [0,0,Math.PI/2], 8);
 
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(.16, .46, .2), rubber);
-  grip.position.set(0, -.28, .18);
-  grip.rotation.x = -.18;
-  weapon.add(grip);
+  // Front sight and side hardware.
+  addBox([.07, .13, .07], [0, .29, -1.30], dark);
+  addBox([.035, .10, .04], [0, .37, -1.30], accent);
+  addBox([.05, .08, .42], [.17, .07, -1.23], dark);
+  addBox([.05, .08, .42], [-.17, .07, -1.23], dark);
 
-  const sightBase = new THREE.Mesh(new THREE.BoxGeometry(.16, .08, .4), dark);
-  sightBase.position.set(0, .23, -.36);
-  weapon.add(sightBase);
+  // Magazine, release, trigger and guard.
+  const magazine = addBox([.19, .46, .31], [0, -.28, -.40], bodyDark, [-.18,0,0], 'Magazine');
+  addBox([.215, .05, .25], [0, -.52, -.40], rubber, [-.18,0,0]);
+  addBox([.07, .30, .05], [.11, -.35, -.40], metal, [-.18,0,0]);
+  addBox([.045, .08, .18], [.22, -.17, -.18], metal);
+  addCyl(.025, .025, .16, [0, -.16, .02], metal, [0,0,Math.PI/2], 10);
+  addBox([.17, .07, .23], [0, -.30, .16], dark, [-.18,0,0], 'TriggerGuard');
+  addBox([.10, .24, .16], [0, -.29, .20], rubber, [-.18,0,0], 'Grip');
 
-  const sight = new THREE.Mesh(new THREE.BoxGeometry(.05, .08, .18), accent);
-  sight.position.set(0, .29, -.43);
-  weapon.add(sight);
+  // Stock with cheek rest, buttpad and sling points.
+  addBox([.36, .23, .64], [0, -.015, .50], rubber, [-.08,0,0], 'Stock');
+  addBox([.39, .12, .22], [0, .085, .56], bodyDark, [-.08,0,0]);
+  addBox([.40, .19, .08], [0, -.035, .83], dark, [-.08,0,0]);
+  addBox([.37, .17, .07], [0, -.13, .83], rubber, [-.08,0,0]);
+  addCyl(.028, .028, .11, [.21, .02, .56], metal, [0,Math.PI/2,0], 8);
+  addCyl(.028, .028, .11, [-.21, .02, .56], metal, [0,Math.PI/2,0], 8);
 
+  // Angled foregrip / support.
+  addBox([.14, .31, .18], [0, -.19, -1.04], rubber, [-.18,0,0], 'Foregrip');
+  addBox([.18, .08, .18], [0, -.07, -1.05], dark);
+
+  // Detailed hands wrapped around the weapon.
+  const handMat = createMaterial(0x80634f, .03, .9);
+  const gloveMat = createMaterial(0x171c21, .04, .84);
+  const leftHand = new THREE.Mesh(new THREE.SphereGeometry(.125, 14, 10), gloveMat);
+  leftHand.scale.set(1.05, .72, 1.35);
+  leftHand.position.set(-.27, -.14, -.87);
+  leftHand.castShadow = true;
+  weapon.add(leftHand);
+  const rightHand = new THREE.Mesh(new THREE.SphereGeometry(.12, 14, 10), gloveMat);
+  rightHand.scale.set(1.0, .75, 1.3);
+  rightHand.position.set(.27, -.13, .17);
+  rightHand.castShadow = true;
+  weapon.add(rightHand);
+  addCyl(.055, .055, .16, [-.27, -.15, -.78], handMat, [0,0,Math.PI/2], 10);
+  addCyl(.055, .055, .16, [.27, -.15, .10], handMat, [0,0,Math.PI/2], 10);
+
+  // Weapon support arms.
   const leftArm = new THREE.Group();
   const rightArm = new THREE.Group();
-  const armMat = createMaterial(0xbfc7cf, .15, .62);
+  leftArm.name = 'WeaponLeftArm';
+  rightArm.name = 'WeaponRightArm';
 
-  const leftSleeve = new THREE.Mesh(new THREE.CylinderGeometry(.11, .13, .7, 10), armMat);
-  leftSleeve.rotation.z = -.35;
-  leftSleeve.position.set(-.34, -.05, -.48);
-  leftArm.add(leftSleeve);
-
-  const rightSleeve = new THREE.Mesh(new THREE.CylinderGeometry(.11, .13, .7, 10), armMat);
-  rightSleeve.rotation.z = .35;
-  rightSleeve.position.set(.34, -.05, -.48);
-  rightArm.add(rightSleeve);
-
+  const armMat = createMaterial(0xb6bec7, .18, .58);
+  const sleeveL = new THREE.Mesh(new THREE.CylinderGeometry(.115, .145, .72, 12), armMat);
+  sleeveL.rotation.z = -.35;
+  sleeveL.position.set(-.34, -.04, -.50);
+  sleeveL.castShadow = true;
+  leftArm.add(sleeveL);
+  const sleeveR = new THREE.Mesh(new THREE.CylinderGeometry(.115, .145, .72, 12), armMat);
+  sleeveR.rotation.z = .35;
+  sleeveR.position.set(.34, -.04, -.50);
+  sleeveR.castShadow = true;
+  rightArm.add(sleeveR);
   weapon.add(leftArm, rightArm);
 
-  const flash = new THREE.PointLight(0xffcf6a, 0, 6, 2);
-  flash.position.set(0, .05, -2.42);
+  // Muzzle flash.
+  const flash = new THREE.PointLight(0xffcf6a, 0, 7, 2);
+  flash.position.set(0, .04, -2.42);
   weapon.add(flash);
-
   const flashMesh = new THREE.Mesh(
-    new THREE.ConeGeometry(.11, .4, 8),
-    new THREE.MeshBasicMaterial({ color: 0xffdc85, transparent: true, opacity: 0, blending: THREE.AdditiveBlending })
-  );
-  flashMesh.rotation.x = -Math.PI / 2;
-  flashMesh.position.set(0, .05, -2.48);
-  weapon.add(flashMesh);
-
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(.2, .07, .72), dark);
-  rail.position.set(0, .27, -.36);
-  weapon.add(rail);
-
-  const opticBase = new THREE.Mesh(new THREE.BoxGeometry(.18, .11, .24), dark);
-  opticBase.position.set(0, .36, -.28);
-  weapon.add(opticBase);
-
-  const opticGlass = new THREE.Mesh(
-    new THREE.BoxGeometry(.12, .09, .16),
-    new THREE.MeshStandardMaterial({
-      color: 0x081218,
-      emissive: 0x3c98b7,
-      emissiveIntensity: 2.5,
-      metalness: .8,
-      roughness: .12,
+    new THREE.ConeGeometry(.12, .44, 10),
+    new THREE.MeshBasicMaterial({
+      color: 0xffdc85,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending
     })
   );
-  opticGlass.position.set(0, .4, -.27);
-  weapon.add(opticGlass);
-
-  const foregrip = new THREE.Mesh(new THREE.BoxGeometry(.13, .3, .2), rubber);
-  foregrip.position.set(0, -.2, -1.1);
-  foregrip.rotation.x = -.18;
-  weapon.add(foregrip);
-
-  const handMat = createMaterial(0x8c6d59, .05, .9);
-  const leftHand = new THREE.Mesh(new THREE.SphereGeometry(.12, 12, 8), handMat);
-  leftHand.scale.set(1, .75, 1.25);
-  leftHand.position.set(-.29, -.16, -.9);
-  weapon.add(leftHand);
-
-  const rightHand = new THREE.Mesh(new THREE.SphereGeometry(.12, 12, 8), handMat);
-  rightHand.scale.set(1, .75, 1.25);
-  rightHand.position.set(.29, -.16, .12);
-  weapon.add(rightHand);
+  flashMesh.rotation.x = -Math.PI / 2;
+  flashMesh.position.set(0, .04, -2.52);
+  weapon.add(flashMesh);
 
   weapon.userData.flash = flash;
   weapon.userData.flashMesh = flashMesh;
-  weapon.userData.muzzle = muzzle;
+  weapon.userData.muzzle = weapon.getObjectByName('MuzzleDevice');
   weapon.position.set(.43, -.48, -1.03);
   weapon.rotation.set(-.03, -.04, -.015);
   camera.add(weapon);
@@ -383,23 +419,28 @@ function spawnEnemyModel() {
   const group = new THREE.Group();
   group.name = 'EnemySoldier';
 
-  const armor = createMaterial(0x55616c, .62, .34);
-  const armorDark = createMaterial(0x303941, .7, .3);
-  const cloth = createMaterial(0x151a1f, .06, .82);
-  const rubber = createMaterial(0x0b0e11, .03, .9);
-  const trim = createMaterial(0x77838e, .55, .3);
+  const armor = createMaterial(0x55616c, .66, .32);
+  const armorDark = createMaterial(0x2b333b, .78, .28);
+  const armorBlack = createMaterial(0x171d23, .55, .38);
+  const cloth = createMaterial(0x14191f, .04, .84);
+  const clothMid = createMaterial(0x20272e, .08, .78);
+  const rubber = createMaterial(0x090c10, .02, .94);
+  const trim = createMaterial(0x77838e, .58, .27);
+  const metal = createMaterial(0x9ca8b2, .72, .25);
   const skin = createMaterial(0x9f806b, .04, .88);
+  const skinDark = createMaterial(0x6f5344, .03, .94);
   const lens = new THREE.MeshStandardMaterial({
-    color: 0x121d25,
-    emissive: 0x174b61,
-    emissiveIntensity: 1.8,
-    metalness: .65,
-    roughness: .15,
+    color: 0x0b141a,
+    emissive: 0x174f69,
+    emissiveIntensity: 2.0,
+    metalness: .7,
+    roughness: .12,
   });
 
-  const box = (size, position, material, parent, name = '') => {
+  const box = (size, position, material, parent, name = '', rotation = [0,0,0]) => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
     mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     if (name) mesh.name = name;
@@ -407,11 +448,8 @@ function spawnEnemyModel() {
     return mesh;
   };
 
-  const cyl = (radiusTop, radiusBottom, height, position, material, parent, rotation = [0,0,0], name = '') => {
-    const mesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 10, 1),
-      material
-    );
+  const cyl = (rt, rb, height, position, material, parent, rotation = [0,0,0], radial = 12, name = '') => {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, height, radial, 1), material);
     mesh.position.set(...position);
     mesh.rotation.set(...rotation);
     mesh.castShadow = true;
@@ -422,9 +460,20 @@ function spawnEnemyModel() {
   };
 
   const sphere = (radius, position, material, parent, scale = [1,1,1], name = '') => {
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 14, 10), material);
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 16, 12), material);
     mesh.position.set(...position);
     mesh.scale.set(...scale);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    if (name) mesh.name = name;
+    parent.add(mesh);
+    return mesh;
+  };
+
+  const torus = (radius, tube, position, material, parent, rotation = [0,0,0], arc = Math.PI * 2, name = '') => {
+    const mesh = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 16, arc), material);
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     if (name) mesh.name = name;
@@ -437,112 +486,148 @@ function spawnEnemyModel() {
   hips.position.y = 1.42;
   group.add(hips);
 
-  // Torso / plate carrier.
-  box([1.02, 1.12, .62], [0, .62, 0], cloth, hips, 'Torso');
-  box([1.10, .72, .68], [0, .72, -.045], armorDark, hips, 'PlateCarrier');
-  box([.78, .44, .72], [0, .82, -.085], armor, hips, 'ChestPlate');
-  box([.58, .18, .70], [0, 1.12, -.01], trim, hips, 'CollarPlate');
-  sphere(.19, [-.60, 1.08, 0], armor, hips, [1.05, .72, 1.1], 'LeftShoulder');
-  sphere(.19, [.60, 1.08, 0], armor, hips, [1.05, .72, 1.1], 'RightShoulder');
+  // Lower torso / tactical belt.
+  box([1.08, 1.16, .64], [0, .62, 0], cloth, hips, 'Torso');
+  box([1.16, .76, .70], [0, .70, -.04], armorDark, hips, 'PlateCarrier');
+  box([.84, .46, .74], [0, .82, -.10], armor, hips, 'ChestPlate');
+  box([.60, .18, .72], [0, 1.12, -.02], trim, hips, 'CollarPlate');
 
-  // Magazines, battle belt, and pouches.
+  // Plate carrier segmentation / MOLLE rows.
   for (const x of [-.30, 0, .30]) {
-    box([.22, .22, .13], [x, .42, -.39], rubber, hips, 'ChestPouch');
+    box([.20, .18, .06], [x, .49, -.405], armorBlack, hips, 'MollePanel');
+    box([.20, .18, .14], [x, .43, -.44], rubber, hips, 'ChestPouch');
+    box([.16, .06, .05], [x, .54, -.49], trim, hips);
   }
-  box([.94, .17, .68], [0, .25, 0], cloth, hips, 'BattleBelt');
-  box([.22, .24, .16], [-.42, .18, -.40], rubber, hips, 'LeftHipPouch');
-  box([.22, .24, .16], [.42, .18, -.40], rubber, hips, 'RightHipPouch');
+  for (const x of [-.44, -.22, 0, .22, .44]) {
+    box([.08, .06, .06], [x, .31, -.40], trim, hips);
+  }
 
-  // Backpack and radio.
-  box([.64, .72, .28], [0, .57, .43], cloth, hips, 'Backpack');
-  box([.45, .28, .18], [0, .72, .58], rubber, hips, 'PackTop');
-  cyl(.018, .026, .72, [.22, 1.14, .48], trim, hips, [0, 0, -.12], 'RadioAntenna');
+  // Shoulder protection.
+  sphere(.20, [-.60, 1.08, 0], armor, hips, [1.08, .72, 1.12], 'LeftShoulder');
+  sphere(.20, [.60, 1.08, 0], armor, hips, [1.08, .72, 1.12], 'RightShoulder');
+  box([.26, .09, .46], [-.63, .89, -.04], armorDark, hips, 'LeftShoulderStrap', [0,0,-.05]);
+  box([.26, .09, .46], [.63, .89, -.04], armorDark, hips, 'RightShoulderStrap', [0,0,.05]);
 
-  // Neck, headset, and combat helmet.
-  cyl(.16, .18, .22, [0, 1.28, 0], skin, hips, [0,0,0], 'Neck');
-  const head = sphere(.39, [0, 1.57, 0], skin, hips, [1, 1.05, .94], 'RagdollHead');
-  sphere(.46, [0, 1.79, 0], rubber, hips, [1.03, .64, 1.0], 'CombatHelmet');
-  box([.62, .15, .12], [0, 1.72, -.37], armorDark, hips, 'HelmetVisorFrame');
-  box([.49, .08, .045], [0, 1.72, -.42], lens, hips, 'HelmetVisor');
-  box([.12, .23, .09], [-.43, 1.61, -.02], rubber, hips, 'HeadsetLeft');
-  box([.12, .23, .09], [.43, 1.61, -.02], rubber, hips, 'HeadsetRight');
-  cyl(.035, .035, .22, [.27, 1.86, .03], trim, hips, [0, 0, Math.PI / 2], 'HelmetMount');
+  // Battle belt, holsters and side pouches.
+  box([1.02, .18, .70], [0, .22, 0], clothMid, hips, 'BattleBelt');
+  box([.22, .26, .18], [-.48, .18, -.40], rubber, hips, 'LeftHipPouch');
+  box([.22, .26, .18], [.48, .18, -.40], rubber, hips, 'RightHipPouch');
+  box([.18, .30, .22], [-.42, .02, -.35], armorBlack, hips, 'LeftUtilityPouch');
+  box([.18, .30, .22], [.42, .02, -.35], armorBlack, hips, 'RightUtilityPouch');
+  torus(.08, .018, [-.26, .25, -.38], metal, hips, [Math.PI/2,0,0], Math.PI * 1.55, 'BeltBuckle');
 
-  // Left arm with elbow articulation.
+  // Backpack with straps, side cells and radio.
+  box([.68, .78, .30], [0, .58, .43], clothMid, hips, 'Backpack');
+  box([.50, .28, .20], [0, .72, .60], rubber, hips, 'PackTop');
+  box([.10, .56, .08], [-.38, .60, .37], armorBlack, hips, 'PackLeftStrap');
+  box([.10, .56, .08], [.38, .60, .37], armorBlack, hips, 'PackRightStrap');
+  box([.20, .34, .22], [-.27, .55, .56], cloth, hips, 'PackSideLeft');
+  box([.20, .34, .22], [.27, .55, .56], cloth, hips, 'PackSideRight');
+  cyl(.018, .027, .76, [.23, 1.16, .50], trim, hips, [0,0,-.12], 8, 'RadioAntenna');
+  box([.18, .30, .10], [.28, 1.02, .48], rubber, hips, 'RadioBody');
+
+  // Neck / jaw / head.
+  cyl(.16, .18, .22, [0, 1.27, 0], skin, hips, [0,0,0], 12, 'Neck');
+  sphere(.39, [0, 1.56, 0], skin, hips, [1, 1.06, .95], 'RagdollHead');
+  box([.50, .22, .34], [0, 1.44, -.03], skinDark, hips, 'JawShadow');
+  box([.18, .10, .08], [-.13, 1.61, -.36], dark, hips, 'LeftEyeline');
+  box([.18, .10, .08], [.13, 1.61, -.36], dark, hips, 'RightEyeline');
+
+  // High-cut helmet, rails, NV mount, straps and visor.
+  sphere(.47, [0, 1.79, 0], rubber, hips, [1.05, .66, 1.02], 'CombatHelmet');
+  box([.66, .11, .13], [0, 1.72, -.38], armorDark, hips, 'HelmetVisorFrame');
+  box([.51, .075, .046], [0, 1.72, -.425], lens, hips, 'HelmetVisor');
+  box([.57, .08, .12], [-.33, 1.81, .03], armorBlack, hips, 'HelmetRailLeft');
+  box([.57, .08, .12], [.33, 1.81, .03], armorBlack, hips, 'HelmetRailRight');
+  box([.18, .13, .12], [0, 1.93, -.07], armorDark, hips, 'NVGMount');
+  torus(.10, .018, [0, 1.92, -.11], metal, hips, [Math.PI/2,0,0], Math.PI * 1.45, 'NVGRing');
+  box([.12, .18, .12], [-.43, 1.61, -.02], rubber, hips, 'HeadsetLeft');
+  box([.12, .18, .12], [.43, 1.61, -.02], rubber, hips, 'HeadsetRight');
+  cyl(.018, .018, .25, [.45, 1.48, -.05], metal, hips, [0,0,Math.PI/2], 8, 'HeadsetMic');
+
+  // Arms with articulated elbows, forearm armor, gloves and wrist hardware.
   const leftArm = new THREE.Group();
   leftArm.name = 'RagdollLeftArm';
-  leftArm.position.set(-.70, 1.05, 0);
+  leftArm.position.set(-.70, 1.04, 0);
   hips.add(leftArm);
-  sphere(.17, [0, .03, 0], armor, leftArm, [1, .85, 1.05], 'LeftShoulderCap');
-  box([.31, .62, .32], [0, -.34, 0], armor, leftArm, 'LeftUpperArm');
+  sphere(.18, [0, .03, 0], armor, leftArm, [1.05, .9, 1.1], 'LeftShoulderCap');
+  box([.34, .62, .34], [0, -.33, 0], clothMid, leftArm, 'LeftUpperArm');
+  box([.29, .48, .31], [0, -.36, -.06], armorDark, leftArm, 'LeftUpperArmor', [0,0,-.03]);
   const leftElbow = new THREE.Group();
   leftElbow.name = 'RagdollLeftElbow';
   leftElbow.position.set(0, -.68, 0);
   leftArm.add(leftElbow);
-  sphere(.14, [0,0,0], armorDark, leftElbow, [1, .9, 1], 'LeftElbowPad');
-  box([.29, .58, .30], [0, -.32, 0], armorDark, leftElbow, 'LeftForearm');
-  box([.28, .20, .32], [0, -.68, -.01], rubber, leftElbow, 'LeftGlove');
+  sphere(.15, [0,0,0], armorDark, leftElbow, [1, .95, 1.05], 'LeftElbowPad');
+  box([.31, .58, .30], [0, -.32, 0], cloth, leftElbow, 'LeftForearm');
+  box([.26, .43, .33], [0, -.34, -.05], armor, leftElbow, 'LeftForearmGuard');
+  box([.30, .20, .34], [0, -.68, -.01], rubber, leftElbow, 'LeftGlove');
+  for (const x of [-.08, 0, .08]) box([.035, .13, .11], [x, -.78, -.08], clothMid, leftElbow);
 
-  // Right arm with elbow articulation.
   const rightArm = new THREE.Group();
   rightArm.name = 'RagdollRightArm';
-  rightArm.position.set(.70, 1.05, 0);
+  rightArm.position.set(.70, 1.04, 0);
   hips.add(rightArm);
-  sphere(.17, [0, .03, 0], armor, rightArm, [1, .85, 1.05], 'RightShoulderCap');
-  box([.31, .62, .32], [0, -.34, 0], armor, rightArm, 'RightUpperArm');
+  sphere(.18, [0, .03, 0], armor, rightArm, [1.05, .9, 1.1], 'RightShoulderCap');
+  box([.34, .62, .34], [0, -.33, 0], clothMid, rightArm, 'RightUpperArm');
+  box([.29, .48, .31], [0, -.36, -.06], armorDark, rightArm, 'RightUpperArmor', [0,0,.03]);
   const rightElbow = new THREE.Group();
   rightElbow.name = 'RagdollRightElbow';
   rightElbow.position.set(0, -.68, 0);
   rightArm.add(rightElbow);
-  sphere(.14, [0,0,0], armorDark, rightElbow, [1, .9, 1], 'RightElbowPad');
-  box([.29, .58, .30], [0, -.32, 0], armorDark, rightElbow, 'RightForearm');
-  box([.28, .20, .32], [0, -.68, -.01], rubber, rightElbow, 'RightGlove');
+  sphere(.15, [0,0,0], armorDark, rightElbow, [1, .95, 1.05], 'RightElbowPad');
+  box([.31, .58, .30], [0, -.32, 0], cloth, rightElbow, 'RightForearm');
+  box([.26, .43, .33], [0, -.34, -.05], armor, rightElbow, 'RightForearmGuard');
+  box([.30, .20, .34], [0, -.68, -.01], rubber, rightElbow, 'RightGlove');
+  for (const x of [-.08, 0, .08]) box([.035, .13, .11], [x, -.78, -.08], clothMid, rightElbow);
 
-  // Assault rifle silhouette.
+  // Visible rifle with more than a silhouette.
   const rifle = new THREE.Group();
   rifle.name = 'Rifle';
   rifle.position.set(.20, .58, -.42);
   rifle.rotation.set(.02, 0, -.08);
   hips.add(rifle);
-  box([.18, .20, .90], [0, 0, -.35], armorDark, rifle, 'RifleReceiver');
-  box([.14, .16, .64], [0, .03, -.92], rubber, rifle, 'RifleHandguard');
-  box([.10, .10, .55], [0, .04, -1.28], trim, rifle, 'RifleBarrel');
-  box([.14, .16, .44], [0, -.03, .24], rubber, rifle, 'RifleStock');
-  box([.14, .35, .24], [0, -.25, -.38], rubber, rifle, 'RifleMagazine');
-  box([.16, .07, .28], [0, .15, -.55], armorDark, rifle, 'RifleRail');
-  box([.13, .10, .20], [0, .23, -.55], lens, rifle, 'RifleOptic');
-  box([.15, .26, .16], [0, -.22, -.76], rubber, rifle, 'RifleGrip');
 
-  // Left leg with knee articulation.
-  const leftLeg = new THREE.Group();
-  leftLeg.name = 'RagdollLeftLeg';
-  leftLeg.position.set(-.29, .08, 0);
-  hips.add(leftLeg);
-  box([.39, .72, .42], [0, -.38, 0], cloth, leftLeg, 'LeftThigh');
-  box([.47, .20, .45], [0, -.62, -.02], armorDark, leftLeg, 'LeftKneePad');
-  const leftKnee = new THREE.Group();
-  leftKnee.name = 'RagdollLeftKnee';
-  leftKnee.position.set(0, -.76, 0);
-  leftLeg.add(leftKnee);
-  box([.34, .62, .36], [0, -.31, 0], armor, leftKnee, 'LeftShin');
-  box([.42, .25, .64], [0, -.66, -.08], rubber, leftKnee, 'LeftBoot');
+  box([.20, .22, .94], [0, 0, -.34], armorDark, rifle, 'RifleReceiver');
+  box([.15, .17, .65], [0, .03, -.93], rubber, rifle, 'RifleHandguard');
+  box([.08, .10, .57], [0, .04, -1.27], metal, rifle, 'RifleBarrel');
+  box([.15, .17, .44], [0, -.03, .24], rubber, rifle, 'RifleStock');
+  box([.15, .36, .25], [0, -.25, -.38], rubber, rifle, 'RifleMagazine');
+  box([.18, .07, .30], [0, .15, -.55], armorDark, rifle, 'RifleRail');
+  box([.13, .11, .20], [0, .23, -.55], lens, rifle, 'RifleOptic');
+  box([.15, .26, .17], [0, -.22, -.76], rubber, rifle, 'RifleGrip');
+  cyl(.05, .06, .16, [0, .04, -1.58], armorBlack, rifle, [Math.PI/2,0,0], 10, 'RifleMuzzle');
+  box([.05, .05, .20], [.11, .05, -1.17], metal, rifle);
+  box([.05, .05, .20], [-.11, .05, -1.17], metal, rifle);
 
-  // Right leg with knee articulation.
-  const rightLeg = new THREE.Group();
-  rightLeg.name = 'RagdollRightLeg';
-  rightLeg.position.set(.29, .08, 0);
-  hips.add(rightLeg);
-  box([.39, .72, .42], [0, -.38, 0], cloth, rightLeg, 'RightThigh');
-  box([.47, .20, .45], [0, -.62, -.02], armorDark, rightLeg, 'RightKneePad');
-  const rightKnee = new THREE.Group();
-  rightKnee.name = 'RagdollRightKnee';
-  rightKnee.position.set(0, -.76, 0);
-  rightLeg.add(rightKnee);
-  box([.34, .62, .36], [0, -.31, 0], armor, rightKnee, 'RightShin');
-  box([.42, .25, .64], [0, -.66, -.08], rubber, rightKnee, 'RightBoot');
+  // Legs with layered pants, knee shells, shin guards and proper boots.
+  const makeLeg = (side, name, kneeName) => {
+    const leg = new THREE.Group();
+    leg.name = name;
+    leg.position.set(side * .29, .08, 0);
+    hips.add(leg);
+    box([.41, .74, .44], [0, -.38, 0], cloth, leg, side < 0 ? 'LeftThigh' : 'RightThigh');
+    box([.35, .48, .44], [0, -.39, -.07], clothMid, leg, side < 0 ? 'LeftThighArmor' : 'RightThighArmor', [0,0,side * .04]);
+    box([.46, .12, .48], [0, -.66, -.03], armorDark, leg, side < 0 ? 'LeftKneePad' : 'RightKneePad');
+    const knee = new THREE.Group();
+    knee.name = kneeName;
+    knee.position.set(0, -.76, 0);
+    leg.add(knee);
+    box([.36, .64, .38], [0, -.32, 0], cloth, knee, side < 0 ? 'LeftShin' : 'RightShin');
+    box([.29, .46, .40], [0, -.34, -.08], armor, knee, side < 0 ? 'LeftShinGuard' : 'RightShinGuard');
+    box([.44, .26, .68], [0, -.68, -.08], rubber, knee, side < 0 ? 'LeftBoot' : 'RightBoot');
+    box([.46, .08, .25], [0, -.78, -.16], armorBlack, knee);
+    box([.10, .08, .16], [side * .15, -.79, -.20], metal, knee);
+    return { leg, knee };
+  };
 
-  // Split the soldier around the waist so the upper and lower body can
-  // move independently during animation and ragdoll collapse.
+  const leftLegParts = makeLeg(-1, 'RagdollLeftLeg', 'RagdollLeftKnee');
+  const rightLegParts = makeLeg(1, 'RagdollRightLeg', 'RagdollRightKnee');
+  const leftLeg = leftLegParts.leg;
+  const rightLeg = rightLegParts.leg;
+  const leftKnee = leftLegParts.knee;
+  const rightKnee = rightLegParts.knee;
+
+  // Keep the upper/lower hierarchy required by the ragdoll solver.
   const lowerBody = new THREE.Group();
   lowerBody.name = 'RagdollLowerBody';
   hips.add(lowerBody);
@@ -554,13 +639,14 @@ function spawnEnemyModel() {
   for (const child of [...hips.children]) {
     if (child === lowerBody || child === upperBody) continue;
 
-    // Legs and pelvis/belt equipment belong to the lower body.
     const isLower =
       child === leftLeg ||
       child === rightLeg ||
       child.name === 'BattleBelt' ||
       child.name === 'LeftHipPouch' ||
-      child.name === 'RightHipPouch';
+      child.name === 'RightHipPouch' ||
+      child.name === 'LeftUtilityPouch' ||
+      child.name === 'RightUtilityPouch';
 
     (isLower ? lowerBody : upperBody).add(child);
   }
@@ -581,7 +667,6 @@ function spawnEnemyModel() {
     rifle,
   };
   group.userData.visuals = { armor, lens };
-
   group.userData.baseScale = .54;
   group.scale.setScalar(group.userData.baseScale);
   return group;
