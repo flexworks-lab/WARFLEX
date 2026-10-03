@@ -96,6 +96,7 @@ const enemies = [];
 const tracers = [];
 const particles = [];
 const ragdolls = [];
+const droppedGuns = [];
 const shellCasings = [];
 const arenaLights = [];
 
@@ -577,6 +578,8 @@ function resetGame() {
   particles.length = 0;
   for (const rag of ragdolls) scene.remove(rag.group);
   ragdolls.length = 0;
+  for (const gun of droppedGuns) scene.remove(gun.mesh);
+  droppedGuns.length = 0;
   for (const shell of shellCasings) scene.remove(shell.mesh);
   shellCasings.length = 0;
 
@@ -733,14 +736,16 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
       lower,
       upperAngle: 0,
       lowerAngle: 0,
-      upperVelocity: (Math.random() - .5) * (isArm ? 6.5 : 4.5) + impactSide * .9,
-      lowerVelocity: (Math.random() - .5) * (isArm ? 8 : 6) + impactBack * .7,
-      upperTarget: (Math.random() - .5) * (isArm ? .32 : .20) + impactBack * .10,
-      lowerTarget: (Math.random() - .5) * (isArm ? .26 : .18),
+      // Strong initial impulse makes limbs visibly fling away from the hit.
+      upperVelocity: (Math.random() - .5) * (isArm ? 15 : 9) + impactSide * (isArm ? 3.2 : 1.8),
+      lowerVelocity: (Math.random() - .5) * (isArm ? 18 : 12) + impactBack * (isArm ? 2.8 : 2.1),
+      upperTarget: (Math.random() - .5) * (isArm ? .45 : .32) + impactBack * .16,
+      lowerTarget: (Math.random() - .5) * (isArm ? .38 : .28),
       upperLimit,
       lowerLimit,
-      damping: isArm ? 2.6 : 3.0,
-      targetDecay: isArm ? 1.15 : 1.45,
+      damping: isArm ? 1.55 : 2.15,
+      targetDecay: isArm ? .72 : .95,
+      fling: isArm ? 1.4 : 1.0,
     };
   }).filter(j => j.upper && j.lower);
 
@@ -771,6 +776,35 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
   const side = direction
     ? new THREE.Vector3(-direction.z, 0, direction.x).multiplyScalar((Math.random() - .5) * 2.8)
     : new THREE.Vector3();
+
+  // Detach a real dropped rifle from the dead soldier.
+  const droppedRifle = ragParts.rifle;
+  let droppedGun = null;
+  if (droppedRifle) {
+    scene.attach(droppedRifle);
+    droppedRifle.visible = true;
+    const gunVelocity = direction
+      ? direction.clone().multiplyScalar(2.4 + Math.random() * 1.8)
+      : new THREE.Vector3();
+    gunVelocity.y = 2.2 + Math.random() * 1.8;
+    gunVelocity.x += (Math.random() - .5) * 2.2;
+    gunVelocity.z += (Math.random() - .5) * 2.2;
+
+    const gunSpin = new THREE.Vector3(
+      (Math.random() - .5) * 16,
+      (Math.random() - .5) * 18,
+      (Math.random() - .5) * 16
+    );
+
+    droppedGun = {
+      mesh: droppedRifle,
+      velocity: gunVelocity,
+      angularVelocity: gunSpin,
+      bounds: new THREE.Box3(),
+      life: 9 + Math.random() * 3,
+    };
+    droppedGuns.push(droppedGun);
+  }
 
   ragdolls.push({
     group: fallPivot,
@@ -1268,16 +1302,18 @@ function updateRagdolls(dt) {
       joint.upperTarget *= Math.exp(-joint.targetDecay * dt);
       joint.lowerTarget *= Math.exp(-joint.targetDecay * dt);
 
+      // Preserve a fast fling for the first part of the fall, then damp naturally.
+      const flingDamping = rag.age < .55 ? .45 : .95;
       joint.upperVelocity += (
-        (joint.upperTarget - joint.upperAngle) * 9.0 -
-        joint.upperVelocity * joint.damping
+        (joint.upperTarget - joint.upperAngle) * 7.5 -
+        joint.upperVelocity * (joint.damping * flingDamping)
       ) * dt;
       joint.upperAngle += joint.upperVelocity * dt;
       joint.upperAngle = THREE.MathUtils.clamp(joint.upperAngle, -joint.upperLimit, joint.upperLimit);
 
       joint.lowerVelocity += (
-        (joint.lowerTarget - joint.lowerAngle) * 11.0 -
-        joint.lowerVelocity * joint.damping
+        (joint.lowerTarget - joint.lowerAngle) * 8.5 -
+        joint.lowerVelocity * (joint.damping * flingDamping)
       ) * dt;
       joint.lowerAngle += joint.lowerVelocity * dt;
       joint.lowerAngle = THREE.MathUtils.clamp(joint.lowerAngle, -joint.lowerLimit, joint.lowerLimit);
@@ -1336,6 +1372,31 @@ function updateRagdolls(dt) {
     if (rag.life <= 0) {
       scene.remove(rag.group);
       ragdolls.splice(i, 1);
+    }
+  }
+
+  for (let i = droppedGuns.length - 1; i >= 0; i -= 1) {
+    const gun = droppedGuns[i];
+    gun.life -= dt;
+
+    gun.velocity.y -= CONFIG.ragdollGravity * dt;
+    gun.mesh.position.addScaledVector(gun.velocity, dt);
+    gun.mesh.rotation.x += gun.angularVelocity.x * dt;
+    gun.mesh.rotation.y += gun.angularVelocity.y * dt;
+    gun.mesh.rotation.z += gun.angularVelocity.z * dt;
+
+    gun.bounds.setFromObject(gun.mesh);
+    if (gun.bounds.min.y < .025) {
+      gun.mesh.position.y += .025 - gun.bounds.min.y;
+      gun.velocity.y = Math.max(0, gun.velocity.y);
+      gun.velocity.x *= Math.exp(-3.2 * dt);
+      gun.velocity.z *= Math.exp(-3.2 * dt);
+      gun.angularVelocity.multiplyScalar(Math.exp(-2.8 * dt));
+    }
+
+    if (gun.life <= 0) {
+      scene.remove(gun.mesh);
+      droppedGuns.splice(i, 1);
     }
   }
 
