@@ -226,3 +226,180 @@ button:active { transform: translateY(0); }
   .wave-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .wave-choice.wide { grid-column: span 2; }
 }
+
+/* Atmospheric gothic menu */
+.gothic-screen {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(75,93,111,.13), transparent 34%),
+    radial-gradient(circle at 50% 82%, rgba(21,28,35,.6), rgba(2,4,6,.98) 72%);
+}
+.gothic-screen::before,
+.gothic-screen::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+}
+.gothic-screen::before {
+  opacity: .5;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(255,255,255,.08) 0 1px, transparent 2px),
+    radial-gradient(circle at 82% 26%, rgba(255,255,255,.06) 0 1px, transparent 2px),
+    radial-gradient(circle at 32% 76%, rgba(255,255,255,.05) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 74%, rgba(255,255,255,.05) 0 1px, transparent 2px);
+  background-size: 220px 220px, 270px 270px, 190px 190px, 250px 250px;
+}
+.gothic-screen::after {
+  border: 1px solid rgba(208,220,230,.05);
+  box-shadow: inset 0 0 150px rgba(0,0,0,.82);
+}
+.menu-mist {
+  position: absolute;
+  inset: -15%;
+  pointer-events: none;
+  opacity: .35;
+  background:
+    radial-gradient(ellipse at 48% 56%, rgba(188,204,215,.07), transparent 30%),
+    radial-gradient(ellipse at 55% 68%, rgba(122,145,159,.05), transparent 36%);
+  filter: blur(24px);
+  animation: mistDrift 13s ease-in-out infinite alternate;
+}
+@keyframes mistDrift {
+  from { transform: translate3d(-1.5%,0,0) scale(1); }
+  to { transform: translate3d(1.5%,-1%,0) scale(1.04); }
+}
+.gothic-panel {
+  width: min(790px, calc(100vw - 32px));
+  padding: clamp(34px, 6vw, 64px);
+  background:
+    linear-gradient(180deg, rgba(12,16,20,.82), rgba(7,9,12,.88));
+  border: 1px solid rgba(196,210,220,.14);
+  box-shadow:
+    0 30px 110px rgba(0,0,0,.72),
+    inset 0 1px 0 rgba(255,255,255,.03);
+}
+.menu-crest {
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 18px;
+  position: relative;
+  opacity: .9;
+  filter: drop-shadow(0 0 16px rgba(213,224,232,.08));
+}
+.crest-ring {
+  position: absolute;
+  inset: 13px;
+  border: 2px solid rgba(218,228,235,.55);
+  border-radius: 50%;
+}
+.crest-eye {
+  position: absolute;
+  left: 50%;
+  top: 38px;
+  width: 18px;
+  height: 11px;
+  transform: translateX(-50%);
+  border: 2px solid rgba(237,242,245,.82);
+  border-radius: 60% 20% 60% 20%;
+  rotate: 45deg;
+}
+.crest-horn {
+  position: absolute;
+  top: 3px;
+  width: 18px;
+  height: 42px;
+  border: 2px solid rgba(218,228,235,.5);
+  border-bottom: 0;
+  border-radius: 100% 100% 0 0;
+}
+.crest-horn.left {
+  left: 16px;
+  rotate: -24deg;
+}
+.crest-horn.right {
+  right: 16px;
+  rotate: 24deg;
+}
+.gothic-eyebrow {
+  color: #8f9ba5;
+  letter-spacing: .28em;
+  text-align: center;
+}
+.gothic-title {
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  letter-spacing: .015em;
+  text-shadow: 0 3px 18px rgba(0,0,0,.55);
+}
+.gothic-title span {
+  color: #d4dce2;
+  font-style: italic;
+}
+.menu-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(400px, 80%);
+  margin: 18px auto 8px;
+}
+.menu-divider i {
+  height: 1px;
+  flex: 1;
+  background: linear-gradient(90deg, transparent, rgba(214,224,231,.34));
+}
+.menu-divider i:last-child {
+  background: linear-gradient(90deg, rgba(214,224,231,.34), transparent);
+}
+.menu-divider b {
+  color: #cbd6de;
+  font-size: 12px;
+  font-weight: 400;
+}
+.gothic-lede {
+  margin: 8px auto 28px;
+  max-width: 560px;
+  text-align: center;
+  color: #929ca5;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.55;
+}
+.menu-subtitle {
+  margin: 24px 0 10px;
+  text-align: center;
+  color: #6f7c87;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .34em;
+}
+.menu-controls {
+  border-top: 1px solid rgba(255,255,255,.05);
+  padding-top: 18px;
+}
+.gothic-panel .wave-choice {
+  background: rgba(255,255,255,.025);
+  border-color: rgba(210,220,228,.09);
+  font-family: Georgia, "Times New Roman", serif;
+}
+.gothic-panel .wave-choice strong {
+  font-size: 26px;
+  font-weight: 500;
+}
+.gothic-panel .wave-choice span {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+.gothic-panel .wave-choice.active {
+  background: linear-gradient(180deg, rgba(210,220,228,.12), rgba(210,220,228,.035));
+  border-color: rgba(218,228,235,.42);
+}
+.gothic-panel .deploy-button {
+  border: 1px solid rgba(226,234,239,.12);
+  background: linear-gradient(180deg, #edf2f4, #cad3d9);
+  box-shadow: 0 12px 30px rgba(0,0,0,.28);
+}
+@media (max-width: 640px) {
+  .menu-crest { width: 72px; height: 72px; }
+  .gothic-title { font-size: 48px; }
+  .gothic-lede { font-size: 15px; }
+}
