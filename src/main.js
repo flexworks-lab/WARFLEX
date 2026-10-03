@@ -36,6 +36,11 @@ const els = {
   finalWave: document.querySelector('#final-wave'),
   finalKills: document.querySelector('#final-kills'),
   finalScore: document.querySelector('#final-score'),
+  updateNotice: document.querySelector('#update-notice'),
+  updateTitle: document.querySelector('#update-title'),
+  updateMessage: document.querySelector('#update-message'),
+  updateReload: document.querySelector('#update-reload'),
+  updateDismiss: document.querySelector('#update-dismiss'),
 };
 
 const scene = new THREE.Scene();
@@ -95,6 +100,43 @@ const player = {
   position: new THREE.Vector3(0, 1.65, 18),
   radius: 0.45,
 };
+
+const UPDATE_STORAGE_KEY = 'warfex:lastSeenUpdate';
+let pendingUpdate = null;
+
+function showUpdateNotification(info, live = false) {
+  pendingUpdate = info;
+  els.updateTitle.textContent = 'UPDATE AVAILABLE';
+  els.updateMessage.textContent = info.message || 'A new WARFLEX update is ready. Reload to get the latest version.';
+  els.updateNotice.classList.remove('hidden');
+
+  if (live && 'Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification('WARFLEX updated', {
+        body: info.message || 'A new update is ready to install.',
+        tag: 'warfex-update',
+      });
+    } catch {}
+  }
+}
+
+async function checkForUpdates(initial = false) {
+  try {
+    const response = await fetch(`./update.json?ts=${Date.now()}`, { cache: 'no-store' });
+    if (!response.ok) return;
+    const info = await response.json();
+    if (!info?.version) return;
+
+    const seen = localStorage.getItem(UPDATE_STORAGE_KEY);
+    if (!seen) {
+      localStorage.setItem(UPDATE_STORAGE_KEY, info.version);
+      return;
+    }
+    if (seen !== info.version) showUpdateNotification(info, !initial);
+  } catch {
+    // The game still works when the update manifest is temporarily unavailable.
+  }
+}
 
 function makeBox(size, position, color, cast = true) {
   const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
@@ -733,6 +775,15 @@ function enterGame() {
 els.startButton.addEventListener('click', enterGame);
 els.resumeButton.addEventListener('click', () => renderer.domElement.requestPointerLock());
 els.restartButton.addEventListener('click', enterGame);
+els.updateReload.addEventListener('click', () => {
+  if (pendingUpdate?.version) localStorage.setItem(UPDATE_STORAGE_KEY, pendingUpdate.version);
+  location.reload();
+});
+els.updateDismiss.addEventListener('click', () => {
+  if (pendingUpdate?.version) localStorage.setItem(UPDATE_STORAGE_KEY, pendingUpdate.version);
+  pendingUpdate = null;
+  els.updateNotice.classList.add('hidden');
+});
 
 window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyR') reload();
@@ -777,4 +828,6 @@ window.addEventListener('resize', () => {
 });
 
 camera.position.set(0, 0, 0);
+checkForUpdates(true);
+setInterval(() => checkForUpdates(false), 30000);
 frame();
