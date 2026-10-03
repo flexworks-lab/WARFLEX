@@ -840,10 +840,167 @@ function spawnWave() {
   requestAnimationFrame(spawnNext);
 }
 
+function createEnemyFallbackModel() {
+  const group = new THREE.Group();
+  group.name = 'EnemySoldierFallback';
+
+  const armor = new THREE.MeshStandardMaterial({
+    color: 0x687783,
+    roughness: .42,
+    metalness: .38,
+    emissive: 0x0a1015,
+    emissiveIntensity: .18,
+  });
+  const dark = new THREE.MeshStandardMaterial({
+    color: 0x20272e,
+    roughness: .7,
+    metalness: .15,
+  });
+  const skin = new THREE.MeshStandardMaterial({ color: 0x9a7864, roughness: .92 });
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0x0b1c24,
+    emissive: 0x217f9d,
+    emissiveIntensity: 1.4,
+    metalness: .5,
+    roughness: .15,
+  });
+
+  const hips = new THREE.Group();
+  hips.name = 'RagdollHips';
+  hips.position.y = 1.42;
+  group.add(hips);
+
+  const upperBody = new THREE.Group();
+  upperBody.name = 'RagdollUpperBody';
+  hips.add(upperBody);
+
+  const lowerBody = new THREE.Group();
+  lowerBody.name = 'RagdollLowerBody';
+  hips.add(lowerBody);
+
+  const box = (size, pos, mat, parent, name) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+    m.position.set(...pos);
+    m.name = name;
+    m.castShadow = true;
+    m.receiveShadow = true;
+    m.frustumCulled = false;
+    parent.add(m);
+    return m;
+  };
+  const sphere = (r, pos, mat, parent, name) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), mat);
+    m.position.set(...pos);
+    m.name = name;
+    m.castShadow = true;
+    m.receiveShadow = true;
+    m.frustumCulled = false;
+    parent.add(m);
+    return m;
+  };
+
+  box([1.05, 1.15, .65], [0, .64, 0], dark, upperBody, 'Torso');
+  box([.86, .50, .73], [0, .82, -.08], armor, upperBody, 'ChestPlate');
+  sphere(.21, [-.60, 1.05, 0], armor, upperBody, 'LeftShoulder');
+  sphere(.21, [.60, 1.05, 0], armor, upperBody, 'RightShoulder');
+  sphere(.37, [0, 1.55, 0], skin, upperBody, 'RagdollHead');
+  sphere(.44, [0, 1.78, 0], dark, upperBody, 'CombatHelmet');
+  box([.54, .08, .07], [0, 1.72, -.39], glass, upperBody, 'HelmetVisor');
+
+  const makeArm = (side, armName, elbowName) => {
+    const arm = new THREE.Group();
+    arm.name = armName;
+    arm.position.set(side * .68, 1.02, 0);
+    hips.add(arm);
+    box([.30, .62, .32], [0, -.33, 0], armor, arm, side < 0 ? 'LeftUpperArm' : 'RightUpperArm');
+    const elbow = new THREE.Group();
+    elbow.name = elbowName;
+    elbow.position.y = -.68;
+    arm.add(elbow);
+    sphere(.14, [0,0,0], dark, elbow, side < 0 ? 'LeftElbowPad' : 'RightElbowPad');
+    box([.28, .58, .30], [0, -.32, 0], armor, elbow, side < 0 ? 'LeftForearm' : 'RightForearm');
+    box([.30, .20, .32], [0, -.67, 0], dark, elbow, side < 0 ? 'LeftGlove' : 'RightGlove');
+    return arm;
+  };
+
+  const leftArm = makeArm(-1, 'RagdollLeftArm', 'RagdollLeftElbow');
+  const rightArm = makeArm(1, 'RagdollRightArm', 'RagdollRightElbow');
+
+  const makeLeg = (side, legName, kneeName) => {
+    const leg = new THREE.Group();
+    leg.name = legName;
+    leg.position.set(side * .29, .08, 0);
+    hips.add(leg);
+    box([.39, .72, .42], [0,-.38,0], dark, leg, side < 0 ? 'LeftThigh' : 'RightThigh');
+    box([.43, .14, .45], [0,-.66,-.03], armor, leg, side < 0 ? 'LeftKneePad' : 'RightKneePad');
+    const knee = new THREE.Group();
+    knee.name = kneeName;
+    knee.position.y = -.76;
+    leg.add(knee);
+    box([.34, .62, .36], [0,-.31,0], armor, knee, side < 0 ? 'LeftShin' : 'RightShin');
+    box([.45, .25, .64], [0,-.66,-.08], dark, knee, side < 0 ? 'LeftBoot' : 'RightBoot');
+    return leg;
+  };
+
+  const leftLeg = makeLeg(-1, 'RagdollLeftLeg', 'RagdollLeftKnee');
+  const rightLeg = makeLeg(1, 'RagdollRightLeg', 'RagdollRightKnee');
+
+  const rifle = new THREE.Group();
+  rifle.name = 'Rifle';
+  rifle.position.set(.18, .55, -.42);
+  hips.add(rifle);
+  box([.18,.20,.92],[0,0,-.35],dark,rifle,'RifleReceiver');
+  box([.12,.12,.72],[0,.02,-.95],armor,rifle,'RifleHandguard');
+  box([.07,.07,.60],[0,.03,-1.30],glass,rifle,'RifleBarrel');
+  box([.15,.34,.24],[0,-.24,-.38],dark,rifle,'RifleMagazine');
+
+  group.userData.parts = {
+    hips, lowerBody, upperBody,
+    leftArm, rightArm,
+    leftLeg, rightLeg,
+    leftKnee: leftLeg.getObjectByName('RagdollLeftKnee'),
+    rightKnee: rightLeg.getObjectByName('RagdollRightKnee'),
+    head: group.getObjectByName('RagdollHead'),
+    rifle,
+  };
+  group.userData.visuals = { armor, lens: glass };
+  group.userData.baseScale = .54;
+
+  group.traverse((o) => {
+    if (o.isMesh) {
+      o.visible = true;
+      o.frustumCulled = false;
+    }
+  });
+
+  return group;
+}
+
 function spawnEnemy(index = 0) {
-  const group = spawnEnemyModel();
+  let group;
+  let usedFallback = false;
+
+  try {
+    group = spawnEnemyModel();
+    let meshCount = 0;
+    group.traverse((o) => { if (o.isMesh) meshCount += 1; });
+    if (!meshCount) throw new Error('Enemy model was created without renderable meshes.');
+  } catch (error) {
+    usedFallback = true;
+    showRuntimeError(error, 'Enemy model construction failed; using fallback model');
+    group = createEnemyFallbackModel();
+  }
+
   const spawn = getSpawnPoint(index);
   group.position.copy(spawn);
+  group.visible = true;
+  group.updateMatrixWorld(true);
+  group.traverse((o) => {
+    if (o.isMesh) {
+      o.visible = true;
+      o.frustumCulled = false;
+    }
+  });
 
   const roll = Math.random();
   let role = 'rusher';
@@ -866,6 +1023,7 @@ function spawnEnemy(index = 0) {
   }
 
   group.userData.role = role;
+  group.userData.usedFallback = usedFallback;
   scene.add(group);
 
   enemies.push({
