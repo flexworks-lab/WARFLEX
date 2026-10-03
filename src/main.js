@@ -540,13 +540,26 @@ function spawnEnemyModel() {
   box([.34, .62, .36], [0, -.31, 0], armor, rightKnee, 'RightShin');
   box([.42, .25, .64], [0, -.66, -.08], rubber, rightKnee, 'RightBoot');
 
+  // Upper body gets its own spine pivot so aiming, breathing, and ragdoll collapse
+  // can move independently from the pelvis and legs.
+  const upperBody = new THREE.Group();
+  upperBody.name = 'RagdollSpine';
+  hips.add(upperBody);
+  for (const child of [...hips.children]) {
+    if (child !== upperBody && child !== leftLeg && child !== rightLeg) upperBody.add(child);
+  }
+
   group.userData.parts = {
     hips,
+    upperBody,
     leftArm,
     rightArm,
     leftLeg,
     rightLeg,
+    leftKnee,
+    rightKnee,
     head,
+    rifle,
   };
   group.userData.visuals = { armor, lens };
 
@@ -653,6 +666,8 @@ function spawnEnemy(index = 0) {
     baseScale: group.userData.baseScale || .54,
     phase: Math.random() * Math.PI * 2,
     walkTime: Math.random() * Math.PI * 2,
+    animTime: Math.random() * Math.PI * 2,
+    shootRecoil: 0,
     strafeSign: Math.random() < .5 ? -1 : 1,
     strafeTimer: .5 + Math.random(),
     hurtFlash: 0,
@@ -669,7 +684,7 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
   model.visible = true;
   model.scale.setScalar(enemy.baseScale || enemy.group.userData.baseScale || .54);
 
-  // Rotate around the soldier's hips, not the feet, so the body can actually fall onto the floor.
+  // Rotate around the soldier's hips, not the feet, so the body collapses instead of spinning around its feet.
   const fallPivot = new THREE.Group();
   fallPivot.name = 'RagdollFallPivot';
   fallPivot.position.copy(enemy.group.position);
@@ -680,40 +695,81 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
   model.position.set(0, -(1.42 * model.scale.x), 0);
   model.rotation.set(0, 0, 0);
   fallPivot.add(model);
+  model.updateMatrixWorld(true);
+
+  const ragParts = {
+    hips: model.getObjectByName('RagdollHips'),
+    upperBody: model.getObjectByName('RagdollSpine'),
+    leftArm: model.getObjectByName('RagdollLeftArm'),
+    rightArm: model.getObjectByName('RagdollRightArm'),
+    leftLeg: model.getObjectByName('RagdollLeftLeg'),
+    rightLeg: model.getObjectByName('RagdollRightLeg'),
+    leftKnee: model.getObjectByName('RagdollLeftKnee'),
+    rightKnee: model.getObjectByName('RagdollRightKnee'),
+    leftElbow: model.getObjectByName('RagdollLeftElbow'),
+    rightElbow: model.getObjectByName('RagdollRightElbow'),
+    head: model.getObjectByName('RagdollHead'),
+    rifle: model.getObjectByName('Rifle'),
+  };
+  model.userData.ragdollParts = ragParts;
+
+  const impactLocal = impactPoint ? model.worldToLocal(impactPoint.clone()) : new THREE.Vector3(0, .6, 0);
+  const impactSide = THREE.MathUtils.clamp(impactLocal.x * 1.2, -.9, .9);
+  const impactBack = THREE.MathUtils.clamp(-impactLocal.z * .9, -.8, .8);
 
   const jointConfigs = [
-    ['RagdollLeftArm', 'RagdollLeftElbow', 1.25, .95],
-    ['RagdollRightArm', 'RagdollRightElbow', 1.25, .95],
-    ['RagdollLeftLeg', 'RagdollLeftKnee', .85, .72],
-    ['RagdollRightLeg', 'RagdollRightKnee', .85, .72],
+    ['RagdollLeftArm', 'RagdollLeftElbow', 1.35, 1.05],
+    ['RagdollRightArm', 'RagdollRightElbow', 1.35, 1.05],
+    ['RagdollLeftLeg', 'RagdollLeftKnee', .95, .78],
+    ['RagdollRightLeg', 'RagdollRightKnee', .95, .78],
   ];
 
   const joints = jointConfigs.map(([upperName, lowerName, upperLimit, lowerLimit]) => {
     const upper = model.getObjectByName(upperName);
     const lower = model.getObjectByName(lowerName);
+    const isArm = upperName.includes('Arm');
     return {
       upper,
       lower,
       upperAngle: 0,
       lowerAngle: 0,
-      upperVelocity: (Math.random() - .5) * 8,
-      lowerVelocity: (Math.random() - .5) * 10,
-      upperTarget: (Math.random() - .5) * .45,
-      lowerTarget: (Math.random() - .5) * .35,
+      upperVelocity: (Math.random() - .5) * (isArm ? 6.5 : 4.5) + impactSide * .9,
+      lowerVelocity: (Math.random() - .5) * (isArm ? 8 : 6) + impactBack * .7,
+      upperTarget: (Math.random() - .5) * (isArm ? .32 : .20) + impactBack * .10,
+      lowerTarget: (Math.random() - .5) * (isArm ? .26 : .18),
       upperLimit,
       lowerLimit,
-      damping: 2.05,
+      damping: isArm ? 2.6 : 3.0,
+      targetDecay: isArm ? 1.15 : 1.45,
     };
   }).filter(j => j.upper && j.lower);
 
-  const kick = headshot ? 5.2 : 3.6;
+  const spine = {
+    object: ragParts.upperBody,
+    angleX: 0,
+    angleZ: 0,
+    velocityX: -impactBack * .7 + (Math.random() - .5) * 2.2,
+    velocityZ: impactSide * .6 + (Math.random() - .5) * 1.8,
+    targetX: THREE.MathUtils.clamp(-impactBack * .22, -.55, .55),
+    targetZ: THREE.MathUtils.clamp(impactSide * .18, -.45, .45),
+  };
+
+  const neck = {
+    object: ragParts.head,
+    angleX: 0,
+    angleY: 0,
+    velocityX: (Math.random() - .5) * 5.5 - impactBack * .55,
+    velocityY: (Math.random() - .5) * 6 + impactSide * .55,
+  };
+
+  const kick = headshot ? 5.4 : 3.8;
   const rootVelocity = direction
     ? direction.clone().multiplyScalar(kick)
     : new THREE.Vector3();
-  rootVelocity.y = headshot ? 3.6 : 2.2;
+  rootVelocity.y = headshot ? 3.8 : 2.35;
 
   const side = direction
-    ? new THREE.Vector3(-direction.z, 0, direction.x).multiplyScalar((Math.random() - .5) * 2.4)
+    ? new THREE.Vector3(-direction.z, 0, direction.x).multiplyScalar((Math.random() - .5) * 2.8)
     : new THREE.Vector3();
 
   ragdolls.push({
@@ -721,14 +777,19 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
     model,
     velocity: rootVelocity.add(side),
     angularVelocity: new THREE.Vector3(
-      (Math.random() - .5) * (headshot ? 5 : 4),
-      (Math.random() - .5) * 8,
+      (Math.random() - .5) * (headshot ? 5.8 : 4.8),
+      (Math.random() - .5) * 9,
       0
     ),
     fallAngle: 0,
     fallVelocity: 0,
-    fallTarget: -Math.PI * .5,
+    fallTarget: -Math.PI * .5 + THREE.MathUtils.clamp(impactSide * .10 + (Math.random() - .5) * .14, -.24, .12),
     joints,
+    spine,
+    neck,
+    age: 0,
+    grounded: false,
+    groundTime: 0,
     life: 12 + Math.random() * 3.5,
   });
 
@@ -1022,6 +1083,7 @@ function enemyShoot(enemy) {
   if (!sight.clear) return false;
 
   enemy.attackTimer = enemy.attackCooldown * (.75 + Math.random() * .5);
+  enemy.shootRecoil = 1;
 
   const direction = new THREE.Vector3().subVectors(sight.target, sight.origin).normalize();
   const accuracy = enemy.role === 'heavy' ? .80 : .68;
@@ -1111,15 +1173,46 @@ function updateEnemies(dt) {
     enemy.group.rotation.y = Math.atan2(faceX, faceZ) + Math.PI;
 
     const parts = enemy.group.userData.parts;
-    const swing = Math.sin(enemy.walkTime + enemy.phase) * (dist > 2.2 ? .6 : .12);
-    parts.leftArm.rotation.x = swing;
-    parts.rightArm.rotation.x = -swing;
-    parts.leftLeg.rotation.x = -swing;
-    parts.rightLeg.rotation.x = swing;
-    parts.hips.position.y = 1.42 + Math.abs(Math.sin(enemy.walkTime * .5)) * .04;
-    parts.head.rotation.y = Math.sin(enemy.walkTime * .25) * .05;
+    enemy.shootRecoil = Math.max(0, enemy.shootRecoil - dt * 7);
+
+    const moveAmount = enemy.role === 'rusher' ? 1 : .48;
+    const stride = Math.sin(enemy.animTime) * moveAmount;
+    const counterStride = Math.sin(enemy.animTime + Math.PI) * moveAmount;
+    const bounce = Math.abs(Math.sin(enemy.animTime * .5)) * (enemy.role === 'rusher' ? .035 : .015);
+    const breath = Math.sin(enemy.animTime * .65 + enemy.phase) * .018;
+    const isAiming = enemy.role !== 'rusher';
+
+    // Procedural locomotion: rushers run, ranged units keep their rifle up.
+    parts.leftLeg.rotation.x = -stride * (enemy.role === 'rusher' ? .72 : .28);
+    parts.rightLeg.rotation.x = -counterStride * (enemy.role === 'rusher' ? .72 : .28);
+    parts.leftKnee.rotation.x = Math.max(0, stride) * (enemy.role === 'rusher' ? .34 : .12);
+    parts.rightKnee.rotation.x = Math.max(0, counterStride) * (enemy.role === 'rusher' ? .34 : .12);
+
+    if (isAiming) {
+      parts.leftArm.rotation.x = -.34 + counterStride * .08 + breath;
+      parts.rightArm.rotation.x = -.30 + stride * .08 - breath;
+      parts.leftArm.rotation.z = .08;
+      parts.rightArm.rotation.z = -.08;
+    } else {
+      parts.leftArm.rotation.x = -.08 + stride * .42;
+      parts.rightArm.rotation.x = -.10 + counterStride * .42;
+      parts.leftArm.rotation.z = .10;
+      parts.rightArm.rotation.z = -.10;
+    }
+
+    parts.upperBody.rotation.x = isAiming
+      ? -.035 + breath * .35
+      : -.065 + breath * .25;
+    parts.upperBody.rotation.z = Math.sin(enemy.animTime * .5 + enemy.phase) * .012;
+    parts.hips.position.y = 1.42 + bounce;
+
+    parts.head.rotation.x = Math.sin(enemy.animTime * .42 + enemy.phase) * .025;
+    parts.head.rotation.y = Math.sin(enemy.animTime * .27 + enemy.phase) * .07;
+    parts.rifle.rotation.x = .02 - enemy.shootRecoil * .16 + breath * .2;
+    parts.rifle.rotation.z = -.08 + Math.sin(enemy.animTime * .55) * .01;
 
     enemy.walkTime += dt * (enemy.role === 'rusher' ? 11 : 7);
+    enemy.animTime += dt * (enemy.role === 'rusher' ? 12 : 6.5);
   }
 }
 
@@ -1127,60 +1220,102 @@ function updateRagdolls(dt) {
   for (let i = ragdolls.length - 1; i >= 0; i -= 1) {
     const rag = ragdolls[i];
     rag.life -= dt;
+    rag.age += dt;
 
     rag.velocity.y -= CONFIG.ragdollGravity * dt;
     rag.group.position.addScaledVector(rag.velocity, dt);
 
-    rag.angularVelocity.x *= Math.exp(-0.8 * dt);
-    rag.angularVelocity.y *= Math.exp(-0.8 * dt);
+    // Root motion keeps some momentum instead of snapping into a canned pose.
+    const airDamping = rag.grounded ? .42 : .12;
+    rag.angularVelocity.x *= Math.exp(-airDamping * dt);
+    rag.angularVelocity.y *= Math.exp(-airDamping * dt);
     rag.group.rotation.x += rag.angularVelocity.x * dt;
     rag.group.rotation.y += rag.angularVelocity.y * dt;
 
-    // Force a full right-side fall around the hips.
-    rag.fallVelocity += ((rag.fallTarget - rag.fallAngle) * 20 - rag.fallVelocity * 5.2) * dt;
+    // Mostly right-side collapse, but the hit location and impact momentum vary the final roll.
+    rag.fallVelocity += ((rag.fallTarget - rag.fallAngle) * 16 - rag.fallVelocity * 4.4) * dt;
     rag.fallAngle += rag.fallVelocity * dt;
     rag.fallAngle = THREE.MathUtils.clamp(rag.fallAngle, rag.fallTarget, 0);
     rag.group.rotation.z = rag.fallAngle;
 
+    // Spine bends separately from the pelvis so the torso does not behave like a rigid plank.
+    const spine = rag.spine;
+    spine.targetX *= Math.exp(-1.15 * dt);
+    spine.targetZ *= Math.exp(-1.15 * dt);
+    spine.velocityX += ((spine.targetX - spine.angleX) * 9.5 - spine.velocityX * 3.4) * dt;
+    spine.velocityZ += ((spine.targetZ - spine.angleZ) * 8.5 - spine.velocityZ * 3.0) * dt;
+    spine.angleX += spine.velocityX * dt;
+    spine.angleZ += spine.velocityZ * dt;
+    spine.angleX = THREE.MathUtils.clamp(spine.angleX, -.72, .72);
+    spine.angleZ = THREE.MathUtils.clamp(spine.angleZ, -.55, .55);
+    spine.object.rotation.x = spine.angleX;
+    spine.object.rotation.z = spine.angleZ;
+
+    // The head lags behind the torso, then settles.
+    const neck = rag.neck;
+    neck.velocityX += (-neck.angleX * 7.5 - neck.velocityX * 2.4) * dt;
+    neck.velocityY += (-neck.angleY * 7.0 - neck.velocityY * 2.1) * dt;
+    neck.angleX += neck.velocityX * dt;
+    neck.angleY += neck.velocityY * dt;
+    neck.angleX = THREE.MathUtils.clamp(neck.angleX, -1.0, 1.0);
+    neck.angleY = THREE.MathUtils.clamp(neck.angleY, -1.0, 1.0);
+    neck.object.rotation.x = neck.angleX;
+    neck.object.rotation.y = neck.angleY;
+
     for (const joint of rag.joints) {
+      joint.upperTarget *= Math.exp(-joint.targetDecay * dt);
+      joint.lowerTarget *= Math.exp(-joint.targetDecay * dt);
+
       joint.upperVelocity += (
-        (joint.upperTarget - joint.upperAngle) * 11 -
+        (joint.upperTarget - joint.upperAngle) * 9.0 -
         joint.upperVelocity * joint.damping
       ) * dt;
       joint.upperAngle += joint.upperVelocity * dt;
       joint.upperAngle = THREE.MathUtils.clamp(joint.upperAngle, -joint.upperLimit, joint.upperLimit);
 
       joint.lowerVelocity += (
-        (joint.lowerTarget - joint.lowerAngle) * 13 -
+        (joint.lowerTarget - joint.lowerAngle) * 11.0 -
         joint.lowerVelocity * joint.damping
       ) * dt;
       joint.lowerAngle += joint.lowerVelocity * dt;
       joint.lowerAngle = THREE.MathUtils.clamp(joint.lowerAngle, -joint.lowerLimit, joint.lowerLimit);
 
       joint.upper.rotation.x = joint.upperAngle;
-      joint.upper.rotation.z = Math.sin(joint.upperAngle * 1.7) * .12;
+      joint.upper.rotation.z = Math.sin(joint.upperAngle * 1.35) * .16;
       joint.lower.rotation.x = joint.lowerAngle;
-      joint.lower.rotation.z = Math.sin(joint.lowerAngle * 1.4) * .08;
+      joint.lower.rotation.z = Math.sin(joint.lowerAngle * 1.15) * .11;
     }
 
+    // One soft floor impact: bleed velocity into the joints instead of repeatedly bouncing.
     if (rag.group.position.y < .18) {
       rag.group.position.y = .18;
-      if (Math.abs(rag.velocity.y) > .7) {
-        rag.velocity.y *= -.18;
-        rag.velocity.x *= .82;
-        rag.velocity.z *= .82;
-        rag.angularVelocity.multiplyScalar(.88);
-      } else {
+      if (!rag.grounded) {
+        rag.grounded = true;
+        rag.groundTime = 0;
         rag.velocity.y = 0;
-        rag.velocity.x *= .97;
-        rag.velocity.z *= .97;
-        rag.angularVelocity.multiplyScalar(.90);
+        rag.velocity.x *= .72;
+        rag.velocity.z *= .72;
+        rag.angularVelocity.multiplyScalar(.62);
+        spine.velocityX *= .65;
+        spine.velocityZ *= .65;
+        neck.velocityX *= .6;
+        neck.velocityY *= .6;
+        for (const joint of rag.joints) {
+          joint.upperVelocity *= .68;
+          joint.lowerVelocity *= .68;
+        }
+      } else {
+        rag.groundTime += dt;
+        rag.velocity.y = 0;
+        rag.velocity.x *= Math.exp(-2.4 * dt);
+        rag.velocity.z *= Math.exp(-2.4 * dt);
+        rag.angularVelocity.multiplyScalar(Math.exp(-1.8 * dt));
       }
     }
 
-    if (rag.velocity.lengthSq() < .015 && rag.angularVelocity.lengthSq() < .015) {
-      rag.velocity.multiplyScalar(.92);
-      rag.angularVelocity.multiplyScalar(.92);
+    if (rag.velocity.lengthSq() < .008 && rag.angularVelocity.lengthSq() < .008 && rag.groundTime > .8) {
+      rag.velocity.multiplyScalar(.9);
+      rag.angularVelocity.multiplyScalar(.88);
     }
 
     if (rag.life <= 0) {
