@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: github-pages-${{ github.ref }}
+  group: github-pages-deploy
   cancel-in-progress: true
 
 jobs:
@@ -19,9 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Write update manifest
+        env:
+          UPDATE_MESSAGE: ${{ github.event.head_commit.message || 'WARFLEX updated' }}
+        run: |
+          node -e 'const fs=require("fs"); const info={version:process.env.GITHUB_SHA,message:process.env.UPDATE_MESSAGE,timestamp:new Date().toISOString()}; fs.writeFileSync("update.json", JSON.stringify(info));'
+
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
-        if: github.ref == 'refs/heads/main'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
