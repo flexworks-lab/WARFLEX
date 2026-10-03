@@ -1327,30 +1327,42 @@ function updateRagdolls(dt) {
     // Keep the entire body above the floor, not just the hip pivot.
     // The soldier can rotate onto its side, so every frame we resolve the
     // lowest visible body point against the floor surface at y = 0.
-    rag.bounds.setFromObject(rag.model);
-    const floorClearance = .025;
+    // Hard floor solver: inspect every visible ragdoll mesh and push the
+    // entire body upward until its lowest world-space point is above y=0.
+    rag.model.updateMatrixWorld(true);
+    rag.bounds.makeEmpty();
+    rag.model.traverse((part) => {
+      if (!part.isMesh || !part.visible) return;
+      part.geometry.computeBoundingBox();
+      if (part.geometry.boundingBox) {
+        const meshBox = part.geometry.boundingBox.clone().applyMatrix4(part.matrixWorld);
+        rag.bounds.union(meshBox);
+      }
+    });
+
+    const floorClearance = .04;
     const penetration = floorClearance - rag.bounds.min.y;
 
     if (penetration > 0) {
       rag.group.position.y += penetration;
       rag.groundContact = Math.min(1, rag.groundContact + dt * 12);
 
-      // Kill downward momentum as soon as any part touches the floor.
+      // Never allow downward travel while any body part is touching the floor.
       if (rag.velocity.y < 0) rag.velocity.y = 0;
-      rag.velocity.x *= Math.exp(-3.2 * dt);
-      rag.velocity.z *= Math.exp(-3.2 * dt);
-      rag.angularVelocity.multiplyScalar(Math.exp(-2.6 * dt));
+      rag.velocity.x *= Math.exp(-3.4 * dt);
+      rag.velocity.z *= Math.exp(-3.4 * dt);
+      rag.angularVelocity.multiplyScalar(Math.exp(-2.9 * dt));
 
       if (!rag.grounded) {
         rag.grounded = true;
         rag.groundTime = 0;
-        spine.velocityX *= .65;
-        spine.velocityZ *= .65;
-        neck.velocityX *= .6;
-        neck.velocityY *= .6;
+        spine.velocityX *= .58;
+        spine.velocityZ *= .58;
+        neck.velocityX *= .52;
+        neck.velocityY *= .52;
         for (const joint of rag.joints) {
-          joint.upperVelocity *= .68;
-          joint.lowerVelocity *= .68;
+          joint.upperVelocity *= .62;
+          joint.lowerVelocity *= .62;
         }
       }
     } else {
