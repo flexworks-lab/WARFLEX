@@ -1066,11 +1066,22 @@ function shoot() {
 
   const wallHits = raycaster.intersectObjects(obstacles, false);
   const enemyHits = raycaster.intersectObjects(allEnemyMeshes, false);
+  const ragdollMeshes = [];
+  for (const rag of ragdolls) {
+    rag.model.traverse(o => {
+      if (o.isMesh) ragdollMeshes.push(o);
+    });
+  }
+  const ragdollHits = raycaster.intersectObjects(ragdollMeshes, false);
+
   let hitPoint = origin.clone().addScaledVector(direction, 90);
   const wallDistance = wallHits[0]?.distance ?? Infinity;
   const enemyHit = enemyHits.find(hit => hit.distance < wallDistance);
+  const ragdollHit = ragdollHits.find(hit => hit.distance < wallDistance);
+  const closestEnemyDistance = enemyHit?.distance ?? Infinity;
+  const closestRagdollDistance = ragdollHit?.distance ?? Infinity;
 
-  if (enemyHit) {
+  if (closestEnemyDistance <= closestRagdollDistance && enemyHit) {
     const enemy = enemies.find(e => {
       let found = false;
       e.group.traverse(o => { if (o === enemyHit.object) found = true; });
@@ -1088,6 +1099,19 @@ function shoot() {
       showHitmarker(headshot);
       if (enemy.health <= 0) removeEnemy(enemy, headshot, hitPoint, direction);
     }
+  } else if (ragdollHit) {
+    const rag = ragdolls.find(r => {
+      let found = false;
+      r.model.traverse(o => { if (o === ragdollHit.object) found = true; });
+      return found;
+    });
+
+    if (rag) {
+      hitPoint = ragdollHit.point;
+      applyRagdollHit(rag, hitPoint, direction, ragdollHit.object);
+      spawnBurst(hitPoint, 0xcbd6df, 7);
+      showHitmarker(false);
+    }
   } else if (wallHits[0]) {
     hitPoint = wallHits[0].point;
     spawnBurst(hitPoint.clone(), 0xb8c3cc);
@@ -1097,6 +1121,42 @@ function shoot() {
   updateHud();
 }
 
+function applyRagdollHit(rag, hitPoint, direction, hitObject) {
+  if (!rag || !rag.model) return;
+
+  const localImpact = rag.model.worldToLocal(hitPoint.clone());
+  const sideImpulse = THREE.MathUtils.clamp(localImpact.x * 1.4, -1.5, 1.5);
+  const verticalImpact = THREE.MathUtils.clamp(localImpact.y, -.5, 1.8);
+  const isHead = hitObject?.name === 'RagdollHead';
+  const isArm = hitObject?.name?.includes('Arm') || hitObject?.name?.includes('Elbow');
+  const isLeg = hitObject?.name?.includes('Leg') || hitObject?.name?.includes('Knee');
+
+  const force = isHead ? 3.8 : isArm || isLeg ? 2.6 : 3.1;
+  rag.velocity.addScaledVector(direction, force);
+  rag.velocity.y += isHead ? 1.5 : .55;
+  rag.angularVelocity.x += (Math.random() - .5) * 4 + verticalImpact * 2;
+  rag.angularVelocity.y += sideImpulse * 3.0 + (Math.random() - .5) * 3;
+  rag.fallVelocity += (Math.random() - .5) * 3;
+
+  const limbBoost = isArm ? 10 : isLeg ? 8 : 6;
+  for (const joint of rag.joints) {
+    joint.upperVelocity += (Math.random() - .5) * limbBoost + sideImpulse * 2.2;
+    joint.lowerVelocity += (Math.random() - .5) * (limbBoost + 3) + direction.y * 4;
+    joint.upperTarget += (Math.random() - .5) * .28;
+    joint.lowerTarget += (Math.random() - .5) * .34;
+  }
+
+  rag.spine.velocityX += (Math.random() - .5) * 3.5;
+  rag.spine.velocityZ += sideImpulse * 1.6;
+  rag.neck.velocityX += (Math.random() - .5) * 5;
+  rag.neck.velocityY += sideImpulse * 2.5;
+
+  // Give the whole body a fresh burst even after it has already settled.
+  rag.grounded = false;
+  rag.groundTime = 0;
+  rag.groundContact = 0;
+}
+ 
 function reload() {
   if (state.reloadTimer > 0 || state.ammo >= CONFIG.magSize || state.reserve <= 0 || state.over) return;
   state.reloadTimer = CONFIG.reloadTime;
@@ -1283,7 +1343,6 @@ function updateEnemies(dt) {
 function updateRagdolls(dt) {
   for (let i = ragdolls.length - 1; i >= 0; i -= 1) {
     const rag = ragdolls[i];
-    rag.life -= dt;
     rag.age += dt;
 
     rag.velocity.y -= CONFIG.ragdollGravity * dt;
@@ -1446,10 +1505,6 @@ function updateRagdolls(dt) {
       rag.angularVelocity.multiplyScalar(.88);
     }
 
-    if (rag.life <= 0) {
-      scene.remove(rag.group);
-      ragdolls.splice(i, 1);
-    }
   }
 
   for (let i = droppedGuns.length - 1; i >= 0; i -= 1) {
