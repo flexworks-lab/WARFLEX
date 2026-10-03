@@ -368,123 +368,178 @@ function spawnEnemyModel() {
   const group = new THREE.Group();
   group.name = 'EnemySoldier';
 
-  const armor = createMaterial(0x5f6c78, .55, .42);
-  const dark = createMaterial(0x1a2026, .82, .28);
-  const trim = createMaterial(0x303b45, .72, .3);
-  const skin = createMaterial(0xb8a18f, .08, .86);
-  const red = new THREE.MeshBasicMaterial({ color: 0xff3045 });
+  const armor = createMaterial(0x55616c, .62, .34);
+  const armorDark = createMaterial(0x303941, .7, .3);
+  const cloth = createMaterial(0x151a1f, .06, .82);
+  const rubber = createMaterial(0x0b0e11, .03, .9);
+  const trim = createMaterial(0x77838e, .55, .3);
+  const skin = createMaterial(0x9f806b, .04, .88);
+  const lens = new THREE.MeshStandardMaterial({
+    color: 0x121d25,
+    emissive: 0x174b61,
+    emissiveIntensity: 1.8,
+    metalness: .65,
+    roughness: .15,
+  });
+
+  const box = (size, position, material, parent, name = '') => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+    mesh.position.set(...position);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    if (name) mesh.name = name;
+    parent.add(mesh);
+    return mesh;
+  };
+
+  const cyl = (radiusTop, radiusBottom, height, position, material, parent, rotation = [0,0,0], name = '') => {
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 10, 1),
+      material
+    );
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    if (name) mesh.name = name;
+    parent.add(mesh);
+    return mesh;
+  };
+
+  const sphere = (radius, position, material, parent, scale = [1,1,1], name = '') => {
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 14, 10), material);
+    mesh.position.set(...position);
+    mesh.scale.set(...scale);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    if (name) mesh.name = name;
+    parent.add(mesh);
+    return mesh;
+  };
 
   const hips = new THREE.Group();
   hips.name = 'RagdollHips';
-  hips.position.y = .82;
+  hips.position.y = .78;
   group.add(hips);
 
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(1.08, 1.32, .68), armor);
-  torso.position.y = .66;
-  torso.castShadow = true;
-  hips.add(torso);
+  // Torso / plate carrier.
+  box([1.02, 1.12, .62], [0, .62, 0], cloth, hips, 'Torso');
+  box([1.10, .72, .68], [0, .72, -.045], armorDark, hips, 'PlateCarrier');
+  box([.78, .44, .72], [0, .82, -.085], armor, hips, 'ChestPlate');
+  box([.58, .18, .70], [0, 1.12, -.01], trim, hips, 'CollarPlate');
+  sphere(.19, [-.60, 1.08, 0], armor, hips, [1.05, .72, 1.1], 'LeftShoulder');
+  sphere(.19, [.60, 1.08, 0], armor, hips, [1.05, .72, 1.1], 'RightShoulder');
 
-  const chest = new THREE.Mesh(new THREE.BoxGeometry(1.16, .44, .76), dark);
-  chest.position.set(0, .86, -.05);
-  chest.castShadow = true;
-  hips.add(chest);
+  // Magazines, battle belt, and pouches.
+  for (const x of [-.30, 0, .30]) {
+    box([.22, .22, .13], [x, .42, -.39], rubber, hips, 'ChestPouch');
+  }
+  box([.94, .17, .68], [0, .25, 0], cloth, hips, 'BattleBelt');
+  box([.22, .24, .16], [-.42, .18, -.40], rubber, hips, 'LeftHipPouch');
+  box([.22, .24, .16], [.42, .18, -.40], rubber, hips, 'RightHipPouch');
 
-  const plate = new THREE.Mesh(new THREE.BoxGeometry(.72, .38, .81), trim);
-  plate.position.set(0, 1.06, -.08);
-  plate.castShadow = true;
-  hips.add(plate);
+  // Backpack and radio.
+  box([.64, .72, .28], [0, .57, .43], cloth, hips, 'Backpack');
+  box([.45, .28, .18], [0, .72, .58], rubber, hips, 'PackTop');
+  cyl(.018, .026, .72, [.22, 1.14, .48], trim, hips, [0, 0, -.12], 'RadioAntenna');
 
-  const belt = new THREE.Mesh(new THREE.BoxGeometry(1.08, .18, .7), dark);
-  belt.position.set(0, .25, 0);
-  hips.add(belt);
+  // Neck, headset, and combat helmet.
+  cyl(.16, .18, .22, [0, 1.28, 0], skin, hips, [0,0,0], 'Neck');
+  const head = sphere(.39, [0, 1.57, 0], skin, hips, [1, 1.05, .94], 'RagdollHead');
+  sphere(.46, [0, 1.79, 0], rubber, hips, [1.03, .64, 1.0], 'CombatHelmet');
+  box([.62, .15, .12], [0, 1.72, -.37], armorDark, hips, 'HelmetVisorFrame');
+  box([.49, .08, .045], [0, 1.72, -.42], lens, hips, 'HelmetVisor');
+  box([.12, .23, .09], [-.43, 1.61, -.02], rubber, hips, 'HeadsetLeft');
+  box([.12, .23, .09], [.43, 1.61, -.02], rubber, hips, 'HeadsetRight');
+  cyl(.035, .035, .22, [.27, 1.86, .03], trim, hips, [0, 0, Math.PI / 2], 'HelmetMount');
 
-  const backpack = new THREE.Mesh(new THREE.BoxGeometry(.7, .78, .3), dark);
-  backpack.position.set(0, .58, .48);
-  backpack.castShadow = true;
-  hips.add(backpack);
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(.42, 14, 10), skin);
-  head.name = 'RagdollHead';
-  head.position.set(0, 1.72, 0);
-  head.castShadow = true;
-  hips.add(head);
-
-  const helmet = new THREE.Mesh(new THREE.SphereGeometry(.46, 14, 8), dark);
-  helmet.scale.set(1, .62, 1);
-  helmet.position.set(0, 1.93, 0);
-  helmet.castShadow = true;
-  hips.add(helmet);
-
-  const visor = new THREE.Mesh(new THREE.BoxGeometry(.5, .1, .04), red);
-  visor.position.set(0, 1.76, -.39);
-  hips.add(visor);
-
-  const leftShoulder = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8), armor);
-  leftShoulder.position.set(-.62, 1.17, 0);
-  hips.add(leftShoulder);
-
-  const rightShoulder = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8), armor);
-  rightShoulder.position.set(.62, 1.17, 0);
-  hips.add(rightShoulder);
-
+  // Left arm with elbow articulation.
   const leftArm = new THREE.Group();
   leftArm.name = 'RagdollLeftArm';
-  leftArm.position.set(-.72, 1.12, 0);
-  const leftUpper = new THREE.Mesh(new THREE.BoxGeometry(.32, .92, .34), armor);
-  leftUpper.position.y = -.35;
-  leftUpper.castShadow = true;
-  leftArm.add(leftUpper);
-  const leftFore = new THREE.Mesh(new THREE.BoxGeometry(.29, .72, .31), dark);
-  leftFore.position.y = -1.02;
-  leftArm.add(leftFore);
+  leftArm.position.set(-.70, 1.05, 0);
   hips.add(leftArm);
+  sphere(.17, [0, .03, 0], armor, leftArm, [1, .85, 1.05], 'LeftShoulderCap');
+  box([.31, .62, .32], [0, -.34, 0], armor, leftArm, 'LeftUpperArm');
+  const leftElbow = new THREE.Group();
+  leftElbow.name = 'RagdollLeftElbow';
+  leftElbow.position.set(0, -.68, 0);
+  leftArm.add(leftElbow);
+  sphere(.14, [0,0,0], armorDark, leftElbow, [1, .9, 1], 'LeftElbowPad');
+  box([.29, .58, .30], [0, -.32, 0], armorDark, leftElbow, 'LeftForearm');
+  box([.28, .20, .32], [0, -.68, -.01], rubber, leftElbow, 'LeftGlove');
 
+  // Right arm with elbow articulation.
   const rightArm = new THREE.Group();
   rightArm.name = 'RagdollRightArm';
-  rightArm.position.set(.72, 1.12, 0);
-  const rightUpper = new THREE.Mesh(new THREE.BoxGeometry(.32, .92, .34), armor);
-  rightUpper.position.y = -.35;
-  rightUpper.castShadow = true;
-  rightArm.add(rightUpper);
-  const rightFore = new THREE.Mesh(new THREE.BoxGeometry(.29, .72, .31), dark);
-  rightFore.position.y = -1.02;
-  rightArm.add(rightFore);
+  rightArm.position.set(.70, 1.05, 0);
   hips.add(rightArm);
+  sphere(.17, [0, .03, 0], armor, rightArm, [1, .85, 1.05], 'RightShoulderCap');
+  box([.31, .62, .32], [0, -.34, 0], armor, rightArm, 'RightUpperArm');
+  const rightElbow = new THREE.Group();
+  rightElbow.name = 'RagdollRightElbow';
+  rightElbow.position.set(0, -.68, 0);
+  rightArm.add(rightElbow);
+  sphere(.14, [0,0,0], armorDark, rightElbow, [1, .9, 1], 'RightElbowPad');
+  box([.29, .58, .30], [0, -.32, 0], armorDark, rightElbow, 'RightForearm');
+  box([.28, .20, .32], [0, -.68, -.01], rubber, rightElbow, 'RightGlove');
 
-  const weaponMesh = new THREE.Mesh(new THREE.BoxGeometry(.18, .18, .75), dark);
-  weaponMesh.position.set(.38, .35, -.55);
-  weaponMesh.rotation.x = -.25;
-  weaponMesh.castShadow = true;
-  hips.add(weaponMesh);
+  // Assault rifle silhouette.
+  const rifle = new THREE.Group();
+  rifle.name = 'Rifle';
+  rifle.position.set(.20, .58, -.42);
+  rifle.rotation.set(.02, 0, -.08);
+  hips.add(rifle);
+  box([.18, .20, .90], [0, 0, -.35], armorDark, rifle, 'RifleReceiver');
+  box([.14, .16, .64], [0, .03, -.92], rubber, rifle, 'RifleHandguard');
+  box([.10, .10, .55], [0, .04, -1.28], trim, rifle, 'RifleBarrel');
+  box([.14, .16, .44], [0, -.03, .24], rubber, rifle, 'RifleStock');
+  box([.14, .35, .24], [0, -.25, -.38], rubber, rifle, 'RifleMagazine');
+  box([.16, .07, .28], [0, .15, -.55], armorDark, rifle, 'RifleRail');
+  box([.13, .10, .20], [0, .23, -.55], lens, rifle, 'RifleOptic');
+  box([.15, .26, .16], [0, -.22, -.76], rubber, rifle, 'RifleGrip');
 
+  // Left leg with knee articulation.
   const leftLeg = new THREE.Group();
   leftLeg.name = 'RagdollLeftLeg';
-  leftLeg.position.set(-.3, .06, 0);
-  const leftThigh = new THREE.Mesh(new THREE.BoxGeometry(.4, .95, .42), armor);
-  leftThigh.position.y = -.38;
-  leftThigh.castShadow = true;
-  leftLeg.add(leftThigh);
-  const leftBoot = new THREE.Mesh(new THREE.BoxGeometry(.44, .34, .62), dark);
-  leftBoot.position.set(0, -.97, -.08);
-  leftLeg.add(leftBoot);
+  leftLeg.position.set(-.29, .08, 0);
   hips.add(leftLeg);
+  box([.39, .72, .42], [0, -.38, 0], cloth, leftLeg, 'LeftThigh');
+  box([.47, .20, .45], [0, -.62, -.02], armorDark, leftLeg, 'LeftKneePad');
+  const leftKnee = new THREE.Group();
+  leftKnee.name = 'RagdollLeftKnee';
+  leftKnee.position.set(0, -.76, 0);
+  leftLeg.add(leftKnee);
+  box([.34, .62, .36], [0, -.31, 0], armor, leftKnee, 'LeftShin');
+  box([.42, .25, .64], [0, -.66, -.08], rubber, leftKnee, 'LeftBoot');
 
+  // Right leg with knee articulation.
   const rightLeg = new THREE.Group();
   rightLeg.name = 'RagdollRightLeg';
-  rightLeg.position.set(.3, .06, 0);
-  const rightThigh = new THREE.Mesh(new THREE.BoxGeometry(.4, .95, .42), armor);
-  rightThigh.position.y = -.38;
-  rightThigh.castShadow = true;
-  rightLeg.add(rightThigh);
-  const rightBoot = new THREE.Mesh(new THREE.BoxGeometry(.44, .34, .62), dark);
-  rightBoot.position.set(0, -.97, -.08);
-  rightLeg.add(rightBoot);
+  rightLeg.position.set(.29, .08, 0);
   hips.add(rightLeg);
+  box([.39, .72, .42], [0, -.38, 0], cloth, rightLeg, 'RightThigh');
+  box([.47, .20, .45], [0, -.62, -.02], armorDark, rightLeg, 'RightKneePad');
+  const rightKnee = new THREE.Group();
+  rightKnee.name = 'RagdollRightKnee';
+  rightKnee.position.set(0, -.76, 0);
+  rightLeg.add(rightKnee);
+  box([.34, .62, .36], [0, -.31, 0], armor, rightKnee, 'RightShin');
+  box([.42, .25, .64], [0, -.66, -.08], rubber, rightKnee, 'RightBoot');
 
-  group.userData.parts = { hips, leftArm, rightArm, leftLeg, rightLeg, head };
-  group.scale.setScalar(.78);
+  group.userData.parts = {
+    hips,
+    leftArm,
+    rightArm,
+    leftLeg,
+    rightLeg,
+    head,
+  };
+
+  group.userData.baseScale = .78;
+  group.scale.setScalar(group.userData.baseScale);
   return group;
 }
+
 function resetGame() {
   for (const enemy of enemies) scene.remove(enemy.group);
   enemies.length = 0;
@@ -548,7 +603,8 @@ function spawnEnemy(index = 0) {
     maxHealth: CONFIG.enemyBaseHealth + state.wave * 7,
     speed: CONFIG.enemySpeed + Math.min(state.wave * .08, 1.2),
     attackTimer: .7 + Math.random() * 1.4,
-    radius: .8,
+    radius: .72,
+    baseScale: group.userData.baseScale || .78,
     phase: Math.random() * Math.PI * 2,
     walkTime: Math.random() * Math.PI * 2,
     hurtFlash: 0,
@@ -557,7 +613,7 @@ function spawnEnemy(index = 0) {
   });
 }
 
-function createRagdoll(enemy, impactPoint, direction) {
+function createRagdoll(enemy, impactPoint, direction, headshot = false) {
   enemy.group.updateMatrixWorld(true);
 
   const ragGroup = enemy.group.clone(true);
@@ -565,45 +621,56 @@ function createRagdoll(enemy, impactPoint, direction) {
   ragGroup.visible = true;
   ragGroup.position.copy(enemy.group.position);
   ragGroup.quaternion.copy(enemy.group.quaternion);
-  ragGroup.scale.copy(enemy.group.scale);
+  ragGroup.scale.setScalar(enemy.baseScale || enemy.group.userData.baseScale || .78);
   scene.add(ragGroup);
 
-  const jointNames = [
-    'RagdollLeftArm',
-    'RagdollRightArm',
-    'RagdollLeftLeg',
-    'RagdollRightLeg',
+  const jointConfigs = [
+    ['RagdollLeftArm', 'RagdollLeftElbow', 1.25, .95],
+    ['RagdollRightArm', 'RagdollRightElbow', 1.25, .95],
+    ['RagdollLeftLeg', 'RagdollLeftKnee', .85, .72],
+    ['RagdollRightLeg', 'RagdollRightKnee', .85, .72],
   ];
 
-  const joints = jointNames
-    .map((name) => ragGroup.getObjectByName(name))
-    .filter(Boolean)
-    .map((joint) => ({
-      object: joint,
-      angle: 0,
-      velocity: (Math.random() - .5) * 9,
-      spring: 0,
-      damping: 4.2,
-      limit: joint.name.includes('Arm') ? 1.35 : .85,
-    }));
+  const joints = jointConfigs.map(([upperName, lowerName, upperLimit, lowerLimit]) => {
+    const upper = ragGroup.getObjectByName(upperName);
+    const lower = ragGroup.getObjectByName(lowerName);
+    return {
+      upper,
+      lower,
+      upperAngle: 0,
+      lowerAngle: 0,
+      upperVelocity: (Math.random() - .5) * 8,
+      lowerVelocity: (Math.random() - .5) * 10,
+      upperTarget: (Math.random() - .5) * .35,
+      lowerTarget: (Math.random() - .5) * .28,
+      upperLimit,
+      lowerLimit,
+      damping: 4.8,
+    };
+  }).filter(j => j.upper && j.lower);
 
+  const kick = headshot ? 5.2 : 3.6;
   const rootVelocity = direction
-    ? direction.clone().multiplyScalar(3.2)
+    ? direction.clone().multiplyScalar(kick)
     : new THREE.Vector3();
-  rootVelocity.y = 2.4 + Math.random() * 2.8;
+  rootVelocity.y = headshot ? 4.2 : 2.8;
+
+  const impact = impactPoint ? impactPoint.clone() : enemy.group.position.clone().add(new THREE.Vector3(0, 1.1, 0));
+  const side = direction
+    ? new THREE.Vector3(-direction.z, 0, direction.x).multiplyScalar((Math.random() - .5) * 2.4)
+    : new THREE.Vector3();
 
   ragdolls.push({
     group: ragGroup,
-    velocity: rootVelocity,
+    velocity: rootVelocity.add(side),
     angularVelocity: new THREE.Vector3(
-      (Math.random() - .5) * 5,
-      (Math.random() - .5) * 7,
-      (Math.random() - .5) * 5
+      (Math.random() - .5) * (headshot ? 7 : 5),
+      (Math.random() - .5) * 9,
+      (Math.random() - .5) * (headshot ? 7 : 5)
     ),
     joints,
-    impact: impactPoint ? impactPoint.clone() : ragGroup.position.clone(),
-    life: CONFIG.ragdollLife + Math.random() * 1.5,
-    settled: false,
+    impact,
+    life: CONFIG.ragdollLife + Math.random() * 1.8,
   });
 
   scene.remove(enemy.group);
@@ -620,11 +687,12 @@ function removeEnemy(enemy, headshot = false, hitPoint = null, direction = null)
     headshot ? 0xffe6a2 : 0xff5b66,
     headshot ? 18 : 12
   );
-  createRagdoll(enemy, hitPoint, direction);
+  createRagdoll(enemy, hitPoint, direction, headshot);
   const index = enemies.indexOf(enemy);
   if (index !== -1) enemies.splice(index, 1);
   updateHud();
 }
+
 function spawnBurst(position, color, count = 12) {
   for (let i = 0; i < count; i += 1) {
     const size = .04 + Math.random() * .08;
@@ -878,7 +946,10 @@ function updateEnemies(dt) {
     parts.hips.position.y = .8 + Math.abs(Math.sin(enemy.walkTime * .5)) * .04;
     parts.head.rotation.y = Math.sin(enemy.walkTime * .25) * .05;
 
-    if (enemy.hurtFlash > 0) enemy.group.scale.setScalar(1.035);
+    if (enemy.hurtFlash > 0) {
+      // Hit feedback must never change the soldier's physical size.
+      enemy.group.scale.setScalar(enemy.baseScale);
+    }
 
     if (dist < 18 && enemy.attackTimer <= 0) {
       enemy.attackTimer = Math.max(.45, 1.25 - state.wave * .03);
@@ -896,29 +967,50 @@ function updateRagdolls(dt) {
     rag.velocity.y -= CONFIG.ragdollGravity * dt;
     rag.group.position.addScaledVector(rag.velocity, dt);
 
+    rag.angularVelocity.multiplyScalar(Math.exp(-2.2 * dt));
     rag.group.rotation.x += rag.angularVelocity.x * dt;
     rag.group.rotation.y += rag.angularVelocity.y * dt;
     rag.group.rotation.z += rag.angularVelocity.z * dt;
 
     for (const joint of rag.joints) {
-      joint.velocity += (-joint.angle * 18 - joint.velocity * joint.damping) * dt;
-      joint.angle += joint.velocity * dt;
-      joint.angle = THREE.MathUtils.clamp(joint.angle, -joint.limit, joint.limit);
-      joint.object.rotation.x = joint.angle;
-      joint.object.rotation.z = Math.sin(joint.angle * 1.7) * .16;
+      joint.upperVelocity += (
+        (joint.upperTarget - joint.upperAngle) * 22 -
+        joint.upperVelocity * joint.damping
+      ) * dt;
+      joint.upperAngle += joint.upperVelocity * dt;
+      joint.upperAngle = THREE.MathUtils.clamp(joint.upperAngle, -joint.upperLimit, joint.upperLimit);
+
+      joint.lowerVelocity += (
+        (joint.lowerTarget - joint.lowerAngle) * 26 -
+        joint.lowerVelocity * joint.damping
+      ) * dt;
+      joint.lowerAngle += joint.lowerVelocity * dt;
+      joint.lowerAngle = THREE.MathUtils.clamp(joint.lowerAngle, -joint.lowerLimit, joint.lowerLimit);
+
+      joint.upper.rotation.x = joint.upperAngle;
+      joint.upper.rotation.z = Math.sin(joint.upperAngle * 1.7) * .12;
+      joint.lower.rotation.x = joint.lowerAngle;
+      joint.lower.rotation.z = Math.sin(joint.lowerAngle * 1.4) * .08;
     }
 
-    if (rag.group.position.y < .12) {
-      rag.group.position.y = .12;
-      if (Math.abs(rag.velocity.y) > .8) {
-        rag.velocity.y *= -.24;
-        rag.angularVelocity.multiplyScalar(.82);
+    if (rag.group.position.y < .10) {
+      rag.group.position.y = .10;
+      if (Math.abs(rag.velocity.y) > .7) {
+        rag.velocity.y *= -.18;
+        rag.velocity.x *= .82;
+        rag.velocity.z *= .82;
+        rag.angularVelocity.multiplyScalar(.72);
       } else {
         rag.velocity.y = 0;
-        rag.velocity.x *= .8;
-        rag.velocity.z *= .8;
-        rag.angularVelocity.multiplyScalar(.78);
+        rag.velocity.x *= .90;
+        rag.velocity.z *= .90;
+        rag.angularVelocity.multiplyScalar(.65);
       }
+    }
+
+    if (rag.velocity.lengthSq() < .08 && rag.angularVelocity.lengthSq() < .08) {
+      rag.velocity.multiplyScalar(.7);
+      rag.angularVelocity.multiplyScalar(.7);
     }
 
     if (rag.life <= 0) {
@@ -947,6 +1039,7 @@ function updateRagdolls(dt) {
     }
   }
 }
+
 function updateWave(dt) {
   if (state.spawnLeft > 0 || enemies.length > 0) return;
   state.nextWaveTimer += dt;
