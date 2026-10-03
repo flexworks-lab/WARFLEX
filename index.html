@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A fast browser FPS shooter built with Three.js." />
+  <title>PROJECT STRIKE</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <div id="hud" class="hud hidden">
+    <div class="top-left">
+      <div class="brand">PROJECT STRIKE</div>
+      <div class="status-row"><span>WAVE</span><strong id="wave">1</strong></div>
+    </div>
+    <div id="crosshair" class="crosshair" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+    <div id="hitmarker" class="hitmarker" aria-hidden="true">✕</div>
+    <div class="bottom-left">
+      <div class="health-label"><span>HEALTH</span><strong id="health">100</strong></div>
+      <div class="health-bar"><div id="health-fill"></div></div>
+    </div>
+    <div class="bottom-right">
+      <div class="ammo"><strong id="ammo">30</strong><span>/ <b id="reserve">120</b></span></div>
+      <div class="weapon">MK-01 // RIFLE</div>
+      <div id="reload" class="reload hidden">RELOADING...</div>
+    </div>
+    <div class="scoreboard">
+      <div><span>KILLS</span><strong id="kills">0</strong></div>
+      <div><span>SCORE</span><strong id="score">0</strong></div>
+    </div>
+  </div>
+
+  <div id="start-screen" class="screen">
+    <div class="panel">
+      <p class="eyebrow">ONLINE // TRAINING SIM</p>
+      <h1>PROJECT <span>STRIKE</span></h1>
+      <p class="lede">Fast movement. Hitscan gunplay. Endless enemy waves.</p>
+      <button id="start-button">DEPLOY</button>
+      <div class="controls">
+        <span><b>WASD</b> Move</span>
+        <span><b>SHIFT</b> Sprint</span>
+        <span><b>SPACE</b> Jump</span>
+        <span><b>CLICK</b> Fire</span>
+        <span><b>R</b> Reload</span>
+        <span><b>ESC</b> Pause</span>
+      </div>
+      <p class="small">Best in Chromium / Edge / Chrome with a mouse.</p>
+    </div>
+  </div>
+
+  <div id="pause-screen" class="screen hidden">
+    <div class="panel compact">
+      <p class="eyebrow">SYSTEM PAUSED</p>
+      <h2>WEAPONS HOT</h2>
+      <p>Click below to re-enter the arena.</p>
+      <button id="resume-button">RESUME</button>
+    </div>
+  </div>
+
+  <div id="game-over" class="screen hidden">
+    <div class="panel compact">
+      <p class="eyebrow">SIGNAL LOST</p>
+      <h2>YOU'RE DOWN</h2>
+      <div class="result"><span>WAVE</span><strong id="final-wave">1</strong></div>
+      <div class="result"><span>KILLS</span><strong id="final-kills">0</strong></div>
+      <div class="result"><span>SCORE</span><strong id="final-score">0</strong></div>
+      <button id="restart-button">REDEPLOY</button>
+    </div>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js"
+      }
+    }
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
