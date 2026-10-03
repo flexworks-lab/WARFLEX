@@ -27,9 +27,9 @@ jobs:
 
       - name: Stamp and validate client bundle
         run: |
-          sed -i "s/__WARFLEX_BUILD__/\${GITHUB_SHA}/g" index.html
+          sed -i "s/__WARFLEX_BUILD__/${GITHUB_SHA}/g" index.html
           node --check src/main.js
-          grep -q "./src/main.js?v=\${GITHUB_SHA}" index.html
+          grep -q "./src/main.js?v=${GITHUB_SHA}" index.html
           test -s src/main.js
 
       - name: Deploy to gh-pages
