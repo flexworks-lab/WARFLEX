@@ -844,11 +844,8 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
     angularVelocity: new THREE.Vector3(
       (Math.random() - .5) * (headshot ? 5.8 : 4.8),
       (Math.random() - .5) * 9,
-      0
+      (Math.random() - .5) * (headshot ? 5.2 : 4.2)
     ),
-    fallAngle: 0,
-    fallVelocity: 0,
-    fallTarget: -Math.PI * .5 + THREE.MathUtils.clamp(impactSide * .10 + (Math.random() - .5) * .14, -.24, .12),
     joints,
     spine,
     lowerBody,
@@ -859,7 +856,8 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
     grounded: false,
     groundTime: 0,
     groundContact: 0,
-    life: 12 + Math.random() * 3.5,
+    // Kept only as metadata for debugging; permanent ragdolls are never removed by age.
+    life: Infinity,
   });
 
   const rag = ragdolls[ragdolls.length - 1];
@@ -1129,41 +1127,89 @@ function shoot() {
   updateHud();
 }
 
+function getRagdollHitPart(hitObject) {
+  let node = hitObject;
+  while (node) {
+    if (node.name === 'RagdollHead') return 'head';
+    if (node.name === 'RagdollLeftArm') return 'leftArm';
+    if (node.name === 'RagdollRightArm') return 'rightArm';
+    if (node.name === 'RagdollLeftLeg') return 'leftLeg';
+    if (node.name === 'RagdollRightLeg') return 'rightLeg';
+    if (node.name === 'RagdollUpperBody') return 'upperBody';
+    if (node.name === 'RagdollLowerBody') return 'lowerBody';
+
+    if (
+      node.name === 'CombatHelmet' ||
+      node.name === 'HelmetVisor' ||
+      node.name === 'HelmetVisorFrame' ||
+      node.name === 'HeadsetLeft' ||
+      node.name === 'HeadsetRight'
+    ) return 'head';
+
+    node = node.parent;
+  }
+
+  return 'body';
+}
+
 function applyRagdollHit(rag, hitPoint, direction, hitObject) {
   if (!rag || !rag.model) return;
 
   const localImpact = rag.model.worldToLocal(hitPoint.clone());
-  const sideImpulse = THREE.MathUtils.clamp(localImpact.x * 1.4, -1.5, 1.5);
-  const verticalImpact = THREE.MathUtils.clamp(localImpact.y, -.5, 1.8);
-  const isHead = hitObject?.name === 'RagdollHead';
-  const isArm = hitObject?.name?.includes('Arm') || hitObject?.name?.includes('Elbow');
-  const isLeg = hitObject?.name?.includes('Leg') || hitObject?.name?.includes('Knee');
+  const hitPart = getRagdollHitPart(hitObject);
+  const sideImpulse = THREE.MathUtils.clamp(localImpact.x * 1.5, -1.6, 1.6);
+  const verticalImpact = THREE.MathUtils.clamp(localImpact.y, -.7, 1.9);
 
-  const force = isHead ? 3.8 : isArm || isLeg ? 2.6 : 3.1;
+  const force =
+    hitPart === 'head' ? 4.0 :
+    hitPart === 'leftArm' || hitPart === 'rightArm' ? 2.9 :
+    hitPart === 'leftLeg' || hitPart === 'rightLeg' ? 2.7 :
+    3.2;
+
+  // Treat a body shot like a real impulse at the point of impact:
+  // linear kick + torque from the offset between the hip center and hit point.
   rag.velocity.addScaledVector(direction, force);
-  rag.velocity.y += isHead ? 1.5 : .55;
-  rag.angularVelocity.x += (Math.random() - .5) * 4 + verticalImpact * 2;
-  rag.angularVelocity.y += sideImpulse * 3.0 + (Math.random() - .5) * 3;
-  rag.fallVelocity += (Math.random() - .5) * 3;
+  rag.velocity.y += hitPart === 'head' ? 1.7 : .6;
 
-  const limbBoost = isArm ? 10 : isLeg ? 8 : 6;
+  const bodyCenter = rag.group.getWorldPosition(new THREE.Vector3());
+  const impactOffset = hitPoint.clone().sub(bodyCenter);
+  const impulse = direction.clone().multiplyScalar(force);
+  const torque = impactOffset.cross(impulse);
+
+  rag.angularVelocity.addScaledVector(torque, .75);
+  rag.angularVelocity.x += (Math.random() - .5) * 1.8 + verticalImpact * .7;
+  rag.angularVelocity.y += sideImpulse * 1.8 + (Math.random() - .5) * 1.8;
+  rag.angularVelocity.z += (Math.random() - .5) * 1.8 - sideImpulse * .8;
+
+  const limbBoost = hitPart === 'head' ? 5 : hitPart.includes('Arm') ? 11 : hitPart.includes('Leg') ? 9 : 6;
+
   for (const joint of rag.joints) {
-    joint.upperVelocity += (Math.random() - .5) * limbBoost + sideImpulse * 2.2;
-    joint.lowerVelocity += (Math.random() - .5) * (limbBoost + 3) + direction.y * 4;
-    joint.upperVelocityZ += (Math.random() - .5) * (limbBoost * .8) - sideImpulse * 1.8;
-    joint.lowerVelocityZ += (Math.random() - .5) * (limbBoost * .9) + sideImpulse * 1.3;
-    joint.upperTarget += (Math.random() - .5) * .34;
-    joint.lowerTarget += (Math.random() - .5) * .40;
-    joint.upperTargetZ += (Math.random() - .5) * .30;
-    joint.lowerTargetZ += (Math.random() - .5) * .34;
+    const isTarget =
+      hitPart === 'leftArm' ? joint.upper.name === 'RagdollLeftArm' :
+      hitPart === 'rightArm' ? joint.upper.name === 'RagdollRightArm' :
+      hitPart === 'leftLeg' ? joint.upper.name === 'RagdollLeftLeg' :
+      hitPart === 'rightLeg' ? joint.upper.name === 'RagdollRightLeg' :
+      false;
+
+    const boost = isTarget ? limbBoost * 1.8 : limbBoost * .45;
+
+    joint.upperVelocity += (Math.random() - .5) * boost + sideImpulse * (isTarget ? 2.8 : .7);
+    joint.lowerVelocity += (Math.random() - .5) * (boost + 3) + direction.y * (isTarget ? 5 : 1.8);
+    joint.upperVelocityZ += (Math.random() - .5) * boost * .75 - sideImpulse * (isTarget ? 2.2 : .6);
+    joint.lowerVelocityZ += (Math.random() - .5) * boost * .85 + sideImpulse * (isTarget ? 1.8 : .5);
+
+    joint.upperTarget += (Math.random() - .5) * (isTarget ? .42 : .16);
+    joint.lowerTarget += (Math.random() - .5) * (isTarget ? .48 : .18);
+    joint.upperTargetZ += (Math.random() - .5) * (isTarget ? .34 : .12);
+    joint.lowerTargetZ += (Math.random() - .5) * (isTarget ? .38 : .14);
   }
 
-  rag.spine.velocityX += (Math.random() - .5) * 3.5;
-  rag.spine.velocityZ += sideImpulse * 1.6;
-  rag.neck.velocityX += (Math.random() - .5) * 5;
-  rag.neck.velocityY += sideImpulse * 2.5;
+  rag.spine.velocityX += (Math.random() - .5) * 3.2 - direction.y * .8;
+  rag.spine.velocityZ += sideImpulse * 1.8;
+  rag.neck.velocityX += (Math.random() - .5) * 5.5;
+  rag.neck.velocityY += sideImpulse * 2.8;
 
-  // Give the whole body a fresh burst even after it has already settled.
+  // A dead body can always be kicked again; shots wake the sleeping solver.
   rag.grounded = false;
   rag.groundTime = 0;
   rag.groundContact = 0;
@@ -1360,18 +1406,13 @@ function updateRagdolls(dt) {
     rag.velocity.y -= CONFIG.ragdollGravity * dt;
     rag.group.position.addScaledVector(rag.velocity, dt);
 
-    // Root motion keeps some momentum instead of snapping into a canned pose.
-    const airDamping = rag.grounded ? .42 : .12;
-    rag.angularVelocity.x *= Math.exp(-airDamping * dt);
-    rag.angularVelocity.y *= Math.exp(-airDamping * dt);
+    // Root motion is fully momentum-driven on all three axes.
+    // There is no canned fall direction fighting the body's angular velocity.
+    const airDamping = rag.grounded ? .52 : .10;
+    rag.angularVelocity.multiplyScalar(Math.exp(-airDamping * dt));
     rag.group.rotation.x += rag.angularVelocity.x * dt;
     rag.group.rotation.y += rag.angularVelocity.y * dt;
-
-    // Mostly right-side collapse, but the hit location and impact momentum vary the final roll.
-    rag.fallVelocity += ((rag.fallTarget - rag.fallAngle) * 16 - rag.fallVelocity * 4.4) * dt;
-    rag.fallAngle += rag.fallVelocity * dt;
-    rag.fallAngle = THREE.MathUtils.clamp(rag.fallAngle, rag.fallTarget, 0);
-    rag.group.rotation.z = rag.fallAngle;
+    rag.group.rotation.z += rag.angularVelocity.z * dt;
 
     // Loose body mechanics: the limbs keep their own angular momentum.
     // A small inward bias develops over time, but never fully overrides the fling.
