@@ -1132,18 +1132,10 @@ function updateEnemies(dt) {
     parts.hips.position.y = 1.42 + Math.abs(Math.sin(enemy.walkTime * .5)) * .04;
     parts.head.rotation.y = Math.sin(enemy.walkTime * .25) * .05;
 
-    const closeLean = THREE.MathUtils.clamp((6.5 - dist) / 6.5, 0, 1);
     const hitKick = enemy.hitReact > 0 ? enemy.hitReact / .24 : 0;
 
-    // Strong backward recoil when the player gets close.
-    enemy.group.rotation.order = 'YXZ';
-    enemy.group.rotation.x = closeLean * .62;
-
-    parts.hips.rotation.x = closeLean * .18 - hitStrengthToLean(enemy.hitStrength, hitKick);
+    parts.hips.rotation.x = -hitStrengthToLean(enemy.hitStrength, hitKick);
     parts.hips.rotation.z = enemy.hitSide * enemy.hitStrength * hitKick;
-    parts.head.rotation.x = closeLean * .28;
-    parts.leftArm.rotation.x += closeLean * .5;
-    parts.rightArm.rotation.x += closeLean * .5;
 
     enemy.walkTime += dt * (enemy.role === 'rusher' ? 11 : 7);
   }
