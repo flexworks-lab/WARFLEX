@@ -367,6 +367,7 @@ function spawnEnemyModel() {
   const red = new THREE.MeshBasicMaterial({ color: 0xff3045 });
 
   const hips = new THREE.Group();
+  hips.name = 'RagdollHips';
   hips.position.y = .82;
   group.add(hips);
 
@@ -395,6 +396,7 @@ function spawnEnemyModel() {
   hips.add(backpack);
 
   const head = new THREE.Mesh(new THREE.SphereGeometry(.42, 14, 10), skin);
+  head.name = 'RagdollHead';
   head.position.set(0, 1.72, 0);
   head.castShadow = true;
   hips.add(head);
@@ -418,6 +420,7 @@ function spawnEnemyModel() {
   hips.add(rightShoulder);
 
   const leftArm = new THREE.Group();
+  leftArm.name = 'RagdollLeftArm';
   leftArm.position.set(-.72, 1.12, 0);
   const leftUpper = new THREE.Mesh(new THREE.BoxGeometry(.32, .92, .34), armor);
   leftUpper.position.y = -.35;
@@ -429,6 +432,7 @@ function spawnEnemyModel() {
   hips.add(leftArm);
 
   const rightArm = new THREE.Group();
+  rightArm.name = 'RagdollRightArm';
   rightArm.position.set(.72, 1.12, 0);
   const rightUpper = new THREE.Mesh(new THREE.BoxGeometry(.32, .92, .34), armor);
   rightUpper.position.y = -.35;
@@ -446,6 +450,7 @@ function spawnEnemyModel() {
   hips.add(weaponMesh);
 
   const leftLeg = new THREE.Group();
+  leftLeg.name = 'RagdollLeftLeg';
   leftLeg.position.set(-.3, .06, 0);
   const leftThigh = new THREE.Mesh(new THREE.BoxGeometry(.4, .95, .42), armor);
   leftThigh.position.y = -.38;
@@ -457,6 +462,7 @@ function spawnEnemyModel() {
   hips.add(leftLeg);
 
   const rightLeg = new THREE.Group();
+  rightLeg.name = 'RagdollRightLeg';
   rightLeg.position.set(.3, .06, 0);
   const rightThigh = new THREE.Mesh(new THREE.BoxGeometry(.4, .95, .42), armor);
   rightThigh.position.y = -.38;
@@ -468,6 +474,7 @@ function spawnEnemyModel() {
   hips.add(rightLeg);
 
   group.userData.parts = { hips, leftArm, rightArm, leftLeg, rightLeg, head };
+  group.scale.setScalar(.78);
   return group;
 }
 function resetGame() {
@@ -544,39 +551,55 @@ function spawnEnemy(index = 0) {
 
 function createRagdoll(enemy, impactPoint, direction) {
   enemy.group.updateMatrixWorld(true);
-  const kick = direction ? direction.clone().multiplyScalar(2.8) : new THREE.Vector3();
-  enemy.group.traverse((source) => {
-    if (!source.isMesh) return;
-    const material = Array.isArray(source.material)
-      ? source.material.map((m) => m.clone())
-      : source.material.clone();
-    const piece = new THREE.Mesh(source.geometry, material);
-    source.getWorldPosition(piece.position);
-    source.getWorldQuaternion(piece.quaternion);
-    source.getWorldScale(piece.scale);
-    piece.castShadow = true;
-    piece.receiveShadow = true;
-    scene.add(piece);
 
-    const away = piece.position.clone().sub(impactPoint || enemy.group.position);
-    away.y = Math.max(.2, away.y);
-    if (away.lengthSq() < .01) away.set((Math.random()-.5), 1, (Math.random()-.5));
-    away.normalize();
+  const ragGroup = enemy.group.clone(true);
+  ragGroup.name = 'ConnectedEnemyRagdoll';
+  ragGroup.visible = true;
+  ragGroup.position.copy(enemy.group.position);
+  ragGroup.quaternion.copy(enemy.group.quaternion);
+  ragGroup.scale.copy(enemy.group.scale);
+  scene.add(ragGroup);
 
-    ragdolls.push({
-      mesh: piece,
-      velocity: away.multiplyScalar(2.5 + Math.random() * 4).add(kick),
-      angularVelocity: new THREE.Vector3(
-        (Math.random()-.5) * 11,
-        (Math.random()-.5) * 11,
-        (Math.random()-.5) * 11
-      ),
-      life: CONFIG.ragdollLife + Math.random() * 2,
-    });
+  const jointNames = [
+    'RagdollLeftArm',
+    'RagdollRightArm',
+    'RagdollLeftLeg',
+    'RagdollRightLeg',
+  ];
+
+  const joints = jointNames
+    .map((name) => ragGroup.getObjectByName(name))
+    .filter(Boolean)
+    .map((joint) => ({
+      object: joint,
+      angle: 0,
+      velocity: (Math.random() - .5) * 9,
+      spring: 0,
+      damping: 4.2,
+      limit: joint.name.includes('Arm') ? 1.35 : .85,
+    }));
+
+  const rootVelocity = direction
+    ? direction.clone().multiplyScalar(3.2)
+    : new THREE.Vector3();
+  rootVelocity.y = 2.4 + Math.random() * 2.8;
+
+  ragdolls.push({
+    group: ragGroup,
+    velocity: rootVelocity,
+    angularVelocity: new THREE.Vector3(
+      (Math.random() - .5) * 5,
+      (Math.random() - .5) * 7,
+      (Math.random() - .5) * 5
+    ),
+    joints,
+    impact: impactPoint ? impactPoint.clone() : ragGroup.position.clone(),
+    life: CONFIG.ragdollLife + Math.random() * 1.5,
+    settled: false,
   });
+
   scene.remove(enemy.group);
 }
-
 function removeEnemy(enemy, headshot = false, hitPoint = null, direction = null) {
   if (enemy.dying) return;
   enemy.dying = true;
@@ -861,23 +884,37 @@ function updateRagdolls(dt) {
   for (let i = ragdolls.length - 1; i >= 0; i -= 1) {
     const rag = ragdolls[i];
     rag.life -= dt;
-    rag.velocity.y -= CONFIG.ragdollGravity * dt;
-    rag.mesh.position.addScaledVector(rag.velocity, dt);
-    rag.mesh.rotation.x += rag.angularVelocity.x * dt;
-    rag.mesh.rotation.y += rag.angularVelocity.y * dt;
-    rag.mesh.rotation.z += rag.angularVelocity.z * dt;
 
-    if (rag.mesh.position.y < .08) {
-      rag.mesh.position.y = .08;
-      if (Math.abs(rag.velocity.y) > 1) rag.velocity.y *= -.28;
-      else rag.velocity.y = 0;
-      rag.velocity.x *= .78;
-      rag.velocity.z *= .78;
-      rag.angularVelocity.multiplyScalar(.84);
+    rag.velocity.y -= CONFIG.ragdollGravity * dt;
+    rag.group.position.addScaledVector(rag.velocity, dt);
+
+    rag.group.rotation.x += rag.angularVelocity.x * dt;
+    rag.group.rotation.y += rag.angularVelocity.y * dt;
+    rag.group.rotation.z += rag.angularVelocity.z * dt;
+
+    for (const joint of rag.joints) {
+      joint.velocity += (-joint.angle * 18 - joint.velocity * joint.damping) * dt;
+      joint.angle += joint.velocity * dt;
+      joint.angle = THREE.MathUtils.clamp(joint.angle, -joint.limit, joint.limit);
+      joint.object.rotation.x = joint.angle;
+      joint.object.rotation.z = Math.sin(joint.angle * 1.7) * .16;
+    }
+
+    if (rag.group.position.y < .12) {
+      rag.group.position.y = .12;
+      if (Math.abs(rag.velocity.y) > .8) {
+        rag.velocity.y *= -.24;
+        rag.angularVelocity.multiplyScalar(.82);
+      } else {
+        rag.velocity.y = 0;
+        rag.velocity.x *= .8;
+        rag.velocity.z *= .8;
+        rag.angularVelocity.multiplyScalar(.78);
+      }
     }
 
     if (rag.life <= 0) {
-      scene.remove(rag.mesh);
+      scene.remove(rag.group);
       ragdolls.splice(i, 1);
     }
   }
@@ -902,7 +939,6 @@ function updateRagdolls(dt) {
     }
   }
 }
-
 function updateWave(dt) {
   if (state.spawnLeft > 0 || enemies.length > 0) return;
   state.nextWaveTimer += dt;
