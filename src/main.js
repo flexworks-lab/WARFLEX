@@ -787,9 +787,11 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
     joints,
     spine,
     neck,
+    bounds: new THREE.Box3(),
     age: 0,
     grounded: false,
     groundTime: 0,
+    groundContact: 0,
     life: 12 + Math.random() * 3.5,
   });
 
@@ -1286,16 +1288,26 @@ function updateRagdolls(dt) {
       joint.lower.rotation.z = Math.sin(joint.lowerAngle * 1.15) * .11;
     }
 
-    // One soft floor impact: bleed velocity into the joints instead of repeatedly bouncing.
-    if (rag.group.position.y < .18) {
-      rag.group.position.y = .18;
+    // Keep the entire body above the floor, not just the hip pivot.
+    // The soldier can rotate onto its side, so every frame we resolve the
+    // lowest visible body point against the floor surface at y = 0.
+    rag.bounds.setFromObject(rag.model);
+    const floorClearance = .025;
+    const penetration = floorClearance - rag.bounds.min.y;
+
+    if (penetration > 0) {
+      rag.group.position.y += penetration;
+      rag.groundContact = Math.min(1, rag.groundContact + dt * 12);
+
+      // Kill downward momentum as soon as any part touches the floor.
+      if (rag.velocity.y < 0) rag.velocity.y = 0;
+      rag.velocity.x *= Math.exp(-3.2 * dt);
+      rag.velocity.z *= Math.exp(-3.2 * dt);
+      rag.angularVelocity.multiplyScalar(Math.exp(-2.6 * dt));
+
       if (!rag.grounded) {
         rag.grounded = true;
         rag.groundTime = 0;
-        rag.velocity.y = 0;
-        rag.velocity.x *= .72;
-        rag.velocity.z *= .72;
-        rag.angularVelocity.multiplyScalar(.62);
         spine.velocityX *= .65;
         spine.velocityZ *= .65;
         neck.velocityX *= .6;
@@ -1304,13 +1316,16 @@ function updateRagdolls(dt) {
           joint.upperVelocity *= .68;
           joint.lowerVelocity *= .68;
         }
-      } else {
-        rag.groundTime += dt;
-        rag.velocity.y = 0;
-        rag.velocity.x *= Math.exp(-2.4 * dt);
-        rag.velocity.z *= Math.exp(-2.4 * dt);
-        rag.angularVelocity.multiplyScalar(Math.exp(-1.8 * dt));
       }
+    } else {
+      rag.groundContact = Math.max(0, rag.groundContact - dt * 2.5);
+      if (rag.groundContact <= 0) rag.grounded = false;
+    }
+
+    if (rag.grounded) {
+      rag.groundTime += dt;
+    } else {
+      rag.groundTime = Math.max(0, rag.groundTime - dt * 2);
     }
 
     if (rag.velocity.lengthSq() < .008 && rag.angularVelocity.lengthSq() < .008 && rag.groundTime > .8) {
