@@ -419,7 +419,7 @@ function spawnEnemyModel() {
 
   const hips = new THREE.Group();
   hips.name = 'RagdollHips';
-  hips.position.y = .78;
+  hips.position.y = 1.42;
   group.add(hips);
 
   // Torso / plate carrier.
@@ -535,7 +535,7 @@ function spawnEnemyModel() {
     head,
   };
 
-  group.userData.baseScale = .78;
+  group.userData.baseScale = .54;
   group.scale.setScalar(group.userData.baseScale);
   return group;
 }
@@ -603,7 +603,7 @@ function spawnEnemy(index = 0) {
     maxHealth: CONFIG.enemyBaseHealth + state.wave * 7,
     speed: CONFIG.enemySpeed + Math.min(state.wave * .08, 1.2),
     attackTimer: .7 + Math.random() * 1.4,
-    radius: .72,
+    radius: .58,
     baseScale: group.userData.baseScale || .78,
     phase: Math.random() * Math.PI * 2,
     walkTime: Math.random() * Math.PI * 2,
