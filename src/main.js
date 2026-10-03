@@ -530,8 +530,8 @@ function spawnEnemyModel() {
   cyl(.16, .18, .22, [0, 1.27, 0], skin, hips, [0,0,0], 12, 'Neck');
   sphere(.39, [0, 1.56, 0], skin, hips, [1, 1.06, .95], 'RagdollHead');
   box([.50, .22, .34], [0, 1.44, -.03], skinDark, hips, 'JawShadow');
-  box([.18, .10, .08], [-.13, 1.61, -.36], dark, hips, 'LeftEyeline');
-  box([.18, .10, .08], [.13, 1.61, -.36], dark, hips, 'RightEyeline');
+  box([.18, .10, .08], [-.13, 1.61, -.36], armorBlack, hips, 'LeftEyeline');
+  box([.18, .10, .08], [.13, 1.61, -.36], armorBlack, hips, 'RightEyeline');
 
   // High-cut helmet, rails, NV mount, straps and visor.
   sphere(.47, [0, 1.79, 0], rubber, hips, [1.05, .66, 1.02], 'CombatHelmet');
