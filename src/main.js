@@ -477,13 +477,17 @@ function resetGame() {
   tracers.length = 0;
   for (const p of particles) scene.remove(p.mesh);
   particles.length = 0;
+  for (const rag of ragdolls) scene.remove(rag.mesh);
+  ragdolls.length = 0;
+  for (const shell of shellCasings) scene.remove(shell.mesh);
+  shellCasings.length = 0;
 
   Object.assign(state, {
     active: true, over: false, yaw: 0, pitch: 0, verticalVelocity: 0, onGround: true,
     health: CONFIG.maxHealth, ammo: CONFIG.magSize, reserve: CONFIG.reserveAmmo,
-    kills: 0, score: 0, wave: 1, spawnLeft: 0, nextWaveTimer: 0,
+    kills: 0, score: 0, wave: state.selectedWave > 0 ? state.selectedWave : 1, spawnLeft: 0, nextWaveTimer: 0,
     fireTimer: 0, reloadTimer: 0, damageCooldown: 0, hurtFlash: 0, walkTime: 0,
-    weaponKick: 0, muzzleFlash: 0,
+    weaponKick: 0, muzzleFlash: 0, shake: 0,
   });
   player.position.set(0, 1.65, 18);
   camera.position.set(0, 0, 0);
@@ -538,17 +542,58 @@ function spawnEnemy(index = 0) {
   });
 }
 
-function removeEnemy(enemy, headshot = false) {
+function createRagdoll(enemy, impactPoint, direction) {
+  enemy.group.updateMatrixWorld(true);
+  const kick = direction ? direction.clone().multiplyScalar(2.8) : new THREE.Vector3();
+  enemy.group.traverse((source) => {
+    if (!source.isMesh) return;
+    const material = Array.isArray(source.material)
+      ? source.material.map((m) => m.clone())
+      : source.material.clone();
+    const piece = new THREE.Mesh(source.geometry, material);
+    source.getWorldPosition(piece.position);
+    source.getWorldQuaternion(piece.quaternion);
+    source.getWorldScale(piece.scale);
+    piece.castShadow = true;
+    piece.receiveShadow = true;
+    scene.add(piece);
+
+    const away = piece.position.clone().sub(impactPoint || enemy.group.position);
+    away.y = Math.max(.2, away.y);
+    if (away.lengthSq() < .01) away.set((Math.random()-.5), 1, (Math.random()-.5));
+    away.normalize();
+
+    ragdolls.push({
+      mesh: piece,
+      velocity: away.multiplyScalar(2.5 + Math.random() * 4).add(kick),
+      angularVelocity: new THREE.Vector3(
+        (Math.random()-.5) * 11,
+        (Math.random()-.5) * 11,
+        (Math.random()-.5) * 11
+      ),
+      life: CONFIG.ragdollLife + Math.random() * 2,
+    });
+  });
+  scene.remove(enemy.group);
+}
+
+function removeEnemy(enemy, headshot = false, hitPoint = null, direction = null) {
   if (enemy.dying) return;
   enemy.dying = true;
-  enemy.deathTimer = .28;
   state.kills += 1;
   state.score += headshot ? 150 : 100;
   state.spawnLeft -= 1;
-  spawnBurst(enemy.group.position, headshot ? 0xffe6a2 : 0xdfe8ef);
+  state.shake = Math.max(state.shake, headshot ? .12 : .075);
+  spawnBurst(
+    hitPoint || enemy.group.position.clone().add(new THREE.Vector3(0, 1.2, 0)),
+    headshot ? 0xffe6a2 : 0xff5b66,
+    headshot ? 18 : 12
+  );
+  createRagdoll(enemy, hitPoint, direction);
+  const index = enemies.indexOf(enemy);
+  if (index !== -1) enemies.splice(index, 1);
   updateHud();
 }
-
 function spawnBurst(position, color) {
   for (let i = 0; i < 8; i += 1) {
     const mesh = new THREE.Mesh(
