@@ -1061,10 +1061,6 @@ function enemyShoot(enemy) {
   return true;
 }
 
-function hitStrengthToLean(strength, kick) {
-  return strength * .45 * kick;
-}
-
 function updateEnemies(dt) {
   for (let i = enemies.length - 1; i >= 0; i -= 1) {
     const enemy = enemies[i];
@@ -1131,11 +1127,6 @@ function updateEnemies(dt) {
     parts.rightLeg.rotation.x = swing;
     parts.hips.position.y = 1.42 + Math.abs(Math.sin(enemy.walkTime * .5)) * .04;
     parts.head.rotation.y = Math.sin(enemy.walkTime * .25) * .05;
-
-    const hitKick = enemy.hitReact > 0 ? enemy.hitReact / .24 : 0;
-
-    parts.hips.rotation.x = -hitStrengthToLean(enemy.hitStrength, hitKick);
-    parts.hips.rotation.z = enemy.hitSide * enemy.hitStrength * hitKick;
 
     enemy.walkTime += dt * (enemy.role === 'rusher' ? 11 : 7);
   }
