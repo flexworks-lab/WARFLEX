@@ -656,9 +656,6 @@ function spawnEnemy(index = 0) {
     strafeSign: Math.random() < .5 ? -1 : 1,
     strafeTimer: .5 + Math.random(),
     hurtFlash: 0,
-    hitReact: 0,
-    hitSide: 0,
-    hitStrength: 0,
     deathTimer: 0,
     dying: false,
   });
@@ -937,7 +934,6 @@ function shoot() {
   const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
   raycaster.set(origin, direction);
 
-  const targets = enemies.filter(e => !e.dying).flatMap(e => e.group.getObjectByName('EnemySoldier') ? [e.group] : e.group.children);
   const allEnemyMeshes = [];
   for (const enemy of enemies) {
     if (!enemy.dying) enemy.group.traverse(o => { if (o.isMesh) allEnemyMeshes.push(o); });
@@ -961,10 +957,6 @@ function shoot() {
       const headshot = enemyHit.object === parts.head;
       enemy.health -= headshot ? 70 : 34;
       enemy.hurtFlash = .08;
-      enemy.hitReact = .24;
-      const bodySide = new THREE.Vector3(-direction.z, 0, direction.x);
-      enemy.hitSide = Math.sign(bodySide.dot(enemy.group.position.clone().sub(origin))) || 1;
-      enemy.hitStrength = headshot ? .3 : .55;
       hitPoint = enemyHit.point;
       spawnBurst(hitPoint, headshot ? 0xff8b93 : 0xcbd6df, headshot ? 14 : 8);
       state.score += headshot ? 25 : 10;
@@ -1066,7 +1058,6 @@ function updateEnemies(dt) {
     const enemy = enemies[i];
     enemy.attackTimer -= dt;
     enemy.hurtFlash = Math.max(0, enemy.hurtFlash - dt);
-    enemy.hitReact = Math.max(0, enemy.hitReact - dt);
     enemy.strafeTimer -= dt;
 
     const toPlayer = new THREE.Vector3().subVectors(player.position, enemy.group.position);
