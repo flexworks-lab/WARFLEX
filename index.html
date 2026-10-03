@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="A fast browser FPS shooter built with Three.js." />
   <title>PROJECT STRIKE</title>
-  <link rel="stylesheet" href="./src/style.css?v=warfex-gothic-1" />
+  <link rel="stylesheet" href="./src/style.css?v=warfex-minimal-1" />
 </head>
 <body>
   <div id="damage-overlay" aria-hidden="true"></div>
@@ -43,42 +43,46 @@
   </div>
 
   <div id="start-screen" class="screen gothic-screen">
-    <div class="menu-mist"></div>
     <div class="panel menu-panel gothic-panel">
-      <div class="menu-crest" aria-hidden="true">
-        <span class="crest-ring"></span>
-        <span class="crest-eye"></span>
-        <span class="crest-horn left"></span>
-        <span class="crest-horn right"></span>
-      </div>
-      <p class="eyebrow gothic-eyebrow">A RUINED WORLD // COMBAT SIMULATION</p>
-      <h1 class="gothic-title">PROJECT <span>STRIKE</span></h1>
-      <div class="menu-divider"><i></i><b>✦</b><i></i></div>
-      <p class="lede gothic-lede">Descend into the arena. Choose your trial. Survive the coming waves.</p>
-
-      <div class="menu-section">
-        <div class="menu-label">STARTING WAVE</div>
-        <div class="wave-grid">
-          <button class="wave-choice active" data-wave-choice="1"><strong>01</strong><span>RECRUIT</span></button>
-          <button class="wave-choice" data-wave-choice="5"><strong>05</strong><span>ASSAULT</span></button>
-          <button class="wave-choice" data-wave-choice="10"><strong>10</strong><span>VETERAN</span></button>
-          <button class="wave-choice" data-wave-choice="20"><strong>20</strong><span>HELL</span></button>
-          <button class="wave-choice wide" data-wave-choice="endless"><strong>∞</strong><span>ENDLESS</span></button>
+      <div class="menu-view" id="menu-main">
+        <p class="eyebrow gothic-eyebrow">A RUINED WORLD // COMBAT SIMULATION</p>
+        <h1 class="gothic-title">PROJECT <span>STRIKE</span></h1>
+        <div class="menu-nav" aria-label="Main menu">
+          <button id="start-button" type="button">START</button>
+          <button id="waves-button" type="button">WAVES</button>
+          <button id="options-button" type="button">OPTIONS</button>
         </div>
+        <p class="small menu-hint">WASD MOVE · SHIFT SPRINT · SPACE JUMP · CLICK FIRE · R RELOAD · ESC PAUSE</p>
       </div>
 
-      <button id="start-button" class="deploy-button">DEPLOY <span id="selected-wave-label">WAVE 1</span></button>
-
-      <div class="menu-subtitle">THE TRIALS</div>
-      <div class="controls menu-controls">
-        <span><b>WASD</b> Move</span>
-        <span><b>SHIFT</b> Sprint</span>
-        <span><b>SPACE</b> Jump</span>
-        <span><b>CLICK</b> Fire</span>
-        <span><b>R</b> Reload</span>
-        <span><b>ESC</b> Pause</span>
+      <div class="menu-view hidden" id="wave-menu">
+        <p class="eyebrow gothic-eyebrow">SELECT YOUR TRIAL</p>
+        <h2 class="menu-view-title">WAVES</h2>
+        <div class="wave-list">
+          <button class="wave-choice active" type="button" data-wave-choice="1"><strong>WAVE 01</strong><span>RECRUIT</span></button>
+          <button class="wave-choice" type="button" data-wave-choice="5"><strong>WAVE 05</strong><span>ASSAULT</span></button>
+          <button class="wave-choice" type="button" data-wave-choice="10"><strong>WAVE 10</strong><span>VETERAN</span></button>
+          <button class="wave-choice" type="button" data-wave-choice="20"><strong>WAVE 20</strong><span>HELL</span></button>
+          <button class="wave-choice" type="button" data-wave-choice="endless"><strong>ENDLESS</strong><span>NO END</span></button>
+        </div>
+        <button id="back-from-waves" class="back-button" type="button">BACK</button>
       </div>
-      <p class="small">Chromium / Edge / Chrome recommended.</p>
+
+      <div class="menu-view hidden" id="options-menu">
+        <p class="eyebrow gothic-eyebrow">OPTIONS</p>
+        <h2 class="menu-view-title">CONTROLS</h2>
+        <div class="options-list">
+          <span><b>WASD</b><em>MOVE</em></span>
+          <span><b>SHIFT</b><em>SPRINT</em></span>
+          <span><b>SPACE</b><em>JUMP</em></span>
+          <span><b>CLICK</b><em>FIRE</em></span>
+          <span><b>R</b><em>RELOAD</em></span>
+          <span><b>ESC</b><em>PAUSE</em></span>
+        </div>
+        <button id="back-from-options" class="back-button" type="button">BACK</button>
+      </div>
+
+      <span id="selected-wave-label" class="hidden" aria-hidden="true">WAVE 1</span>
     </div>
   </div>
 

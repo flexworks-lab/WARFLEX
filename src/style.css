@@ -403,3 +403,230 @@ button:active { transform: translateY(0); }
   .gothic-title { font-size: 48px; }
   .gothic-lede { font-size: 15px; }
 }
+
+
+/* Full-window text menu */
+html, body {
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+}
+
+body {
+  background: #000;
+}
+
+.screen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+           max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  background: transparent !important;
+}
+
+.gothic-screen::before,
+.gothic-screen::after,
+.menu-mist {
+  display: none !important;
+}
+
+.gothic-panel {
+  width: 100%;
+  max-width: none;
+  min-height: calc(100dvh - 48px);
+  padding: 24px;
+  display: grid;
+  place-items: center;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.menu-panel > * {
+  position: relative;
+}
+
+.menu-view {
+  width: min(560px, 100%);
+  max-height: calc(100dvh - 64px);
+  overflow: auto;
+  text-align: center;
+  scrollbar-width: none;
+}
+
+.menu-view::-webkit-scrollbar {
+  display: none;
+}
+
+.menu-crest,
+.menu-divider,
+.gothic-lede,
+.menu-subtitle,
+.menu-controls {
+  display: none !important;
+}
+
+.gothic-eyebrow {
+  margin-bottom: 18px;
+}
+
+.gothic-title {
+  margin-bottom: 42px;
+  font-size: clamp(48px, 8vw, 92px);
+  line-height: .92;
+}
+
+.menu-nav,
+.wave-list,
+.options-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.menu-nav button,
+.back-button,
+.gothic-panel .deploy-button,
+.wave-choice {
+  width: auto;
+  min-width: 0;
+  padding: 7px 12px;
+  border: 0 !important;
+  border-radius: 0;
+  color: #e9edf0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(17px, 2.2vw, 25px);
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-align: center;
+  transform: none;
+}
+
+.menu-nav button:hover,
+.back-button:hover,
+.gothic-panel .deploy-button:hover,
+.wave-choice:hover {
+  color: #fff !important;
+  background: transparent !important;
+  transform: translateY(-1px);
+}
+
+.menu-nav button:active,
+.back-button:active,
+.gothic-panel .deploy-button:active,
+.wave-choice:active {
+  transform: translateY(0);
+}
+
+.menu-hint {
+  margin-top: 34px;
+  line-height: 1.7;
+}
+
+.menu-view-title {
+  margin: 0 0 30px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(42px, 6vw, 66px);
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+.wave-list {
+  gap: 10px;
+}
+
+.wave-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+}
+
+.wave-choice strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(22px, 3vw, 31px);
+  font-weight: 600;
+  letter-spacing: .08em;
+}
+
+.wave-choice span {
+  color: #6f7a84;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .24em;
+}
+
+.wave-choice.active strong {
+  color: #fff;
+}
+
+.wave-choice.active span {
+  color: #a7b1b9;
+}
+
+.back-button {
+  margin-top: 30px;
+  color: #7e8992 !important;
+  font-size: 12px !important;
+}
+
+.options-list {
+  width: min(360px, 100%);
+  margin: 0 auto;
+  gap: 11px;
+}
+
+.options-list span {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 7px 0;
+  color: #b2bcc4;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  font-size: 12px;
+  letter-spacing: .12em;
+}
+
+.options-list b {
+  color: #eef2f4;
+  font-weight: 800;
+}
+
+.options-list em {
+  color: #6f7a84;
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .18em;
+}
+
+@media (max-width: 640px) {
+  .screen {
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+
+  .gothic-panel {
+    min-height: calc(100dvh - 32px);
+    padding: 16px;
+  }
+
+  .gothic-title {
+    margin-bottom: 32px;
+  }
+
+  .menu-view-title {
+    margin-bottom: 22px;
+  }
+}

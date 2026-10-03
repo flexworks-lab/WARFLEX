@@ -44,6 +44,13 @@ const els = {
   updateReload: document.querySelector('#update-reload'),
   updateDismiss: document.querySelector('#update-dismiss'),
   selectedWaveLabel: document.querySelector('#selected-wave-label'),
+  mainMenu: document.querySelector('#menu-main'),
+  waveMenu: document.querySelector('#wave-menu'),
+  optionsMenu: document.querySelector('#options-menu'),
+  wavesButton: document.querySelector('#waves-button'),
+  optionsButton: document.querySelector('#options-button'),
+  backFromWaves: document.querySelector('#back-from-waves'),
+  backFromOptions: document.querySelector('#back-from-options'),
   waveChoices: [...document.querySelectorAll('[data-wave-choice]')],
   damageOverlay: document.querySelector('#damage-overlay'),
 };
@@ -64,6 +71,7 @@ renderer.toneMappingExposure = 1.18;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
+renderer.domElement.style.display = 'none';
 
 scene.add(new THREE.HemisphereLight(0xaec4d8, 0x11151c, 1.5));
 const sun = new THREE.DirectionalLight(0xffffff, 2.4);
@@ -1073,20 +1081,35 @@ function frame() {
 
 function setWaveChoice(value) {
   state.selectedWave = value === 'endless' ? -1 : Number(value);
-  els.selectedWaveLabel.textContent = state.selectedWave === -1 ? 'ENDLESS' : `WAVE ${state.selectedWave}`;
+  if (els.selectedWaveLabel) {
+    els.selectedWaveLabel.textContent = state.selectedWave === -1 ? 'ENDLESS' : `WAVE ${state.selectedWave}`;
+  }
   for (const button of els.waveChoices) {
     button.classList.toggle('active', button.dataset.waveChoice === String(value));
   }
+}
+
+function showMenuView(view) {
+  els.mainMenu.classList.toggle('hidden', view !== 'main');
+  els.waveMenu.classList.toggle('hidden', view !== 'waves');
+  els.optionsMenu.classList.toggle('hidden', view !== 'options');
 }
 
 for (const button of els.waveChoices) {
   button.addEventListener('click', () => setWaveChoice(button.dataset.waveChoice));
 }
 
+els.wavesButton.addEventListener('click', () => showMenuView('waves'));
+els.optionsButton.addEventListener('click', () => showMenuView('options'));
+els.backFromWaves.addEventListener('click', () => showMenuView('main'));
+els.backFromOptions.addEventListener('click', () => showMenuView('main'));
+
 setWaveChoice('1');
+showMenuView('main');
 
 function enterGame() {
   resetGame();
+  renderer.domElement.style.display = 'block';
   els.start.classList.add('hidden');
   els.pause.classList.add('hidden');
   els.gameOver.classList.add('hidden');
