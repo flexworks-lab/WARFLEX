@@ -630,3 +630,28 @@ body {
     margin-bottom: 22px;
   }
 }
+
+
+.combat-callout {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 42px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  pointer-events: none;
+  text-transform: uppercase;
+  text-shadow: 0 2px 18px rgba(0,0,0,.65);
+}
+.combat-callout strong {
+  font-size: clamp(22px, 3vw, 34px);
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: .05em;
+}
+.combat-callout span {
+  color: #8996a1;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .24em;
+}

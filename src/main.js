@@ -7,13 +7,19 @@ const CONFIG = {
   fireInterval: 0.105,
   reloadTime: 1.35,
   walkSpeed: 7.5,
-  sprintSpeed: 11.5,
+  sprintSpeed: 12.8,
   backwardSpeed: 6.4,
+  slideSpeed: 18.5,
+  slideDuration: .72,
+  defaultFov: 78,
+  sprintFov: 87,
+  slideFov: 93,
   jumpSpeed: 7.8,
   gravity: 22,
   mouseSensitivity: 0.0018,
   enemyBaseHealth: 55,
   enemySpeed: 2.7,
+  enemyShootRange: 42,
   ragdollGravity: 20,
   ragdollLife: 5.5,
 };
@@ -53,6 +59,8 @@ const els = {
   backFromOptions: document.querySelector('#back-from-options'),
   waveChoices: [...document.querySelectorAll('[data-wave-choice]')],
   damageOverlay: document.querySelector('#damage-overlay'),
+  combatCallout: document.querySelector('#combat-callout'),
+  comboCount: document.querySelector('#combo-count'),
 };
 
 const scene = new THREE.Scene();
@@ -116,6 +124,12 @@ const state = {
   shake: 0,
   selectedWave: 1,
   menuTime: 0,
+  slideTimer: 0,
+  slideCooldown: 0,
+  slideQueued: false,
+  slideDirection: new THREE.Vector3(),
+  combo: 0,
+  comboTimer: 0,
 };
 
 const player = {
@@ -534,6 +548,7 @@ function spawnEnemyModel() {
     rightLeg,
     head,
   };
+  group.userData.visuals = { armor, lens };
 
   group.userData.baseScale = .54;
   group.scale.setScalar(group.userData.baseScale);
@@ -558,10 +573,15 @@ function resetGame() {
     kills: 0, score: 0, wave: state.selectedWave > 0 ? state.selectedWave : 1, spawnLeft: 0, nextWaveTimer: 0,
     fireTimer: 0, reloadTimer: 0, damageCooldown: 0, hurtFlash: 0, walkTime: 0,
     weaponKick: 0, muzzleFlash: 0, shake: 0,
+    slideTimer: 0, slideCooldown: 0, slideQueued: false,
+    slideDirection: new THREE.Vector3(),
+    combo: 0, comboTimer: 0,
   });
   player.position.set(0, 1.65, 18);
   camera.position.set(0, 0, 0);
   camera.rotation.set(0, 0, 0);
+  camera.fov = CONFIG.defaultFov;
+  camera.updateProjectionMatrix();
   weapon.position.set(.43, -.48, -1.03);
   weapon.rotation.set(-.03, -.04, -.015);
   spawnWave();
@@ -595,19 +615,50 @@ function spawnEnemy(index = 0) {
   const group = spawnEnemyModel();
   const spawn = getSpawnPoint(index);
   group.position.copy(spawn);
+
+  const roll = Math.random();
+  let role = 'rusher';
+  if (state.wave >= 2 && roll > .78) role = 'heavy';
+  else if (roll > .38) role = 'rifleman';
+
+  const roleStats = {
+    rusher: { health: .78, speed: 1.22, damage: 8, cooldown: .72, range: 16 },
+    rifleman: { health: 1.00, speed: .92, damage: 7, cooldown: .95, range: 42 },
+    heavy: { health: 1.85, speed: .62, damage: 13, cooldown: 1.25, range: 38 },
+  }[role];
+
+  const baseHealth = CONFIG.enemyBaseHealth + state.wave * 7;
+  const visual = group.userData.visuals;
+  if (role === 'heavy') {
+    visual.armor.color.setHex(0x6f3439);
+    visual.lens.emissive.setHex(0x6b121b);
+  } else if (role === 'rusher') {
+    visual.armor.color.setHex(0x465867);
+  }
+
+  group.userData.role = role;
   scene.add(group);
 
   enemies.push({
     group,
-    health: CONFIG.enemyBaseHealth + state.wave * 7,
-    maxHealth: CONFIG.enemyBaseHealth + state.wave * 7,
-    speed: CONFIG.enemySpeed + Math.min(state.wave * .08, 1.2),
-    attackTimer: .7 + Math.random() * 1.4,
-    radius: .58,
-    baseScale: group.userData.baseScale || .78,
+    role,
+    health: baseHealth * roleStats.health,
+    maxHealth: baseHealth * roleStats.health,
+    speed: (CONFIG.enemySpeed + Math.min(state.wave * .08, 1.2)) * roleStats.speed,
+    damage: roleStats.damage + Math.floor(state.wave * .35),
+    attackTimer: .55 + Math.random() * roleStats.cooldown,
+    attackCooldown: roleStats.cooldown,
+    attackRange: Math.min(CONFIG.enemyShootRange, roleStats.range),
+    radius: role === 'heavy' ? .68 : .58,
+    baseScale: group.userData.baseScale || .54,
     phase: Math.random() * Math.PI * 2,
     walkTime: Math.random() * Math.PI * 2,
+    strafeSign: Math.random() < .5 ? -1 : 1,
+    strafeTimer: .5 + Math.random(),
     hurtFlash: 0,
+    hitReact: 0,
+    hitSide: 0,
+    hitStrength: 0,
     deathTimer: 0,
     dying: false,
   });
@@ -670,7 +721,7 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
     ),
     joints,
     impact,
-    life: 7 + Math.random() * 2.5,
+    life: 12 + Math.random() * 3.5,
   });
 
   scene.remove(enemy.group);
@@ -687,6 +738,9 @@ function removeEnemy(enemy, headshot = false, hitPoint = null, direction = null)
     headshot ? 0xffe6a2 : 0xff5b66,
     headshot ? 18 : 12
   );
+  state.combo += 1;
+  state.comboTimer = 2.6;
+  state.score += Math.min(state.combo, 10) * 15;
   createRagdoll(enemy, hitPoint, direction, headshot);
   const index = enemies.indexOf(enemy);
   if (index !== -1) enemies.splice(index, 1);
@@ -737,17 +791,17 @@ function spawnMuzzleVfx() {
   state.shake = Math.max(state.shake, .055);
 }
 
-function addTracer(from, to) {
+function addTracer(from, to, color = 0xfff0c8, life = .055) {
   const dir = new THREE.Vector3().subVectors(to, from);
   const len = dir.length();
   const mesh = new THREE.Mesh(
     new THREE.CylinderGeometry(.018, .018, len, 6),
-    new THREE.MeshBasicMaterial({ color: 0xfff0c8, transparent: true, opacity: .9 })
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .9 })
   );
   mesh.position.copy(from).addScaledVector(dir, .5);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
   scene.add(mesh);
-  tracers.push({ mesh, life: .055 });
+  tracers.push({ mesh, life });
 }
 
 function playerCollides(next) {
@@ -767,33 +821,64 @@ function movePlayer(dt) {
   const inputBack = keys.has('KeyS');
   const inputLeft = keys.has('KeyA');
   const inputRight = keys.has('KeyD');
-
   const rawX = Number(inputRight) - Number(inputLeft);
   const rawZ = Number(inputBack) - Number(inputForward);
   const input = new THREE.Vector2(rawX, rawZ);
   const moving = input.lengthSq() > 0;
   if (moving) input.normalize();
 
-  const sprinting = keys.has('ShiftLeft') || keys.has('ShiftRight');
-  const forwardSpeed = sprinting ? CONFIG.sprintSpeed : CONFIG.walkSpeed;
-  const speed = input.y > 0 ? CONFIG.backwardSpeed : forwardSpeed;
-
+  const sprinting = (keys.has('ShiftLeft') || keys.has('ShiftRight')) && moving;
   const lookForward = new THREE.Vector3();
   camera.getWorldDirection(lookForward);
   lookForward.y = 0;
   if (lookForward.lengthSq() < 0.0001) lookForward.set(0, 0, -1);
   lookForward.normalize();
-
   const right = new THREE.Vector3(-lookForward.z, 0, lookForward.x);
-  const velocity = new THREE.Vector3()
-    .addScaledVector(right, input.x * speed)
-    .addScaledVector(lookForward, -input.y * speed);
 
-  const next = player.position.clone().addScaledVector(velocity, dt);
-  if (!playerCollides(new THREE.Vector3(next.x, player.position.y, player.position.z))) player.position.x = next.x;
-  if (!playerCollides(new THREE.Vector3(player.position.x, player.position.y, next.z))) player.position.z = next.z;
+  state.slideCooldown = Math.max(0, state.slideCooldown - dt);
 
-  if (keys.has('Space') && state.onGround) {
+  if (
+    state.slideQueued &&
+    state.slideTimer <= 0 &&
+    state.slideCooldown <= 0 &&
+    state.onGround &&
+    sprinting
+  ) {
+    const slideVector = new THREE.Vector3()
+      .addScaledVector(right, input.x)
+      .addScaledVector(lookForward, -input.y);
+    if (slideVector.lengthSq() > .001) {
+      state.slideDirection.copy(slideVector.normalize());
+      state.slideTimer = CONFIG.slideDuration;
+      state.slideCooldown = .35;
+    }
+    state.slideQueued = false;
+  }
+
+  if (state.slideTimer > 0) {
+    state.slideTimer = Math.max(0, state.slideTimer - dt);
+    const slideNext = player.position.clone().addScaledVector(state.slideDirection, CONFIG.slideSpeed * dt);
+    if (!playerCollides(new THREE.Vector3(slideNext.x, 1.65, player.position.z))) player.position.x = slideNext.x;
+    if (!playerCollides(new THREE.Vector3(player.position.x, 1.65, slideNext.z))) player.position.z = slideNext.z;
+
+    if (keys.has('Space')) {
+      state.slideTimer = 0;
+      state.verticalVelocity = CONFIG.jumpSpeed * .98;
+      state.onGround = false;
+      keys.delete('Space');
+    }
+  } else {
+    const forwardSpeed = sprinting ? CONFIG.sprintSpeed : CONFIG.walkSpeed;
+    const speed = input.y > 0 ? CONFIG.backwardSpeed : forwardSpeed;
+    const velocity = new THREE.Vector3()
+      .addScaledVector(right, input.x * speed)
+      .addScaledVector(lookForward, -input.y * speed);
+    const next = player.position.clone().addScaledVector(velocity, dt);
+    if (!playerCollides(new THREE.Vector3(next.x, player.position.y, player.position.z))) player.position.x = next.x;
+    if (!playerCollides(new THREE.Vector3(player.position.x, player.position.y, next.z))) player.position.z = next.z;
+  }
+
+  if (keys.has('Space') && state.onGround && state.slideTimer <= 0) {
     state.verticalVelocity = CONFIG.jumpSpeed;
     state.onGround = false;
     keys.delete('Space');
@@ -807,12 +892,20 @@ function movePlayer(dt) {
     state.onGround = true;
   }
 
-  if (moving) state.walkTime += dt * (sprinting ? 12 : 8);
-  const moveBob = moving && state.onGround ? Math.sin(state.walkTime) * (sprinting ? .045 : .028) : 0;
+  if (moving) state.walkTime += dt * (sprinting ? 15 : 9);
+  const moveBob = state.slideTimer > 0
+    ? -.34
+    : (moving && state.onGround ? Math.sin(state.walkTime) * (sprinting ? .05 : .03) : 0);
 
   camera.position.copy(player.position);
   camera.position.y += moveBob;
   camera.rotation.set(state.pitch, state.yaw, 0, 'YXZ');
+
+  const targetFov = state.slideTimer > 0
+    ? CONFIG.slideFov
+    : sprinting ? CONFIG.sprintFov : CONFIG.defaultFov;
+  camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.exp(-10 * dt));
+  camera.updateProjectionMatrix();
 }
 
 function shoot() {
@@ -856,6 +949,10 @@ function shoot() {
       const headshot = enemyHit.object === parts.head;
       enemy.health -= headshot ? 70 : 34;
       enemy.hurtFlash = .08;
+      enemy.hitReact = .24;
+      const bodySide = new THREE.Vector3(-direction.z, 0, direction.x);
+      enemy.hitSide = Math.sign(bodySide.dot(enemy.group.position.clone().sub(origin))) || 1;
+      enemy.hitStrength = headshot ? .3 : .55;
       hitPoint = enemyHit.point;
       spawnBurst(hitPoint, headshot ? 0xff8b93 : 0xcbd6df, headshot ? 14 : 8);
       state.score += headshot ? 25 : 10;
@@ -904,37 +1001,96 @@ function damagePlayer(amount) {
   if (state.health <= 0) endGame();
 }
 
+function enemyHasLineOfSight(enemy) {
+  const origin = enemy.group.localToWorld(new THREE.Vector3(.16, 1.05, -.70));
+  const target = camera.position.clone();
+  const direction = new THREE.Vector3().subVectors(target, origin);
+  const distance = direction.length();
+  if (distance <= 0.01) return { origin, target, clear: true };
+  direction.normalize();
+  raycaster.set(origin, direction);
+  const wallHit = raycaster.intersectObjects(obstacles, false)[0];
+  return { origin, target, clear: !wallHit || wallHit.distance > distance };
+}
+
+function enemyShoot(enemy) {
+  const sight = enemyHasLineOfSight(enemy);
+  if (!sight.clear) return false;
+
+  enemy.attackTimer = enemy.attackCooldown * (.75 + Math.random() * .5);
+  const direction = new THREE.Vector3().subVectors(sight.target, sight.origin).normalize();
+  const spread = enemy.role === 'heavy' ? .025 : .045;
+  direction.x += (Math.random() - .5) * spread;
+  direction.y += (Math.random() - .5) * spread;
+  direction.z += (Math.random() - .5) * spread;
+  direction.normalize();
+
+  const shotEnd = sight.origin.clone().addScaledVector(direction, CONFIG.enemyShootRange);
+  raycaster.set(sight.origin, direction);
+  const wall = raycaster.intersectObjects(obstacles, false)[0];
+  if (wall && wall.distance < CONFIG.enemyShootRange) shotEnd.copy(wall.point);
+
+  if (shotEnd.distanceTo(sight.target) < 1.35 && sight.clear) {
+    damagePlayer(enemy.damage);
+  }
+
+  spawnBurst(sight.origin, enemy.role === 'heavy' ? 0xffb052 : 0xff5666, enemy.role === 'heavy' ? 5 : 3);
+  addTracer(sight.origin, shotEnd, enemy.role === 'heavy' ? 0xffb052 : 0xff5666, .065);
+  return true;
+}
+
 function updateEnemies(dt) {
   for (let i = enemies.length - 1; i >= 0; i -= 1) {
     const enemy = enemies[i];
-
-    if (enemy.dying) {
-      enemy.deathTimer -= dt;
-      enemy.group.rotation.z += dt * 7;
-      enemy.group.position.y = Math.max(0, enemy.group.position.y - dt * 2.8);
-      enemy.group.scale.multiplyScalar(Math.max(.001, 1 - dt * 1.5));
-      if (enemy.deathTimer <= 0) {
-        scene.remove(enemy.group);
-        enemies.splice(i, 1);
-      }
-      continue;
-    }
-
     enemy.attackTimer -= dt;
     enemy.hurtFlash = Math.max(0, enemy.hurtFlash - dt);
+    enemy.hitReact = Math.max(0, enemy.hitReact - dt);
+    enemy.strafeTimer -= dt;
 
     const toPlayer = new THREE.Vector3().subVectors(player.position, enemy.group.position);
     toPlayer.y = 0;
     const dist = toPlayer.length();
 
-    if (dist > 2.2) {
-      toPlayer.normalize();
-      enemy.group.position.addScaledVector(toPlayer, enemy.speed * dt);
-      enemy.group.position.x = THREE.MathUtils.clamp(enemy.group.position.x, -51, 51);
-      enemy.group.position.z = THREE.MathUtils.clamp(enemy.group.position.z, -51, 51);
-      enemy.walkTime += dt * 9;
+    if (enemy.role === 'rusher') {
+      if (dist > 2.25) {
+        toPlayer.normalize();
+        enemy.group.position.addScaledVector(toPlayer, enemy.speed * dt);
+      }
+      if (dist < 2.65 && enemy.attackTimer <= 0) {
+        enemy.attackTimer = enemy.attackCooldown;
+        damagePlayer(enemy.damage + 2);
+      }
+    } else {
+      let desired = toPlayer.clone();
+      if (enemy.role === 'rifleman') {
+        if (dist < 15) desired.multiplyScalar(-1);
+        else if (dist > 28) desired.multiplyScalar(1);
+        else desired.set(0, 0, 0);
+      } else {
+        if (dist < 19) desired.multiplyScalar(-1);
+        else if (dist > 32) desired.multiplyScalar(1);
+        else desired.set(0, 0, 0);
+      }
+
+      if (desired.lengthSq() > .01) {
+        desired.normalize();
+        enemy.group.position.addScaledVector(desired, enemy.speed * dt);
+      } else {
+        if (enemy.strafeTimer <= 0) {
+          enemy.strafeTimer = .8 + Math.random() * 1.4;
+          enemy.strafeSign *= -1;
+        }
+        const side = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).normalize();
+        enemy.group.position.addScaledVector(side, enemy.strafeSign * enemy.speed * .75 * dt);
+      }
+
+      if (enemy.attackTimer <= 0 && dist < enemy.attackRange) {
+        enemyShoot(enemy);
+      }
     }
 
+    enemy.group.position.x = THREE.MathUtils.clamp(enemy.group.position.x, -51, 51);
+    enemy.group.position.z = THREE.MathUtils.clamp(enemy.group.position.z, -51, 51);
     enemy.group.lookAt(player.position.x, enemy.group.position.y + 1.05, player.position.z);
 
     const parts = enemy.group.userData.parts;
@@ -946,12 +1102,16 @@ function updateEnemies(dt) {
     parts.hips.position.y = 1.42 + Math.abs(Math.sin(enemy.walkTime * .5)) * .04;
     parts.head.rotation.y = Math.sin(enemy.walkTime * .25) * .05;
 
-
-    if (dist < 18 && enemy.attackTimer <= 0) {
-      enemy.attackTimer = Math.max(.45, 1.25 - state.wave * .03);
-      const chance = THREE.MathUtils.clamp(1 - dist / 22, .1, .8);
-      if (Math.random() < chance) damagePlayer(6 + Math.floor(state.wave * .6));
+    if (enemy.hitReact > 0) {
+      const kick = enemy.hitReact / .24;
+      parts.hips.rotation.z = enemy.hitSide * enemy.hitStrength * kick;
+      parts.hips.rotation.x = -enemy.hitStrength * .45 * kick;
+    } else {
+      parts.hips.rotation.z = 0;
+      parts.hips.rotation.x = 0;
     }
+
+    enemy.walkTime += dt * (enemy.role === 'rusher' ? 11 : 7);
   }
 }
 
@@ -1085,11 +1245,13 @@ function updateWeapon(dt) {
 function updateHud() {
   els.wave.textContent = state.wave;
   els.health.textContent = Math.ceil(state.health);
-  els.healthFill.style.width = `${state.health}%`;
+  els.healthFill.style.width = state.health + '%';
   els.ammo.textContent = state.ammo;
   els.reserve.textContent = state.reserve;
   els.kills.textContent = state.kills;
   els.score.textContent = state.score.toLocaleString();
+  if (els.comboCount) els.comboCount.textContent = state.combo;
+  if (els.combatCallout) els.combatCallout.classList.toggle('hidden', state.combo < 2);
 }
 
 function endGame() {
@@ -1107,6 +1269,8 @@ function tickEffects(dt) {
   state.fireTimer = Math.max(0, state.fireTimer - dt);
   state.damageCooldown = Math.max(0, state.damageCooldown - dt);
   state.hurtFlash = Math.max(0, state.hurtFlash - dt);
+  state.comboTimer = Math.max(0, state.comboTimer - dt);
+  if (state.comboTimer <= 0) state.combo = 0;
 
   if (state.reloadTimer > 0) {
     state.reloadTimer -= dt;
@@ -1221,6 +1385,10 @@ els.updateDismiss.addEventListener('click', () => {
 
 window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyR') reload();
+  if (event.code === 'ControlLeft' || event.code === 'ControlRight' || event.code === 'KeyC') {
+    state.slideQueued = true;
+    event.preventDefault();
+  }
   keys.add(event.code);
 });
 
