@@ -645,7 +645,7 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
       lowerTarget: (Math.random() - .5) * .28,
       upperLimit,
       lowerLimit,
-      damping: 4.8,
+      damping: 2.15,
     };
   }).filter(j => j.upper && j.lower);
 
@@ -664,13 +664,13 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
     group: ragGroup,
     velocity: rootVelocity.add(side),
     angularVelocity: new THREE.Vector3(
-      (Math.random() - .5) * (headshot ? 7 : 5),
-      (Math.random() - .5) * 9,
-      (Math.random() - .5) * (headshot ? 7 : 5)
+      (Math.random() - .5) * (headshot ? 9 : 7),
+      (Math.random() - .5) * 12,
+      (Math.random() - .5) * (headshot ? 9 : 7)
     ),
     joints,
     impact,
-    life: CONFIG.ragdollLife + Math.random() * 1.8,
+    life: 7 + Math.random() * 2.5,
   });
 
   scene.remove(enemy.group);
@@ -943,13 +943,9 @@ function updateEnemies(dt) {
     parts.rightArm.rotation.x = -swing;
     parts.leftLeg.rotation.x = -swing;
     parts.rightLeg.rotation.x = swing;
-    parts.hips.position.y = .8 + Math.abs(Math.sin(enemy.walkTime * .5)) * .04;
+    parts.hips.position.y = 1.42 + Math.abs(Math.sin(enemy.walkTime * .5)) * .04;
     parts.head.rotation.y = Math.sin(enemy.walkTime * .25) * .05;
 
-    if (enemy.hurtFlash > 0) {
-      // Hit feedback must never change the soldier's physical size.
-      enemy.group.scale.setScalar(enemy.baseScale);
-    }
 
     if (dist < 18 && enemy.attackTimer <= 0) {
       enemy.attackTimer = Math.max(.45, 1.25 - state.wave * .03);
@@ -967,21 +963,21 @@ function updateRagdolls(dt) {
     rag.velocity.y -= CONFIG.ragdollGravity * dt;
     rag.group.position.addScaledVector(rag.velocity, dt);
 
-    rag.angularVelocity.multiplyScalar(Math.exp(-2.2 * dt));
+    rag.angularVelocity.multiplyScalar(Math.exp(-0.72 * dt));
     rag.group.rotation.x += rag.angularVelocity.x * dt;
     rag.group.rotation.y += rag.angularVelocity.y * dt;
     rag.group.rotation.z += rag.angularVelocity.z * dt;
 
     for (const joint of rag.joints) {
       joint.upperVelocity += (
-        (joint.upperTarget - joint.upperAngle) * 22 -
+        (joint.upperTarget - joint.upperAngle) * 11 -
         joint.upperVelocity * joint.damping
       ) * dt;
       joint.upperAngle += joint.upperVelocity * dt;
       joint.upperAngle = THREE.MathUtils.clamp(joint.upperAngle, -joint.upperLimit, joint.upperLimit);
 
       joint.lowerVelocity += (
-        (joint.lowerTarget - joint.lowerAngle) * 26 -
+        (joint.lowerTarget - joint.lowerAngle) * 13 -
         joint.lowerVelocity * joint.damping
       ) * dt;
       joint.lowerAngle += joint.lowerVelocity * dt;
@@ -999,18 +995,18 @@ function updateRagdolls(dt) {
         rag.velocity.y *= -.18;
         rag.velocity.x *= .82;
         rag.velocity.z *= .82;
-        rag.angularVelocity.multiplyScalar(.72);
+        rag.angularVelocity.multiplyScalar(.88);
       } else {
         rag.velocity.y = 0;
-        rag.velocity.x *= .90;
-        rag.velocity.z *= .90;
-        rag.angularVelocity.multiplyScalar(.65);
+        rag.velocity.x *= .97;
+        rag.velocity.z *= .97;
+        rag.angularVelocity.multiplyScalar(.90);
       }
     }
 
-    if (rag.velocity.lengthSq() < .08 && rag.angularVelocity.lengthSq() < .08) {
-      rag.velocity.multiplyScalar(.7);
-      rag.angularVelocity.multiplyScalar(.7);
+    if (rag.velocity.lengthSq() < .015 && rag.angularVelocity.lengthSq() < .015) {
+      rag.velocity.multiplyScalar(.92);
+      rag.angularVelocity.multiplyScalar(.92);
     }
 
     if (rag.life <= 0) {
