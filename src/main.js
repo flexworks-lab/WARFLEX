@@ -305,8 +305,46 @@ function createWeapon() {
   flashMesh.position.set(0, .05, -2.48);
   weapon.add(flashMesh);
 
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(.2, .07, .72), dark);
+  rail.position.set(0, .27, -.36);
+  weapon.add(rail);
+
+  const opticBase = new THREE.Mesh(new THREE.BoxGeometry(.18, .11, .24), dark);
+  opticBase.position.set(0, .36, -.28);
+  weapon.add(opticBase);
+
+  const opticGlass = new THREE.Mesh(
+    new THREE.BoxGeometry(.12, .09, .16),
+    new THREE.MeshStandardMaterial({
+      color: 0x081218,
+      emissive: 0x3c98b7,
+      emissiveIntensity: 2.5,
+      metalness: .8,
+      roughness: .12,
+    })
+  );
+  opticGlass.position.set(0, .4, -.27);
+  weapon.add(opticGlass);
+
+  const foregrip = new THREE.Mesh(new THREE.BoxGeometry(.13, .3, .2), rubber);
+  foregrip.position.set(0, -.2, -1.1);
+  foregrip.rotation.x = -.18;
+  weapon.add(foregrip);
+
+  const handMat = createMaterial(0x8c6d59, .05, .9);
+  const leftHand = new THREE.Mesh(new THREE.SphereGeometry(.12, 12, 8), handMat);
+  leftHand.scale.set(1, .75, 1.25);
+  leftHand.position.set(-.29, -.16, -.9);
+  weapon.add(leftHand);
+
+  const rightHand = new THREE.Mesh(new THREE.SphereGeometry(.12, 12, 8), handMat);
+  rightHand.scale.set(1, .75, 1.25);
+  rightHand.position.set(.29, -.16, .12);
+  weapon.add(rightHand);
+
   weapon.userData.flash = flash;
   weapon.userData.flashMesh = flashMesh;
+  weapon.userData.muzzle = muzzle;
   weapon.position.set(.43, -.48, -1.03);
   weapon.rotation.set(-.03, -.04, -.015);
   camera.add(weapon);
@@ -322,70 +360,116 @@ function spawnEnemyModel() {
   const group = new THREE.Group();
   group.name = 'EnemySoldier';
 
-  const armor = createMaterial(0x68747f, .35, .55);
-  const dark = createMaterial(0x20262c, .65, .35);
-  const skin = createMaterial(0xb8c0c7, .18, .7);
-  const red = new THREE.MeshBasicMaterial({ color: 0xff3846 });
+  const armor = createMaterial(0x5f6c78, .55, .42);
+  const dark = createMaterial(0x1a2026, .82, .28);
+  const trim = createMaterial(0x303b45, .72, .3);
+  const skin = createMaterial(0xb8a18f, .08, .86);
+  const red = new THREE.MeshBasicMaterial({ color: 0xff3045 });
 
   const hips = new THREE.Group();
-  hips.position.y = .8;
+  hips.position.y = .82;
   group.add(hips);
 
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.3, .64), armor);
-  torso.position.y = .65;
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(1.08, 1.32, .68), armor);
+  torso.position.y = .66;
   torso.castShadow = true;
   hips.add(torso);
 
-  const chest = new THREE.Mesh(new THREE.BoxGeometry(1.12, .42, .72), dark);
-  chest.position.set(0, .85, -.03);
+  const chest = new THREE.Mesh(new THREE.BoxGeometry(1.16, .44, .76), dark);
+  chest.position.set(0, .86, -.05);
   chest.castShadow = true;
   hips.add(chest);
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(.72, .72, .72), skin);
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(.72, .38, .81), trim);
+  plate.position.set(0, 1.06, -.08);
+  plate.castShadow = true;
+  hips.add(plate);
+
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(1.08, .18, .7), dark);
+  belt.position.set(0, .25, 0);
+  hips.add(belt);
+
+  const backpack = new THREE.Mesh(new THREE.BoxGeometry(.7, .78, .3), dark);
+  backpack.position.set(0, .58, .48);
+  backpack.castShadow = true;
+  hips.add(backpack);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.42, 14, 10), skin);
   head.position.set(0, 1.72, 0);
   head.castShadow = true;
   hips.add(head);
 
-  const visor = new THREE.Mesh(new THREE.BoxGeometry(.46, .11, .035), red);
-  visor.position.set(0, 1.73, -.37);
+  const helmet = new THREE.Mesh(new THREE.SphereGeometry(.46, 14, 8), dark);
+  helmet.scale.set(1, .62, 1);
+  helmet.position.set(0, 1.93, 0);
+  helmet.castShadow = true;
+  hips.add(helmet);
+
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(.5, .1, .04), red);
+  visor.position.set(0, 1.76, -.39);
   hips.add(visor);
+
+  const leftShoulder = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8), armor);
+  leftShoulder.position.set(-.62, 1.17, 0);
+  hips.add(leftShoulder);
+
+  const rightShoulder = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8), armor);
+  rightShoulder.position.set(.62, 1.17, 0);
+  hips.add(rightShoulder);
 
   const leftArm = new THREE.Group();
   leftArm.position.set(-.72, 1.12, 0);
-  const leftUpper = new THREE.Mesh(new THREE.BoxGeometry(.3, .9, .32), armor);
+  const leftUpper = new THREE.Mesh(new THREE.BoxGeometry(.32, .92, .34), armor);
   leftUpper.position.y = -.35;
   leftUpper.castShadow = true;
   leftArm.add(leftUpper);
+  const leftFore = new THREE.Mesh(new THREE.BoxGeometry(.29, .72, .31), dark);
+  leftFore.position.y = -1.02;
+  leftArm.add(leftFore);
   hips.add(leftArm);
 
   const rightArm = new THREE.Group();
   rightArm.position.set(.72, 1.12, 0);
-  const rightUpper = new THREE.Mesh(new THREE.BoxGeometry(.3, .9, .32), armor);
+  const rightUpper = new THREE.Mesh(new THREE.BoxGeometry(.32, .92, .34), armor);
   rightUpper.position.y = -.35;
   rightUpper.castShadow = true;
   rightArm.add(rightUpper);
+  const rightFore = new THREE.Mesh(new THREE.BoxGeometry(.29, .72, .31), dark);
+  rightFore.position.y = -1.02;
+  rightArm.add(rightFore);
   hips.add(rightArm);
 
+  const weaponMesh = new THREE.Mesh(new THREE.BoxGeometry(.18, .18, .75), dark);
+  weaponMesh.position.set(.38, .35, -.55);
+  weaponMesh.rotation.x = -.25;
+  weaponMesh.castShadow = true;
+  hips.add(weaponMesh);
+
   const leftLeg = new THREE.Group();
-  leftLeg.position.set(-.28, .05, 0);
-  const leftLower = new THREE.Mesh(new THREE.BoxGeometry(.36, .9, .38), dark);
-  leftLower.position.y = -.35;
-  leftLower.castShadow = true;
-  leftLeg.add(leftLower);
+  leftLeg.position.set(-.3, .06, 0);
+  const leftThigh = new THREE.Mesh(new THREE.BoxGeometry(.4, .95, .42), armor);
+  leftThigh.position.y = -.38;
+  leftThigh.castShadow = true;
+  leftLeg.add(leftThigh);
+  const leftBoot = new THREE.Mesh(new THREE.BoxGeometry(.44, .34, .62), dark);
+  leftBoot.position.set(0, -.97, -.08);
+  leftLeg.add(leftBoot);
   hips.add(leftLeg);
 
   const rightLeg = new THREE.Group();
-  rightLeg.position.set(.28, .05, 0);
-  const rightLower = new THREE.Mesh(new THREE.BoxGeometry(.36, .9, .38), dark);
-  rightLower.position.y = -.35;
-  rightLower.castShadow = true;
-  rightLeg.add(rightLower);
+  rightLeg.position.set(.3, .06, 0);
+  const rightThigh = new THREE.Mesh(new THREE.BoxGeometry(.4, .95, .42), armor);
+  rightThigh.position.y = -.38;
+  rightThigh.castShadow = true;
+  rightLeg.add(rightThigh);
+  const rightBoot = new THREE.Mesh(new THREE.BoxGeometry(.44, .34, .62), dark);
+  rightBoot.position.set(0, -.97, -.08);
+  rightLeg.add(rightBoot);
   hips.add(rightLeg);
 
   group.userData.parts = { hips, leftArm, rightArm, leftLeg, rightLeg, head };
   return group;
 }
-
 function resetGame() {
   for (const enemy of enemies) scene.remove(enemy.group);
   enemies.length = 0;
