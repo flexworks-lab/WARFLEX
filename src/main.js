@@ -672,7 +672,7 @@ function spawnEnemyModel() {
   return group;
 }
 
-function resetGame() {
+function resetGame(spawnImmediately = true) {
   for (const enemy of enemies) scene.remove(enemy.group);
   enemies.length = 0;
   for (const t of tracers) scene.remove(t.mesh);
@@ -703,8 +703,8 @@ function resetGame() {
   camera.updateProjectionMatrix();
   weapon.position.set(.43, -.48, -1.03);
   weapon.rotation.set(-.03, -.04, -.015);
-  spawnWave();
   updateHud();
+  if (spawnImmediately) spawnWave();
 }
 
 function getSpawnPoint(index) {
@@ -725,9 +725,21 @@ function getSpawnPoint(index) {
 function spawnWave() {
   const count = Math.min(4 + state.wave * 2, 18);
   state.spawnLeft = count;
-  for (let i = 0; i < count; i += 1) spawnEnemy(i);
   state.nextWaveTimer = 0;
   updateHud();
+
+  // Spawn one soldier per frame so START/REDEPLOY never freezes while
+  // the higher-detail models and their materials are being constructed.
+  let nextIndex = 0;
+  const spawnNext = () => {
+    if (!state.active || state.over || nextIndex >= count) return;
+    spawnEnemy(nextIndex);
+    nextIndex += 1;
+    updateHud();
+    if (nextIndex < count) requestAnimationFrame(spawnNext);
+  };
+
+  requestAnimationFrame(spawnNext);
 }
 
 function spawnEnemy(index = 0) {
@@ -1857,13 +1869,22 @@ setWaveChoice('1');
 showMenuView('main');
 
 function enterGame() {
-  resetGame();
+  // Reset the arena state first, but defer enemy construction until the
+  // browser has painted the game screen. This keeps the START button
+  // responsive even with the high-detail soldier models.
+  resetGame(false);
   renderer.domElement.style.display = 'block';
   els.start.classList.add('hidden');
   els.pause.classList.add('hidden');
   els.gameOver.classList.add('hidden');
   els.hud.classList.remove('hidden');
-  renderer.domElement.requestPointerLock();
+
+  renderer.domElement.requestPointerLock?.();
+  requestAnimationFrame(() => {
+    if (state.active && !state.over && enemies.length === 0 && state.spawnLeft === 0) {
+      spawnWave();
+    }
+  });
 }
 
 els.startButton.addEventListener('click', enterGame);
