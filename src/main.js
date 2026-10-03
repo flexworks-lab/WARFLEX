@@ -470,6 +470,20 @@ function spawnEnemyModel() {
     return mesh;
   };
 
+  const capsule = (radius, length, position, material, parent, rotation = [0,0,0], name = '') => {
+    const mesh = new THREE.Mesh(
+      new THREE.CapsuleGeometry(radius, length, 6, 12),
+      material
+    );
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    if (name) mesh.name = name;
+    parent.add(mesh);
+    return mesh;
+  };
+
   const torus = (radius, tube, position, material, parent, rotation = [0,0,0], arc = Math.PI * 2, name = '') => {
     const mesh = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 16, arc), material);
     mesh.position.set(...position);
@@ -490,7 +504,10 @@ function spawnEnemyModel() {
   box([1.08, 1.16, .64], [0, .62, 0], cloth, hips, 'Torso');
   box([1.16, .76, .70], [0, .70, -.04], armorDark, hips, 'PlateCarrier');
   box([.84, .46, .74], [0, .82, -.10], armor, hips, 'ChestPlate');
+  sphere(.38, [0, .84, -.24], armor, hips, [1.15, .62, .55]);
   box([.60, .18, .72], [0, 1.12, -.02], trim, hips, 'CollarPlate');
+  sphere(.20, [-.50, .86, -.04], armorDark, hips, [1.0, .7, .9]);
+  sphere(.20, [.50, .86, -.04], armorDark, hips, [1.0, .7, .9]);
 
   // Plate carrier segmentation / MOLLE rows.
   for (const x of [-.30, 0, .30]) {
@@ -551,8 +568,9 @@ function spawnEnemyModel() {
   leftArm.position.set(-.70, 1.04, 0);
   hips.add(leftArm);
   sphere(.18, [0, .03, 0], armor, leftArm, [1.05, .9, 1.1], 'LeftShoulderCap');
-  box([.34, .62, .34], [0, -.33, 0], clothMid, leftArm, 'LeftUpperArm');
+  capsule(.17, .43, [0, -.35, 0], clothMid, leftArm, [0,0,0], 'LeftUpperArm');
   box([.29, .48, .31], [0, -.36, -.06], armorDark, leftArm, 'LeftUpperArmor', [0,0,-.03]);
+  sphere(.16, [0, -.34, -.07], armor, leftArm, [1.0, .82, 1.0]);
   const leftElbow = new THREE.Group();
   leftElbow.name = 'RagdollLeftElbow';
   leftElbow.position.set(0, -.68, 0);
@@ -568,8 +586,9 @@ function spawnEnemyModel() {
   rightArm.position.set(.70, 1.04, 0);
   hips.add(rightArm);
   sphere(.18, [0, .03, 0], armor, rightArm, [1.05, .9, 1.1], 'RightShoulderCap');
-  box([.34, .62, .34], [0, -.33, 0], clothMid, rightArm, 'RightUpperArm');
+  capsule(.17, .43, [0, -.35, 0], clothMid, rightArm, [0,0,0], 'RightUpperArm');
   box([.29, .48, .31], [0, -.36, -.06], armorDark, rightArm, 'RightUpperArmor', [0,0,.03]);
+  sphere(.16, [0, -.34, -.07], armor, rightArm, [1.0, .82, 1.0]);
   const rightElbow = new THREE.Group();
   rightElbow.name = 'RagdollRightElbow';
   rightElbow.position.set(0, -.68, 0);
@@ -612,8 +631,9 @@ function spawnEnemyModel() {
     knee.name = kneeName;
     knee.position.set(0, -.76, 0);
     leg.add(knee);
-    box([.36, .64, .38], [0, -.32, 0], cloth, knee, side < 0 ? 'LeftShin' : 'RightShin');
+    capsule(.17, .44, [0, -.34, 0], cloth, knee, [0,0,0], side < 0 ? 'LeftShin' : 'RightShin');
     box([.29, .46, .40], [0, -.34, -.08], armor, knee, side < 0 ? 'LeftShinGuard' : 'RightShinGuard');
+    sphere(.17, [0, -.35, -.07], armorDark, knee, [1.0, .9, 1.0]);
     box([.44, .26, .68], [0, -.68, -.08], rubber, knee, side < 0 ? 'LeftBoot' : 'RightBoot');
     box([.46, .08, .25], [0, -.78, -.16], armorBlack, knee);
     box([.10, .08, .16], [side * .15, -.79, -.20], metal, knee);
@@ -708,17 +728,21 @@ function resetGame(spawnImmediately = true) {
 }
 
 function getSpawnPoint(index) {
-  const ring = 25 + (index % 3) * 4;
-  const angle = (index * 2.399963) % (Math.PI * 2);
-  const points = [
-    new THREE.Vector3(Math.cos(angle) * ring, 0, Math.sin(angle) * ring),
-    new THREE.Vector3((index % 2 ? -1 : 1) * 40, 0, -35 + index * 7),
-    new THREE.Vector3(-40 + index * 9, 0, (index % 2 ? -1 : 1) * 38),
+  // Put the first wave in a clear forward arc so enemies are immediately
+  // visible after spawning instead of appearing mostly behind the player.
+  const forwardArc = [
+    new THREE.Vector3(-12, 0, 1),
+    new THREE.Vector3(-6, 0, -7),
+    new THREE.Vector3(0, 0, -11),
+    new THREE.Vector3(6, 0, -7),
+    new THREE.Vector3(12, 0, 1),
+    new THREE.Vector3(-17, 0, -14),
+    new THREE.Vector3(17, 0, -14),
+    new THREE.Vector3(0, 0, -22),
   ];
-  const p = points[index % points.length].clone();
-  p.x = THREE.MathUtils.clamp(p.x, -45, 45);
-  p.z = THREE.MathUtils.clamp(p.z, -45, 45);
-  if (p.distanceTo(player.position) < 15) p.z -= 18;
+
+  const p = forwardArc[index % forwardArc.length].clone();
+  if (p.distanceTo(player.position) < 12) p.z -= 8;
   return p;
 }
 
