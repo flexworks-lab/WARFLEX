@@ -14,6 +14,8 @@ const CONFIG = {
   mouseSensitivity: 0.0018,
   enemyBaseHealth: 55,
   enemySpeed: 2.7,
+  ragdollGravity: 20,
+  ragdollLife: 5.5,
 };
 
 const els = {
@@ -41,6 +43,9 @@ const els = {
   updateMessage: document.querySelector('#update-message'),
   updateReload: document.querySelector('#update-reload'),
   updateDismiss: document.querySelector('#update-dismiss'),
+  selectedWaveLabel: document.querySelector('#selected-wave-label'),
+  waveChoices: [...document.querySelectorAll('[data-wave-choice]')],
+  damageOverlay: document.querySelector('#damage-overlay'),
 };
 
 const scene = new THREE.Scene();
@@ -53,6 +58,9 @@ camera.rotation.order = 'YXZ';
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
@@ -71,6 +79,9 @@ const obstacles = [];
 const enemies = [];
 const tracers = [];
 const particles = [];
+const ragdolls = [];
+const shellCasings = [];
+const arenaLights = [];
 
 const state = {
   active: false,
@@ -94,6 +105,9 @@ const state = {
   walkTime: 0,
   weaponKick: 0,
   muzzleFlash: 0,
+  shake: 0,
+  selectedWave: 1,
+  menuTime: 0,
 };
 
 const player = {
@@ -174,13 +188,37 @@ function addArena() {
 
   const lightPositions = [[-25, 8, -25], [25, 8, -25], [-25, 8, 25], [25, 8, 25], [0, 10, 0]];
   for (const [x, y, z] of lightPositions) {
-    const light = new THREE.PointLight(0xdcecff, 35, 28, 2);
+    const light = new THREE.PointLight(0xdcecff, 48, 32, 2);
     light.position.set(x, y, z);
     scene.add(light);
+    arenaLights.push(light);
+  }
+  const accentMat = new THREE.MeshStandardMaterial({
+    color: 0x25313a,
+    emissive: 0x273a46,
+    emissiveIntensity: 2.2,
+    metalness: .6,
+    roughness: .35,
+  });
+  for (const z of [-48, 48]) {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(86, .08, .18), accentMat);
+    strip.position.set(0, .08, z);
+    scene.add(strip);
+  }
+  for (const x of [-48, 48]) {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(.18, .08, 86), accentMat);
+    strip.position.set(x, .08, 0);
+    scene.add(strip);
   }
 }
 
 addArena();
+
+const arenaGrid = new THREE.GridHelper(108, 54, 0x33404b, 0x1b242d);
+arenaGrid.position.y = 0.015;
+arenaGrid.material.transparent = true;
+arenaGrid.material.opacity = 0.38;
+scene.add(arenaGrid);
 
 function createMaterial(color, metalness = .1, roughness = .65) {
   return new THREE.MeshStandardMaterial({ color, metalness, roughness });
