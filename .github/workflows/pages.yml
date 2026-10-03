@@ -25,6 +25,9 @@ jobs:
         run: |
           node -e 'const fs=require("fs"); const info={version:process.env.GITHUB_SHA,message:process.env.UPDATE_MESSAGE,timestamp:new Date().toISOString()}; fs.writeFileSync("update.json", JSON.stringify(info));'
 
+      - name: Validate JavaScript
+        run: node --check src/main.js
+
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
