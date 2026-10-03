@@ -1274,23 +1274,32 @@ function updateRagdolls(dt) {
     rag.fallAngle = THREE.MathUtils.clamp(rag.fallAngle, rag.fallTarget, 0);
     rag.group.rotation.z = rag.fallAngle;
 
-    // Spine bends separately from the pelvis so the torso does not behave like a rigid plank.
+    // After the initial fling, the body starts collapsing inward instead of
+    // freezing spread out. This gives it a loose "fold onto itself" motion.
+    const foldAmount = THREE.MathUtils.clamp((rag.age - .22) / .95, 0, 1);
+    const foldEase = foldAmount * foldAmount * (3 - 2 * foldAmount);
+
+    // Spine curls forward and slightly sideways.
     const spine = rag.spine;
-    spine.targetX *= Math.exp(-1.15 * dt);
-    spine.targetZ *= Math.exp(-1.15 * dt);
-    spine.velocityX += ((spine.targetX - spine.angleX) * 9.5 - spine.velocityX * 3.4) * dt;
-    spine.velocityZ += ((spine.targetZ - spine.angleZ) * 8.5 - spine.velocityZ * 3.0) * dt;
+    const impactCurl = Math.sin(rag.age * 7.5) * .05 * (1 - foldEase);
+    const foldSpineX = THREE.MathUtils.lerp(spine.targetX, .55, foldEase) + impactCurl;
+    const foldSpineZ = THREE.MathUtils.lerp(spine.targetZ, .16, foldEase);
+    spine.targetX = foldSpineX;
+    spine.targetZ = foldSpineZ;
+    spine.velocityX += ((spine.targetX - spine.angleX) * 10.5 - spine.velocityX * 3.0) * dt;
+    spine.velocityZ += ((spine.targetZ - spine.angleZ) * 9.0 - spine.velocityZ * 2.8) * dt;
     spine.angleX += spine.velocityX * dt;
     spine.angleZ += spine.velocityZ * dt;
-    spine.angleX = THREE.MathUtils.clamp(spine.angleX, -.72, .72);
-    spine.angleZ = THREE.MathUtils.clamp(spine.angleZ, -.55, .55);
+    spine.angleX = THREE.MathUtils.clamp(spine.angleX, -.9, .9);
+    spine.angleZ = THREE.MathUtils.clamp(spine.angleZ, -.65, .65);
     spine.object.rotation.x = spine.angleX;
     spine.object.rotation.z = spine.angleZ;
 
-    // The head lags behind the torso, then settles.
+    // The head follows the torso and tucks inward.
     const neck = rag.neck;
-    neck.velocityX += (-neck.angleX * 7.5 - neck.velocityX * 2.4) * dt;
-    neck.velocityY += (-neck.angleY * 7.0 - neck.velocityY * 2.1) * dt;
+    const foldHeadX = THREE.MathUtils.lerp(0, .42, foldEase);
+    neck.velocityX += ((foldHeadX - neck.angleX) * 8.0 - neck.velocityX * 2.2) * dt;
+    neck.velocityY += (-neck.angleY * 6.5 - neck.velocityY * 2.0) * dt;
     neck.angleX += neck.velocityX * dt;
     neck.angleY += neck.velocityY * dt;
     neck.angleX = THREE.MathUtils.clamp(neck.angleX, -1.0, 1.0);
@@ -1299,29 +1308,43 @@ function updateRagdolls(dt) {
     neck.object.rotation.y = neck.angleY;
 
     for (const joint of rag.joints) {
-      joint.upperTarget *= Math.exp(-joint.targetDecay * dt);
-      joint.lowerTarget *= Math.exp(-joint.targetDecay * dt);
+      // Keep the early fling, then progressively curl the joints toward the body.
+      const isArm = joint.upper.name.includes('Arm');
+      const isLeg = joint.upper.name.includes('Leg');
 
-      // Preserve a fast fling for the first part of the fall, then damp naturally.
-      const flingDamping = rag.age < .55 ? .45 : .95;
+      let desiredUpper = joint.upperTarget;
+      let desiredLower = joint.lowerTarget;
+
+      if (isLeg) {
+        desiredUpper = THREE.MathUtils.lerp(desiredUpper, -.48, foldEase);
+        desiredLower = THREE.MathUtils.lerp(desiredLower, .92, foldEase);
+      } else if (isArm) {
+        desiredUpper = THREE.MathUtils.lerp(desiredUpper, -.58, foldEase);
+        desiredLower = THREE.MathUtils.lerp(desiredLower, .82, foldEase);
+      }
+
+      joint.upperTarget = desiredUpper;
+      joint.lowerTarget = desiredLower;
+
+      const flingDamping = rag.age < .55 ? .42 : THREE.MathUtils.lerp(.72, 1.18, foldEase);
       joint.upperVelocity += (
-        (joint.upperTarget - joint.upperAngle) * 7.5 -
+        (joint.upperTarget - joint.upperAngle) * 8.8 -
         joint.upperVelocity * (joint.damping * flingDamping)
       ) * dt;
       joint.upperAngle += joint.upperVelocity * dt;
       joint.upperAngle = THREE.MathUtils.clamp(joint.upperAngle, -joint.upperLimit, joint.upperLimit);
 
       joint.lowerVelocity += (
-        (joint.lowerTarget - joint.lowerAngle) * 8.5 -
+        (joint.lowerTarget - joint.lowerAngle) * 10.5 -
         joint.lowerVelocity * (joint.damping * flingDamping)
       ) * dt;
       joint.lowerAngle += joint.lowerVelocity * dt;
       joint.lowerAngle = THREE.MathUtils.clamp(joint.lowerAngle, -joint.lowerLimit, joint.lowerLimit);
 
       joint.upper.rotation.x = joint.upperAngle;
-      joint.upper.rotation.z = Math.sin(joint.upperAngle * 1.35) * .16;
+      joint.upper.rotation.z = Math.sin(joint.upperAngle * 1.35) * (.16 + foldEase * .08);
       joint.lower.rotation.x = joint.lowerAngle;
-      joint.lower.rotation.z = Math.sin(joint.lowerAngle * 1.15) * .11;
+      joint.lower.rotation.z = Math.sin(joint.lowerAngle * 1.15) * (.11 + foldEase * .06);
     }
 
     // Keep the entire body above the floor, not just the hip pivot.
