@@ -42,11 +42,24 @@
   </div>
 
   <div id="start-screen" class="screen">
-    <div class="panel">
-      <p class="eyebrow">ONLINE // TRAINING SIM</p>
+    <div class="panel menu-panel">
+      <p class="eyebrow">ONLINE // COMBAT SIMULATION</p>
       <h1>PROJECT <span>STRIKE</span></h1>
-      <p class="lede">Fast movement. Hitscan gunplay. Endless enemy waves.</p>
-      <button id="start-button">DEPLOY</button>
+      <p class="lede">Choose your starting wave, deploy, and survive as long as you can.</p>
+
+      <div class="menu-section">
+        <div class="menu-label">STARTING WAVE</div>
+        <div class="wave-grid">
+          <button class="wave-choice active" data-wave-choice="1"><strong>01</strong><span>RECRUIT</span></button>
+          <button class="wave-choice" data-wave-choice="5"><strong>05</strong><span>ASSAULT</span></button>
+          <button class="wave-choice" data-wave-choice="10"><strong>10</strong><span>VETERAN</span></button>
+          <button class="wave-choice" data-wave-choice="20"><strong>20</strong><span>HELL</span></button>
+          <button class="wave-choice wide" data-wave-choice="endless"><strong>∞</strong><span>ENDLESS</span></button>
+        </div>
+      </div>
+
+      <button id="start-button" class="deploy-button">DEPLOY <span id="selected-wave-label">WAVE 1</span></button>
+
       <div class="controls">
         <span><b>WASD</b> Move</span>
         <span><b>SHIFT</b> Sprint</span>
@@ -55,7 +68,7 @@
         <span><b>R</b> Reload</span>
         <span><b>ESC</b> Pause</span>
       </div>
-      <p class="small">Best in Chromium / Edge / Chrome with a mouse.</p>
+      <p class="small">Chromium / Edge / Chrome recommended.</p>
     </div>
   </div>
 
@@ -86,6 +99,6 @@
       }
     }
   </script>
-  <script type="module" src="./src/main.js?v=warp3d-1"></script>
+  <script type="module" src="./src/main.js?v=warfex-hq-2"></script>
 </body>
 </html>
