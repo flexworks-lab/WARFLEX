@@ -8,6 +8,17 @@
   <link rel="stylesheet" href="./src/style.css" />
 </head>
 <body>
+  <div id="update-notice" class="update-notice hidden" role="status" aria-live="polite">
+    <div class="update-copy">
+      <strong id="update-title">UPDATE AVAILABLE</strong>
+      <span id="update-message">A new WARFLEX update is ready.</span>
+    </div>
+    <div class="update-actions">
+      <button id="update-reload">RELOAD</button>
+      <button id="update-dismiss" aria-label="Dismiss update">×</button>
+    </div>
+  </div>
+
   <div id="hud" class="hud hidden">
     <div class="top-left">
       <div class="brand">PROJECT STRIKE</div>
