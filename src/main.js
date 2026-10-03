@@ -1022,9 +1022,32 @@ function frame() {
     tickEffects(dt);
   }
 
+  updateRagdolls(dt);
   updateWeapon(dt);
+
+  state.shake = Math.max(0, state.shake - dt * 1.9);
+  if (state.shake > 0 && state.active) {
+    camera.position.x += (Math.random()-.5) * state.shake;
+    camera.position.y += (Math.random()-.5) * state.shake;
+    camera.rotation.z += (Math.random()-.5) * state.shake * .7;
+  }
+
   renderer.render(scene, camera);
 }
+
+function setWaveChoice(value) {
+  state.selectedWave = value === 'endless' ? -1 : Number(value);
+  els.selectedWaveLabel.textContent = state.selectedWave === -1 ? 'ENDLESS' : `WAVE ${state.selectedWave}`;
+  for (const button of els.waveChoices) {
+    button.classList.toggle('active', button.dataset.waveChoice === String(value));
+  }
+}
+
+for (const button of els.waveChoices) {
+  button.addEventListener('click', () => setWaveChoice(button.dataset.waveChoice));
+}
+
+setWaveChoice('1');
 
 function enterGame() {
   resetGame();
