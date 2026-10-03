@@ -135,3 +135,94 @@ button:active { transform: translateY(0); }
   .update-actions { gap: 4px; }
   .update-copy span { white-space: normal; }
 }
+
+.menu-panel {
+  width: min(760px, calc(100vw - 32px));
+  padding: clamp(30px, 5vw, 54px);
+  position: relative;
+  overflow: hidden;
+}
+.menu-panel::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(120,170,210,.11), transparent 35%),
+    radial-gradient(circle at 80% 80%, rgba(255,90,110,.06), transparent 34%);
+  pointer-events: none;
+}
+.menu-panel > * { position: relative; }
+.menu-section { margin: 28px 0 22px; }
+.menu-label {
+  margin-bottom: 10px;
+  color: #6f7b86;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .18em;
+}
+.wave-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 9px;
+}
+.wave-choice {
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+  min-height: 72px;
+  padding: 12px 13px;
+  color: #aeb8c1;
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.1);
+  text-align: left;
+}
+.wave-choice:hover {
+  color: #fff;
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.24);
+  transform: translateY(-1px);
+}
+.wave-choice.active {
+  color: #fff;
+  background: rgba(219,228,235,.13);
+  border-color: rgba(219,228,235,.65);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 0 28px rgba(164,194,215,.08);
+}
+.wave-choice strong {
+  font-size: 25px;
+  line-height: 1;
+  letter-spacing: -.04em;
+}
+.wave-choice span {
+  color: #65717c;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .14em;
+}
+.wave-choice.active span { color: #b7c4ce; }
+.wave-choice.wide { grid-column: span 4; min-height: 56px; grid-template-columns: auto 1fr; align-items: center; gap: 10px; }
+.wave-choice.wide strong { font-size: 28px; }
+.deploy-button { width: 100%; margin-top: 2px; }
+.deploy-button span { opacity: .55; }
+
+#damage-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(circle at center, transparent 36%, rgba(255,32,48,.04) 68%, rgba(255,25,40,.4) 100%);
+  transition: opacity .08s ease;
+  mix-blend-mode: screen;
+}
+#damage-overlay.show { opacity: 1; }
+
+.weapon-glow {
+  filter: drop-shadow(0 0 9px rgba(255,205,110,.28));
+}
+
+@media (max-width: 640px) {
+  .wave-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .wave-choice.wide { grid-column: span 2; }
+}
