@@ -278,6 +278,7 @@ function createWeapon() {
 }
 
 const weapon = createWeapon();
+weapon.visible = false;
 
 function spawnEnemyModel() {
   const group = new THREE.Group();
@@ -477,13 +478,19 @@ function movePlayer(dt) {
   if (moving) input.normalize();
 
   const sprinting = keys.has('ShiftLeft') || keys.has('ShiftRight');
-  const speed = input.z > 0 ? CONFIG.backwardSpeed : (sprinting ? CONFIG.sprintSpeed : CONFIG.walkSpeed);
+  const forwardSpeed = sprinting ? CONFIG.sprintSpeed : CONFIG.walkSpeed;
+  const speed = input.y > 0 ? CONFIG.backwardSpeed : forwardSpeed;
 
-  const forward = new THREE.Vector3(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));
-  const right = new THREE.Vector3(Math.cos(state.yaw), 0, -Math.sin(state.yaw));
+  const lookForward = new THREE.Vector3();
+  camera.getWorldDirection(lookForward);
+  lookForward.y = 0;
+  if (lookForward.lengthSq() < 0.0001) lookForward.set(0, 0, -1);
+  lookForward.normalize();
+
+  const right = new THREE.Vector3(-lookForward.z, 0, lookForward.x);
   const velocity = new THREE.Vector3()
     .addScaledVector(right, input.x * speed)
-    .addScaledVector(forward, -input.y * speed);
+    .addScaledVector(lookForward, -input.y * speed);
 
   const next = player.position.clone().addScaledVector(velocity, dt);
   if (!playerCollides(new THREE.Vector3(next.x, player.position.y, player.position.z))) player.position.x = next.x;
@@ -676,8 +683,11 @@ function updateWeapon(dt) {
   weapon.rotation.x = -.03 - state.weaponKick * .09;
   weapon.rotation.y = -.04 + Math.sin(t * bobSpeed * .5) * bobAmount * 1.2;
   weapon.rotation.z = -.015 + Math.sin(t * bobSpeed) * bobAmount * .8;
+  weapon.children.forEach((child) => {
+    if (child.isMesh) child.frustumCulled = false;
+  });
 
-  const visible = state.active && !state.over && document.pointerLockElement === renderer.domElement;
+  const visible = state.active && !state.over;
   weapon.visible = visible;
 
   const flashPower = state.muzzleFlash > 0 ? 18 : 0;
