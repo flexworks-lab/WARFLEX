@@ -25,8 +25,12 @@ jobs:
         run: |
           node -e 'const fs=require("fs"); const info={version:process.env.GITHUB_SHA,message:process.env.UPDATE_MESSAGE,timestamp:new Date().toISOString()}; fs.writeFileSync("update.json", JSON.stringify(info));'
 
-      - name: Validate JavaScript
-        run: node --check src/main.js
+      - name: Stamp and validate client bundle
+        run: |
+          sed -i "s/__WARFLEX_BUILD__/\${GITHUB_SHA}/g" index.html
+          node --check src/main.js
+          grep -q "./src/main.js?v=\${GITHUB_SHA}" index.html
+          test -s src/main.js
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
