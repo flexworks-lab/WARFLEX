@@ -799,7 +799,8 @@ function damagePlayer(amount) {
   if (state.damageCooldown > 0 || state.over) return;
   state.damageCooldown = .22;
   state.health = Math.max(0, state.health - amount);
-  state.hurtFlash = .12;
+  state.hurtFlash = .18;
+  state.shake = Math.max(state.shake, .13);
   updateHud();
   if (state.health <= 0) endGame();
 }
@@ -856,6 +857,52 @@ function updateEnemies(dt) {
   }
 }
 
+function updateRagdolls(dt) {
+  for (let i = ragdolls.length - 1; i >= 0; i -= 1) {
+    const rag = ragdolls[i];
+    rag.life -= dt;
+    rag.velocity.y -= CONFIG.ragdollGravity * dt;
+    rag.mesh.position.addScaledVector(rag.velocity, dt);
+    rag.mesh.rotation.x += rag.angularVelocity.x * dt;
+    rag.mesh.rotation.y += rag.angularVelocity.y * dt;
+    rag.mesh.rotation.z += rag.angularVelocity.z * dt;
+
+    if (rag.mesh.position.y < .08) {
+      rag.mesh.position.y = .08;
+      if (Math.abs(rag.velocity.y) > 1) rag.velocity.y *= -.28;
+      else rag.velocity.y = 0;
+      rag.velocity.x *= .78;
+      rag.velocity.z *= .78;
+      rag.angularVelocity.multiplyScalar(.84);
+    }
+
+    if (rag.life <= 0) {
+      scene.remove(rag.mesh);
+      ragdolls.splice(i, 1);
+    }
+  }
+
+  for (let i = shellCasings.length - 1; i >= 0; i -= 1) {
+    const shell = shellCasings[i];
+    shell.life -= dt;
+    shell.velocity.y -= 12 * dt;
+    shell.mesh.position.addScaledVector(shell.velocity, dt);
+    shell.mesh.rotation.x += shell.angularVelocity.x * dt;
+    shell.mesh.rotation.y += shell.angularVelocity.y * dt;
+    shell.mesh.rotation.z += shell.angularVelocity.z * dt;
+    if (shell.mesh.position.y < .05) {
+      shell.mesh.position.y = .05;
+      shell.velocity.y *= -.22;
+      shell.velocity.x *= .75;
+      shell.velocity.z *= .75;
+    }
+    if (shell.life <= 0) {
+      scene.remove(shell.mesh);
+      shellCasings.splice(i, 1);
+    }
+  }
+}
+
 function updateWave(dt) {
   if (state.spawnLeft > 0 || enemies.length > 0) return;
   state.nextWaveTimer += dt;
@@ -877,8 +924,9 @@ function updateWeapon(dt) {
   state.weaponKick = Math.max(0, state.weaponKick - dt * 10);
   state.muzzleFlash = Math.max(0, state.muzzleFlash - dt);
 
+  const breathing = Math.sin(t * 1.7) * .006;
   weapon.position.x = .43 + Math.sin(t * bobSpeed) * bobAmount;
-  weapon.position.y = -.48 + Math.abs(Math.cos(t * bobSpeed)) * bobAmount - state.weaponKick * .045;
+  weapon.position.y = -.48 + breathing + Math.abs(Math.cos(t * bobSpeed)) * bobAmount - state.weaponKick * .045;
   weapon.position.z = -1.03 + state.weaponKick * .09;
   weapon.rotation.x = -.03 - state.weaponKick * .09;
   weapon.rotation.y = -.04 + Math.sin(t * bobSpeed * .5) * bobAmount * 1.2;
@@ -952,8 +1000,13 @@ function tickEffects(dt) {
     }
   }
 
-  if (state.hurtFlash > 0) renderer.domElement.style.filter = 'brightness(1.15) contrast(1.1)';
-  else renderer.domElement.style.filter = '';
+  if (state.hurtFlash > 0) {
+    renderer.domElement.style.filter = 'brightness(1.2) contrast(1.12) saturate(1.08)';
+    els.damageOverlay.classList.add('show');
+  } else {
+    renderer.domElement.style.filter = '';
+    els.damageOverlay.classList.remove('show');
+  }
 }
 
 function frame() {
