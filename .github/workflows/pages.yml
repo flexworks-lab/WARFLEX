@@ -29,6 +29,11 @@ jobs:
         run: |
           sed -i "s/__WARFLEX_BUILD__/${GITHUB_SHA}/g" index.html
           node --check src/main.js
+          node --check src/physics/PhysicsWorld.js
+          node --check src/physics/RagdollController.js
+          node --check src/systems/WaveDirector.js
+          node --check src/systems/SteeringAgent.js
+          grep -q '"cannon-es":' index.html
           grep -q "./src/main.js?v=${GITHUB_SHA}" index.html
           test -s src/main.js
 
