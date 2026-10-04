@@ -965,6 +965,8 @@ function createEnemyFallbackModel() {
   };
   group.userData.visuals = { armor, lens: glass };
   group.userData.baseScale = .54;
+  // Keep the fallback at the same size as the detailed enemy model.
+  group.scale.setScalar(group.userData.baseScale);
 
   group.traverse((o) => {
     if (o.isMesh) {
