@@ -650,15 +650,15 @@ function copyErrorPanel(title, error) {
   textNode.textContent = message;
   panel.classList.remove('hidden');
 
-  copyButton?.onclick = () => {
-    copyTextToClipboard(message);
-    if (copyButton) {
+  if (copyButton) {
+    copyButton.onclick = () => {
+      copyTextToClipboard(message);
       copyButton.textContent = 'COPIED';
       window.setTimeout(() => {
         copyButton.textContent = 'COPY ERROR';
       }, 1000);
-    }
-  };
+    };
+  }
 }
 
 function showRuntimeError(error, context = 'Runtime error') {
@@ -670,10 +670,12 @@ function showRuntimeError(error, context = 'Runtime error') {
   const existing = document.querySelector('#warfex-debug-error');
   const panel = existing || document.createElement('textarea');
   panel.id = 'warfex-debug-error';
-  panel.textContent =
+  panel.value =
     'WARFLEX ERROR\\n\\n' +
     context + '\\n' +
     (error?.stack || error?.message || String(error));
+  panel.readOnly = true;
+  panel.spellcheck = false;
   Object.assign(panel.style, {
     position: 'fixed',
     left: '12px',
