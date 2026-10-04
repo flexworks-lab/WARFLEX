@@ -779,6 +779,11 @@ const HALF_D = MAP_DEPTH * 0.5;
 const BLANK_BASE_MAP = false;
 const SIMPLE_SLOPE_MAP = true;
 
+// Optimized vegetation is chunked so distant grass can be hidden in groups
+// instead of updating thousands of individual objects.
+const optimizedGrassChunks = [];
+let optimizedGrassCullTimer = 0;
+
 const fallbackArenaRoot = new THREE.Group();
 fallbackArenaRoot.name = 'FallbackArena';
 scene.add(fallbackArenaRoot);
@@ -2111,7 +2116,368 @@ function addArena() {
     addBunker(-72, 27, .08, 1.0);
     addBunker(74, 23, -.10, 1.04);
 
-    console.info('[WARFLEX] Crazy green procedural battlefield visuals enabled.');
+    // ---------------------------------------------------------------------
+    // MAP ZONING: deliberate authored sections instead of one random scatter.
+    // ---------------------------------------------------------------------
+    const mapSections = [
+      { id: 'command', name: 'COMMAND', x: -91, z: 41, w: 70, d: 48, color: 0x596760 },
+      { id: 'training', name: 'TRAINING YARD', x: 0, z: 41, w: 58, d: 48, color: 0x4f6250 },
+      { id: 'logistics', name: 'LOGISTICS', x: 89, z: 41, w: 64, d: 48, color: 0x696458 },
+      { id: 'industrial', name: 'INDUSTRIAL', x: -87, z: -18, w: 72, d: 52, color: 0x5d5f60 },
+      { id: 'vehicle', name: 'VEHICLE HANGARS', x: 0, z: -25, w: 58, d: 48, color: 0x545f61 },
+      { id: 'depot', name: 'MOTOR DEPOT', x: 86, z: -20, w: 68, d: 54, color: 0x655d52 },
+    ];
+
+    const zoneRoots = new Map();
+
+    const makeZoneRoot = (section) => {
+      const root = new THREE.Group();
+      root.name = 'WARFLEX_ZONE_' + section.id.toUpperCase();
+      root.userData.mapSection = section.id;
+      fallbackArenaRoot.add(root);
+      zoneRoots.set(section.id, root);
+
+      // Slightly raised textured foundation makes each area visually read as
+      // an intentional district, not a random collection of props.
+      const foundation = new THREE.Mesh(
+        new THREE.BoxGeometry(section.w, .055, section.d),
+        texturedMat(section.color, 'asphalt', .97, .02, [4, 3], .028),
+      );
+      const centerY = getSimpleTerrainHeight(section.x, section.z) + .025;
+      foundation.position.set(section.x, centerY, section.z);
+      foundation.receiveShadow = true;
+      root.add(foundation);
+
+      for (const side of [-1, 1]) {
+        const curb = new THREE.Mesh(
+          new THREE.BoxGeometry(section.w, .16, .18),
+          concreteEdge,
+        );
+        curb.position.set(
+          section.x,
+          getSimpleTerrainHeight(section.x, section.z + side * section.d * .5),
+          section.z + side * section.d * .5,
+        );
+        root.add(curb);
+      }
+
+      return root;
+    };
+
+    mapSections.forEach(makeZoneRoot);
+
+    // Main roads intentionally align the districts.
+    const addRoadStrip = (x, z, width, depth, rotation = 0) => {
+      const root = new THREE.Group();
+      root.position.set(x, 0, z);
+      root.rotation.y = rotation;
+      fallbackArenaRoot.add(root);
+
+      const road = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, depth, Math.max(2, Math.floor(width / 5)), Math.max(2, Math.floor(depth / 5))),
+        asphalt,
+      );
+      road.rotation.x = -Math.PI / 2;
+      const pos = road.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i += 1) {
+        const localX = pos.getX(i);
+        const localZ = pos.getY(i);
+        pos.setZ(i, getSimpleTerrainHeight(
+          x + localX,
+          z + localZ,
+        ) + .03);
+      }
+      road.geometry.computeVertexNormals();
+      road.receiveShadow = true;
+      root.add(road);
+
+      // Dashed center markings make the circulation layout obvious.
+      for (let p = -Math.floor(width * .42); p < width * .42; p += 5) {
+        const stripe = new THREE.Mesh(
+          new THREE.PlaneGeometry(2.2, .11),
+          hazardMat,
+        );
+        stripe.rotation.x = -Math.PI / 2;
+        stripe.position.set(
+          p,
+          getSimpleTerrainHeight(x + p, z) + .055,
+          0,
+        );
+        root.add(stripe);
+      }
+    };
+
+    addRoadStrip(0, 7, 245, 5.5);
+    addRoadStrip(0, -5, 245, 3.8);
+    addRoadStrip(-45, 0, 78, 4.2, Math.PI / 2);
+    addRoadStrip(45, 0, 78, 4.2, Math.PI / 2);
+    addRoadStrip(0, -49, 236, 4.0);
+
+    // Player-scale textured facility buildings, assigned to specific zones.
+    const addTexturedFacility = ({
+      zone,
+      x,
+      z,
+      width,
+      depth,
+      height,
+      wallColor,
+      roofColor,
+      glassColor = 0x31515b,
+      doors = 1,
+    }) => {
+      const root = new THREE.Group();
+      root.name = 'Facility_' + zone + '_' + Math.round(x) + '_' + Math.round(z);
+      root.position.set(x, getSimpleTerrainHeight(x, z), z);
+      zoneRoots.get(zone)?.add(root);
+
+      const wall = texturedMat(wallColor, 'paintedMetal', .82, .24, [5.5, 3.2], .035);
+      const roof = texturedMat(roofColor, 'corrugatedMetal', .66, .48, [8, 4], .04);
+      const trim = texturedMat(0x777f7e, 'rustSteel', .58, .58, [4, 4], .022);
+      const glassFacade = new THREE.MeshStandardMaterial({
+        color: glassColor,
+        roughness: .10,
+        metalness: .70,
+        emissive: 0x0a3036,
+        emissiveIntensity: .32,
+      });
+
+      box(root, [width + .65, .28, depth + .65], [0, .14, 0], concreteEdge, 0, .025);
+      box(root, [width, height, .42], [0, height * .5, -depth * .5], wall);
+      box(root, [width, height, .42], [0, height * .5, depth * .5], wall);
+      box(root, [.42, height, depth], [-width * .5, height * .5, 0], wall);
+      box(root, [.42, height, depth], [width * .5, height * .5, 0], wall);
+      box(root, [width + .25, .42, depth + .25], [0, height + .21, 0], roof, 0, .025);
+
+      for (let px = -width * .44; px <= width * .44; px += Math.max(3.6, width * .18)) {
+        box(root, [.13, height * .94, .13], [px, height * .48, -depth * .51], trim);
+        box(root, [.13, height * .94, .13], [px, height * .48, depth * .51], trim);
+      }
+
+      for (let px = -width * .40; px <= width * .40; px += 3.2) {
+        box(root, [1.38, 1.05, .07], [px, 3.05, -depth * .525], glassFacade);
+        box(root, [1.38, 1.05, .07], [px, 3.05, depth * .525], glassFacade);
+      }
+
+      const doorSpacing = doors === 1 ? 0 : 4.6;
+      for (let d = 0; d < doors; d += 1) {
+        const dx = (d - (doors - 1) * .5) * doorSpacing;
+        box(root, [3.25, 3.3, .18], [dx, 1.65, -depth * .735], texturedMat(0x252c30, 'rustSteel', .72, .58, [3, 2], .028), 0, .02);
+        box(root, [3.55, 3.55, .25], [dx, 1.78, -depth * .70], trim, 0, .02);
+        for (let y = .35; y < 3.0; y += .55) {
+          box(root, [3.0, .045, .035], [dx, y, -depth * .835], steelDarkMat);
+        }
+      }
+
+      // Surface grime strips keep the architecture from looking like clean
+      // colored blocks even at mid-range.
+      for (const side of [-1, 1]) {
+        box(
+          root,
+          [width * .82, .16, .025],
+          [0, height * .15, side * (depth * .52)],
+          texturedMat(0x4a4c4b, 'concrete', .96, .01, [5, 1], .02),
+        );
+      }
+
+      addCollision(
+        [width, height, .48],
+        [x, getSimpleTerrainHeight(x, z) + height * .5, z - depth * .5],
+        root.name + '_South',
+      );
+      addCollision(
+        [width, height, .48],
+        [x, getSimpleTerrainHeight(x, z) + height * .5, z + depth * .5],
+        root.name + '_North',
+      );
+      addCollision(
+        [.48, height, depth],
+        [x - width * .5, getSimpleTerrainHeight(x, z) + height * .5, z],
+        root.name + '_West',
+      );
+      addCollision(
+        [.48, height, depth],
+        [x + width * .5, getSimpleTerrainHeight(x, z) + height * .5, z],
+        root.name + '_East',
+      );
+    };
+
+    addTexturedFacility({
+      zone: 'command', x: -101, z: 43, width: 27, depth: 18, height: 6.2,
+      wallColor: 0x4d6670, roofColor: 0x252e31, doors: 2,
+    });
+    addTexturedFacility({
+      zone: 'command', x: -72, z: 44, width: 17, depth: 13, height: 4.8,
+      wallColor: 0x55634f, roofColor: 0x29312e, doors: 1,
+    });
+    addTexturedFacility({
+      zone: 'training', x: -4, z: 42, width: 24, depth: 16, height: 5.2,
+      wallColor: 0x626a61, roofColor: 0x252b2d, doors: 1,
+    });
+    addTexturedFacility({
+      zone: 'logistics', x: 72, z: 43, width: 31, depth: 20, height: 6.1,
+      wallColor: 0x7a5d46, roofColor: 0x292d2e, doors: 2,
+    });
+    addTexturedFacility({
+      zone: 'logistics', x: 104, z: 44, width: 17, depth: 14, height: 5.0,
+      wallColor: 0x59616a, roofColor: 0x292d30, doors: 1,
+    });
+    addTexturedFacility({
+      zone: 'industrial', x: -99, z: -19, width: 29, depth: 19, height: 6.0,
+      wallColor: 0x5b6061, roofColor: 0x252b2d, doors: 2,
+    });
+    addTexturedFacility({
+      zone: 'industrial', x: -65, z: -17, width: 20, depth: 15, height: 5.0,
+      wallColor: 0x655d51, roofColor: 0x252a2b, doors: 1,
+    });
+    addTexturedFacility({
+      zone: 'vehicle', x: -7, z: -31, width: 40, depth: 24, height: 9.2,
+      wallColor: 0x4d585b, roofColor: 0x1f282b, doors: 2,
+    });
+    addTexturedFacility({
+      zone: 'depot', x: 70, z: -20, width: 31, depth: 21, height: 6.4,
+      wallColor: 0x6b614f, roofColor: 0x282c2d, doors: 2,
+    });
+    addTexturedFacility({
+      zone: 'depot', x: 104, z: -18, width: 18, depth: 15, height: 5.2,
+      wallColor: 0x655048, roofColor: 0x272c2e, doors: 1,
+    });
+
+    // ---------------------------------------------------------------------
+    // HIGHLY OPTIMIZED GRASS: instanced, chunked, distance-culled.
+    // ---------------------------------------------------------------------
+    const grassMaterial = new THREE.MeshStandardMaterial({
+      color: 0x547d36,
+      roughness: 1,
+      metalness: 0,
+      vertexColors: true,
+    });
+
+    const grassGeometry = new THREE.ConeGeometry(.048, .62, 4, 1);
+    const grassZoneExclusions = [
+      [-130, 4, 130, 10],
+      [-47, -75, 8, 150],
+      [47, -75, 8, 150],
+      [-130, -51, 260, 7],
+      [-130, 66, 260, 7],
+      [-125, 34, 66, 20],
+      [-32, 34, 64, 20],
+      [54, 34, 67, 20],
+      [-123, -42, 70, 20],
+      [-29, -48, 62, 24],
+      [51, -45, 74, 28],
+    ];
+
+    const grassBlocked = (x, z) => {
+      return grassZoneExclusions.some(([cx, cz, w, d]) =>
+        Math.abs(x - cx) < w * .5 &&
+        Math.abs(z - cz) < d * .5
+      );
+    };
+
+    const grassX = 6;
+    const grassZ = 4;
+    const chunkW = MAP_WIDTH / grassX;
+    const chunkD = MAP_DEPTH / grassZ;
+
+    for (let cz = 0; cz < grassZ; cz += 1) {
+      for (let cx = 0; cx < grassX; cx += 1) {
+        const centerX = -HALF_W + chunkW * (cx + .5);
+        const centerZ = -HALF_D + chunkD * (cz + .5);
+        const chunk = new THREE.InstancedMesh(
+          grassGeometry,
+          grassMaterial,
+          650,
+        );
+        chunk.name = 'WARFLEX_GrassChunk_' + cx + '_' + cz;
+        chunk.castShadow = false;
+        chunk.receiveShadow = false;
+        chunk.frustumCulled = true;
+        const dummy = new THREE.Object3D();
+        const instanceColor = new THREE.Color();
+
+        let placed = 0;
+        let attempts = 0;
+
+        while (placed < chunk.count && attempts < chunk.count * 5) {
+          attempts += 1;
+          const seed = (cz * 1013 + cx * 271 + attempts * 17.17);
+          const rx = (Math.sin(seed * 12.9898) * 43758.5453) % 1;
+          const rz = (Math.sin(seed * 78.233) * 24634.6345) % 1;
+          const x = THREE.MathUtils.clamp(
+            centerX + (rx - .5) * chunkW * .94,
+            -HALF_W + 1,
+            HALF_W - 1,
+          );
+          const z = THREE.MathUtils.clamp(
+            centerZ + (rz - .5) * chunkD * .94,
+            -HALF_D + 1,
+            HALF_D - 1,
+          );
+
+          if (grassBlocked(x, z)) continue;
+
+          const h = .38 + Math.abs(Math.sin(seed * 2.7)) * .48;
+          const y = getSimpleTerrainHeight(x, z);
+          dummy.position.set(x, y + h * .48, z);
+          dummy.rotation.y = (Math.sin(seed * 4.1) * Math.PI);
+          const s = .72 + Math.abs(Math.sin(seed * 5.7)) * .62;
+          dummy.scale.set(s, h / .62, s);
+          dummy.updateMatrix();
+          chunk.setMatrixAt(placed, dummy.matrix);
+
+          instanceColor.setHSL(
+            .22 + Math.abs(Math.sin(seed * .17)) * .045,
+            .34 + Math.abs(Math.sin(seed * .23)) * .22,
+            .22 + Math.abs(Math.sin(seed * .31)) * .16,
+          );
+          chunk.setColorAt(placed, instanceColor);
+
+          placed += 1;
+        }
+
+        chunk.instanceMatrix.needsUpdate = true;
+        chunk.instanceColor.needsUpdate = true;
+        chunk.position.set(0, 0, 0);
+        fallbackArenaRoot.add(chunk);
+        optimizedGrassChunks.push({
+          mesh: chunk,
+          x: centerX,
+          z: centerZ,
+          radius: Math.hypot(chunkW, chunkD) * .55,
+        });
+      }
+    }
+
+    // Group the already-authored legacy props into the same section roots so
+    // the scene graph mirrors the visual layout. World transforms are preserved.
+    fallbackArenaRoot.updateMatrixWorld(true);
+    for (const child of [...fallbackArenaRoot.children]) {
+      if (
+        child === simpleTerrainMesh ||
+        child === floor ||
+        child.name.startsWith('WARFLEX_ZONE_') ||
+        child.name.startsWith('WARFLEX_GrassChunk_')
+      ) continue;
+
+      const world = child.getWorldPosition(new THREE.Vector3());
+      let target = null;
+      let bestDistance = Infinity;
+
+      for (const section of mapSections) {
+        const dx = Math.abs(world.x - section.x) / (section.w * .5);
+        const dz = Math.abs(world.z - section.z) / (section.d * .5);
+        const score = dx + dz;
+        if (score < bestDistance) {
+          bestDistance = score;
+          target = zoneRoots.get(section.id);
+        }
+      }
+
+      if (target) target.attach(child);
+    }
+
+    console.info('[WARFLEX] Sectioned military map + textured facilities + optimized grass enabled.');
     return;
   }
   const sectors = [
