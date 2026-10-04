@@ -46,14 +46,11 @@ canvas { display: block; }
 }
 #update-dismiss:hover { color: #fff; background: transparent; transform: none; }
 
-.screen {
-  z-index: 50;
-  pointer-events: auto;
+ .screen {
   position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
-  z-index: 50;
   background: radial-gradient(circle at center, rgba(20,25,32,.45), rgba(4,6,8,.95));
 }
 .panel {
@@ -438,10 +435,7 @@ body {
   display: none !important;
 }
 
-.gothic-panel {
-  position: relative;
-  z-index: 51;
-  pointer-events: auto;
+ .gothic-panel {
   width: 100%;
   max-width: none;
   min-height: calc(100dvh - 48px);
