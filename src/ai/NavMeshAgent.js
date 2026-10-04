@@ -33,6 +33,10 @@ export class NavMeshAgent {
       new THREE.Vector3();
     this.beforeMove =
       new THREE.Vector3();
+    this.obstacleCache = {
+      signature: '',
+      bounds: [],
+    };
   }
 
   resolveCurrentPosition() {
@@ -40,6 +44,7 @@ export class NavMeshAgent {
       this.object,
       this.obstacles,
       this.radius,
+      this.obstacleCache,
     );
   }
 
