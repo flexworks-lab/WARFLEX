@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { PhysicsWorld } from './physics/PhysicsWorld.js';
+import { RagdollController } from './physics/RagdollController.js';
+import { WaveDirector } from './systems/WaveDirector.js';
+import { SteeringAgent } from './systems/SteeringAgent.js';
 
 const CONFIG = {
   maxHealth: 100,
@@ -317,6 +321,21 @@ arenaGrid.material.transparent = true;
 arenaGrid.material.opacity = 0.38;
 scene.add(arenaGrid);
 
+const physicsWorld = new PhysicsWorld({
+  gravity: -22,
+  fixedStep: 1 / 60,
+  maxSubSteps: 3,
+});
+physicsWorld.syncArena(obstacles);
+
+const ragdollController = new RagdollController({
+  scene,
+  physicsWorld,
+  cleanupSeconds: 10,
+});
+
+let waveDirector = null;
+
 function createMaterial(color, metalness = .1, roughness = .65) {
   return new THREE.MeshStandardMaterial({ color, metalness, roughness });
 }
@@ -488,6 +507,110 @@ function createWeapon() {
 
 const weapon = createWeapon();
 weapon.visible = false;
+
+const worldHitMarkers = [];
+
+function createWorldHitMarker() {
+  const group = new THREE.Group();
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+  });
+
+  const armA = new THREE.Mesh(
+    new THREE.BoxGeometry(.16, .018, .018),
+    material.clone(),
+  );
+  const armB = new THREE.Mesh(
+    new THREE.BoxGeometry(.018, .16, .018),
+    material.clone(),
+  );
+  const armC = new THREE.Mesh(
+    new THREE.BoxGeometry(.16, .018, .018),
+    material.clone(),
+  );
+  const armD = new THREE.Mesh(
+    new THREE.BoxGeometry(.018, .16, .018),
+    material.clone(),
+  );
+
+  armA.position.set(.055, .055, 0);
+  armB.position.set(.055, .055, 0);
+  armC.position.set(-.055, -.055, 0);
+  armD.position.set(-.055, -.055, 0);
+
+  group.add(armA, armB, armC, armD);
+  group.visible = false;
+  scene.add(group);
+
+  return {
+    group,
+    materials: [
+      armA.material,
+      armB.material,
+      armC.material,
+      armD.material,
+    ],
+    life: 0,
+    maxLife: .11,
+  };
+}
+
+for (let i = 0; i < 16; i += 1) {
+  worldHitMarkers.push(createWorldHitMarker());
+}
+
+function showWorldHitMarker(position, headshot = false) {
+  const marker =
+    worldHitMarkers.find(item => item.life <= 0) ||
+    worldHitMarkers[0];
+
+  marker.group.position.copy(position);
+  marker.group.quaternion.copy(camera.quaternion);
+
+  const scale = headshot ? 1.35 : 1;
+  marker.group.scale.setScalar(scale);
+
+  for (const material of marker.materials) {
+    material.opacity = 1;
+  }
+
+  marker.group.visible = true;
+  marker.life = marker.maxLife;
+
+  if (headshot) {
+    marker.group.scale.multiplyScalar(1.15);
+  }
+}
+
+function updateWorldHitMarkers(dt) {
+  for (const marker of worldHitMarkers) {
+    if (marker.life <= 0) continue;
+
+    marker.life -= dt;
+
+    if (marker.life <= 0) {
+      marker.life = 0;
+      marker.group.visible = false;
+      continue;
+    }
+
+    marker.group.quaternion.copy(camera.quaternion);
+
+    const alpha = THREE.MathUtils.clamp(
+      marker.life / marker.maxLife,
+      0,
+      1,
+    );
+
+    for (const material of marker.materials) {
+      material.opacity = alpha;
+    }
+  }
+}
 
 function spawnEnemyModel() {
   const group = new THREE.Group();
@@ -773,7 +896,7 @@ function resetGame(spawnImmediately = true) {
   tracers.length = 0;
   for (const p of particles) scene.remove(p.mesh);
   particles.length = 0;
-  for (const rag of ragdolls) scene.remove(rag.group);
+  ragdollController.dispose();
   ragdolls.length = 0;
   for (const gun of droppedGuns) scene.remove(gun.mesh);
   droppedGuns.length = 0;
@@ -798,7 +921,15 @@ function resetGame(spawnImmediately = true) {
   weapon.position.set(.43, -.48, -1.03);
   weapon.rotation.set(-.03, -.04, -.015);
   updateHud();
-  if (spawnImmediately) spawnWave();
+
+  if (waveDirector) {
+    waveDirector.wave = state.wave;
+    waveDirector.stop();
+  }
+
+  if (spawnImmediately) {
+    spawnWave();
+  }
 }
 
 function getSpawnPoint(index) {
@@ -821,23 +952,10 @@ function getSpawnPoint(index) {
 }
 
 function spawnWave() {
-  const count = Math.min(4 + state.wave * 2, 18);
-  state.spawnLeft = count;
-  state.nextWaveTimer = 0;
-  updateHud();
+  if (!waveDirector) return;
 
-  // Spawn one soldier per frame so START/REDEPLOY never freezes while
-  // the higher-detail models and their materials are being constructed.
-  let nextIndex = 0;
-  const spawnNext = () => {
-    if (!state.active || state.over || nextIndex >= count) return;
-    spawnEnemy(nextIndex);
-    nextIndex += 1;
-    updateHud();
-    if (nextIndex < count) requestAnimationFrame(spawnNext);
-  };
-
-  requestAnimationFrame(spawnNext);
+  waveDirector.wave = state.wave;
+  waveDirector.start();
 }
 
 function createEnemyFallbackModel() {
@@ -978,25 +1096,41 @@ function createEnemyFallbackModel() {
   return group;
 }
 
-function spawnEnemy(index = 0) {
+function spawnEnemy(index = 0, spawnPosition = null) {
   let group;
   let usedFallback = false;
 
   try {
     group = spawnEnemyModel();
     let meshCount = 0;
-    group.traverse((o) => { if (o.isMesh) meshCount += 1; });
-    if (!meshCount) throw new Error('Enemy model was created without renderable meshes.');
+    group.traverse((o) => {
+      if (o.isMesh) meshCount += 1;
+    });
+    if (!meshCount) {
+      throw new Error(
+        'Enemy model was created without renderable meshes.',
+      );
+    }
   } catch (error) {
     usedFallback = true;
-    showRuntimeError(error, 'Enemy model construction failed; using fallback model');
+    showRuntimeError(
+      error,
+      'Enemy model construction failed; using fallback model',
+    );
     group = createEnemyFallbackModel();
   }
 
-  const spawn = getSpawnPoint(index);
+  const spawn =
+    spawnPosition?.clone() ||
+    getSpawnPoint(index);
+
   group.position.copy(spawn);
+  group.scale.setScalar(
+    group.userData.baseScale || .54,
+  );
   group.visible = true;
   group.updateMatrixWorld(true);
+
   group.traverse((o) => {
     if (o.isMesh) {
       o.visible = true;
@@ -1006,23 +1140,62 @@ function spawnEnemy(index = 0) {
 
   const roll = Math.random();
   let role = 'rusher';
-  if (state.wave >= 2 && roll > .78) role = 'heavy';
-  else if (roll > .38) role = 'rifleman';
+
+  if (state.wave >= 2 && roll > .78) {
+    role = 'heavy';
+  } else if (roll > .38) {
+    role = 'rifleman';
+  }
 
   const roleStats = {
-    rusher: { health: .78, speed: 1.22, damage: 8, cooldown: .72, range: 16 },
-    rifleman: { health: 1.00, speed: .92, damage: 7, cooldown: .95, range: 42 },
-    heavy: { health: 1.85, speed: .62, damage: 13, cooldown: 1.25, range: 38 },
+    rusher: {
+      health: .78,
+      speed: 1.22,
+      damage: 8,
+      cooldown: .72,
+      range: 16,
+    },
+    rifleman: {
+      health: 1.00,
+      speed: .92,
+      damage: 7,
+      cooldown: .95,
+      range: 42,
+    },
+    heavy: {
+      health: 1.85,
+      speed: .62,
+      damage: 13,
+      cooldown: 1.25,
+      range: 38,
+    },
   }[role];
 
-  const baseHealth = CONFIG.enemyBaseHealth + state.wave * 7;
+  const baseHealth =
+    CONFIG.enemyBaseHealth +
+    state.wave * 7;
+
   const visual = group.userData.visuals;
+
   if (role === 'heavy') {
     visual.armor.color.setHex(0x6f3439);
     visual.lens.emissive.setHex(0x6b121b);
   } else if (role === 'rusher') {
     visual.armor.color.setHex(0x465867);
   }
+
+  const radius =
+    role === 'heavy' ? .68 : .58;
+
+  const steering = new SteeringAgent({
+    object: group,
+    obstacles,
+    radius,
+    getNeighbors: () =>
+      enemies
+        .filter(other => !other.dying)
+        .map(other => other.group),
+  });
 
   group.userData.role = role;
   group.userData.usedFallback = usedFallback;
@@ -1033,253 +1206,110 @@ function spawnEnemy(index = 0) {
     role,
     health: baseHealth * roleStats.health,
     maxHealth: baseHealth * roleStats.health,
-    speed: (CONFIG.enemySpeed + Math.min(state.wave * .08, 1.2)) * roleStats.speed,
-    damage: roleStats.damage + Math.floor(state.wave * .35),
-    attackTimer: .55 + Math.random() * roleStats.cooldown,
+    speed:
+      (CONFIG.enemySpeed +
+        Math.min(state.wave * .08, 1.2)) *
+      roleStats.speed,
+    damage:
+      roleStats.damage +
+      Math.floor(state.wave * .35),
+    attackTimer:
+      .55 + Math.random() * roleStats.cooldown,
     attackCooldown: roleStats.cooldown,
-    attackRange: Math.min(CONFIG.enemyShootRange, roleStats.range),
-    radius: role === 'heavy' ? .68 : .58,
-    baseScale: group.userData.baseScale || .54,
-    phase: Math.random() * Math.PI * 2,
-    walkTime: Math.random() * Math.PI * 2,
-    animTime: Math.random() * Math.PI * 2,
+    attackRange:
+      Math.min(
+        CONFIG.enemyShootRange,
+        roleStats.range,
+      ),
+    radius,
+    baseScale:
+      group.userData.baseScale || .54,
+    phase:
+      Math.random() * Math.PI * 2,
+    walkTime:
+      Math.random() * Math.PI * 2,
+    animTime:
+      Math.random() * Math.PI * 2,
     shootRecoil: 0,
-    strafeSign: Math.random() < .5 ? -1 : 1,
-    strafeTimer: .5 + Math.random(),
+    strafeSign:
+      Math.random() < .5 ? -1 : 1,
+    strafeTimer:
+      .5 + Math.random(),
     hurtFlash: 0,
     deathTimer: 0,
     dying: false,
+    steering,
   });
 }
 
-function createRagdoll(enemy, impactPoint, direction, headshot = false) {
-  enemy.group.updateMatrixWorld(true);
-
-  const model = enemy.group.clone(true);
-  model.name = 'ConnectedEnemyRagdoll';
-  model.visible = true;
-
-  const scale = enemy.baseScale || enemy.group.userData.baseScale || .54;
-  model.scale.setScalar(scale);
-
-  // The hips are the physical root. Every visible part remains parented to
-  // the same skeleton, so the corpse cannot visually "separate".
-  const root = new THREE.Group();
-  root.name = 'RagdollFallPivot';
-  root.position.copy(enemy.group.position);
-  root.quaternion.copy(enemy.group.quaternion);
-  scene.add(root);
-
-  model.position.set(0, -(1.42 * scale), 0);
-  model.rotation.set(0, 0, 0);
-  root.add(model);
-  model.updateMatrixWorld(true);
-
-  const parts = {
-    hips: model.getObjectByName('RagdollHips'),
-    lowerBody: model.getObjectByName('RagdollLowerBody'),
-    upperBody: model.getObjectByName('RagdollUpperBody'),
-    leftArm: model.getObjectByName('RagdollLeftArm'),
-    rightArm: model.getObjectByName('RagdollRightArm'),
-    leftLeg: model.getObjectByName('RagdollLeftLeg'),
-    rightLeg: model.getObjectByName('RagdollRightLeg'),
-    leftKnee: model.getObjectByName('RagdollLeftKnee'),
-    rightKnee: model.getObjectByName('RagdollRightKnee'),
-    leftElbow: model.getObjectByName('RagdollLeftElbow'),
-    rightElbow: model.getObjectByName('RagdollRightElbow'),
-    head: model.getObjectByName('RagdollHead'),
-    rifle: model.getObjectByName('Rifle'),
-  };
-  model.userData.ragdollParts = parts;
-
-  const center = root.position.clone().add(new THREE.Vector3(0, 1.05 * scale, 0));
-  const hit = impactPoint?.clone() || center.clone();
-  const hitOffset = hit.clone().sub(center);
-  const hitDir = direction?.clone().normalize() || new THREE.Vector3(0, 0, -1);
-
-  const force = headshot ? 5.4 : 3.6;
-  const impulse = hitDir.clone().multiplyScalar(force);
-
-  // Force the corpse to tip over as one body. The axis is perpendicular to
-  // the shot direction, so a forward hit produces a forward fall instead of
-  // a slow upright wobble.
-  const fallAxisWorld = new THREE.Vector3(
-    -hitDir.z,
-    0,
-    hitDir.x
-  );
-  if (fallAxisWorld.lengthSq() < .001) fallAxisWorld.set(1, 0, 0);
-  fallAxisWorld.normalize();
-
-  const inverseRoot = root.quaternion.clone().invert();
-  const fallAxisLocal = fallAxisWorld.clone().applyQuaternion(inverseRoot).normalize();
-
-  // Height of the hit controls how hard the body tips. Upper-body/head hits
-  // create more leverage than shots near the pelvis.
-  const leverage = THREE.MathUtils.clamp(
-    1 + hitOffset.y / Math.max(.45 * scale, .001),
-    .8,
-    1.8
-  );
-
-  const joints = [];
-
-  const addJoint = (upperName, lowerName, upperLimit, lowerLimit, type) => {
-    const upper = model.getObjectByName(upperName);
-    const lower = model.getObjectByName(lowerName);
-    if (!upper || !lower) return;
-
-    const isArm = type === 'arm';
-
-    joints.push({
-      upper,
-      lower,
-      upperAngle: 0,
-      lowerAngle: 0,
-      upperVelocity: (Math.random() - .5) * (isArm ? .45 : .20),
-      lowerVelocity: (Math.random() - .5) * (isArm ? .55 : .25),
-      upperZ: 0,
-      lowerZ: 0,
-      upperVelocityZ: (Math.random() - .5) * .30,
-      lowerVelocityZ: (Math.random() - .5) * .35,
-      upperLimit,
-      lowerLimit,
-      stiffness: isArm ? 7.5 : 10.0,
-      damping: isArm ? 2.8 : 3.5,
-      upperRest: isArm ? -.08 : .04,
-      lowerRest: isArm ? .10 : .10,
-    });
-  };
-
-  addJoint('RagdollLeftArm', 'RagdollLeftElbow', 1.15, 1.0, 'arm');
-  addJoint('RagdollRightArm', 'RagdollRightElbow', 1.15, 1.0, 'arm');
-  addJoint('RagdollLeftLeg', 'RagdollLeftKnee', .58, .72, 'leg');
-  addJoint('RagdollRightLeg', 'RagdollRightKnee', .58, .72, 'leg');
-
-  const spine = {
-    object: parts.upperBody,
-    angleX: 0,
-    angleZ: 0,
-    velocityX: (Math.random() - .5) * .35,
-    velocityZ: (Math.random() - .5) * .35,
-    stiffness: 8.0,
-    damping: 2.6,
-  };
-
-  const pelvis = {
-    object: parts.lowerBody,
-    angleX: 0,
-    angleZ: 0,
-    velocityX: 0,
-    velocityZ: 0,
-    stiffness: 9.0,
-    damping: 3.0,
-  };
-
-  const neck = {
-    object: parts.head,
-    angleX: 0,
-    angleY: 0,
-    velocityX: (Math.random() - .5) * .45,
-    velocityY: (Math.random() - .5) * .55,
-    stiffness: 8.0,
-    damping: 2.5,
-  };
-
-  const rootVelocity = impulse.multiplyScalar(.82);
-  rootVelocity.y = headshot ? 2.15 : 1.55;
-
-  // Main fall + a smaller hit-dependent twist. This is the important part:
-  // the soldier tips over immediately rather than disintegrating upright.
-  const rootAngularVelocity = fallAxisLocal.multiplyScalar(
-    (headshot ? 6.2 : 5.1) * leverage
-  );
-  rootAngularVelocity.add(new THREE.Vector3(
-    (Math.random() - .5) * .35,
-    (Math.random() - .5) * .65,
-    (Math.random() - .5) * .35
-  ));
-
-  const impactTorque = hitOffset.cross(impulse);
-  rootAngularVelocity.addScaledVector(
-    impactTorque.applyQuaternion(inverseRoot),
-    .18
-  );
-
-  if (headshot) {
-    rootAngularVelocity.multiplyScalar(1.12);
-  }
-
-  const droppedRifle = parts.rifle;
-  if (droppedRifle) {
-    scene.attach(droppedRifle);
-    droppedRifle.visible = true;
-
-    const gunVelocity = hitDir.clone().multiplyScalar(1.8 + Math.random() * .8);
-    gunVelocity.y = 1.1 + Math.random() * .9;
-
-    droppedGuns.push({
-      mesh: droppedRifle,
-      velocity: gunVelocity,
-      angularVelocity: new THREE.Vector3(
-        (Math.random() - .5) * 8,
-        (Math.random() - .5) * 10,
-        (Math.random() - .5) * 8
-      ),
-      bounds: new THREE.Box3(),
-      life: 9 + Math.random() * 3,
-    });
-  }
-
-  ragdolls.push({
-    group: root,
-    model,
-    velocity: rootVelocity,
-    angularVelocity: rootAngularVelocity,
-    joints,
-    spine,
-    pelvis,
-    neck,
-    bounds: new THREE.Box3(),
-    meshes: [],
-    age: 0,
-    grounded: false,
-    groundTime: 0,
-    sleep: false,
-    justLanded: false,
-    scale,
-    life: Infinity,
+function createRagdoll(
+  enemy,
+  impactPoint,
+  direction,
+  headshot = false,
+  hitPart = 'upperBody',
+) {
+  const rag = ragdollController.create(enemy, {
+    hitPoint: impactPoint,
+    direction,
+    headshot,
+    hitPart,
   });
 
-  const rag = ragdolls[ragdolls.length - 1];
-  rag.model.traverse((o) => {
-    if (!o.isMesh) return;
-    o.visible = true;
-    o.frustumCulled = false;
-    rag.meshes.push(o);
-  });
+  if (rag) {
+    ragdolls.push(rag);
+  }
 
-  scene.remove(enemy.group);
+  return rag;
 }
 
-function removeEnemy(enemy, headshot = false, hitPoint = null, direction = null) {
+function removeEnemy(
+  enemy,
+  headshot = false,
+  hitPoint = null,
+  direction = null,
+  hitPart = 'upperBody',
+) {
   if (enemy.dying) return;
+
   enemy.dying = true;
+  enemy.steering?.stop();
+
   state.kills += 1;
   state.score += headshot ? 150 : 100;
-  state.spawnLeft -= 1;
-  state.shake = Math.max(state.shake, headshot ? .12 : .075);
-  spawnBurst(
-    hitPoint || enemy.group.position.clone().add(new THREE.Vector3(0, 1.2, 0)),
-    headshot ? 0xffe6a2 : 0xff5b66,
-    headshot ? 18 : 12
+  state.spawnLeft = Math.max(0, state.spawnLeft - 1);
+  state.shake = Math.max(
+    state.shake,
+    headshot ? .12 : .075,
   );
+
+  spawnBurst(
+    hitPoint ||
+      enemy.group.position
+        .clone()
+        .add(new THREE.Vector3(0, 1.2, 0)),
+    headshot ? 0xffe6a2 : 0xff5b66,
+    headshot ? 18 : 12,
+  );
+
   state.combo += 1;
   state.comboTimer = 2.6;
-  state.score += Math.min(state.combo, 10) * 15;
-  createRagdoll(enemy, hitPoint, direction, headshot);
+  state.score +=
+    Math.min(state.combo, 10) * 15;
+
+  createRagdoll(
+    enemy,
+    hitPoint,
+    direction,
+    headshot,
+    hitPart,
+  );
+
   const index = enemies.indexOf(enemy);
-  if (index !== -1) enemies.splice(index, 1);
+  if (index !== -1) {
+    enemies.splice(index, 1);
+  }
+
   updateHud();
 }
 
@@ -1444,83 +1474,322 @@ function movePlayer(dt) {
   camera.updateProjectionMatrix();
 }
 
+function getShotDirection() {
+  const base =
+    new THREE.Vector3(0, 0, -1)
+      .applyQuaternion(camera.quaternion)
+      .normalize();
+
+  const moving =
+    keys.has('KeyW') ||
+    keys.has('KeyA') ||
+    keys.has('KeyS') ||
+    keys.has('KeyD');
+
+  const sprinting =
+    keys.has('ShiftLeft') ||
+    keys.has('ShiftRight');
+
+  const spreadDegrees =
+    state.slideTimer > 0
+      ? 1.55
+      : sprinting
+        ? 1.10
+        : moving
+          ? .55
+          : .24;
+
+  const angle =
+    THREE.MathUtils.degToRad(
+      spreadDegrees,
+    );
+
+  if (angle <= 0) {
+    return base;
+  }
+
+  const right =
+    new THREE.Vector3()
+      .crossVectors(
+        base,
+        new THREE.Vector3(0, 1, 0),
+      );
+
+  if (right.lengthSq() < .00001) {
+    right.set(1, 0, 0);
+  }
+
+  right.normalize();
+
+  const up =
+    new THREE.Vector3()
+      .crossVectors(
+        right,
+        base,
+      )
+      .normalize();
+
+  const radius =
+    Math.sqrt(Math.random());
+
+  const theta =
+    Math.random() *
+    Math.PI * 2;
+
+  const offset =
+    Math.tan(angle) * radius;
+
+  base
+    .addScaledVector(
+      right,
+      Math.cos(theta) * offset,
+    )
+    .addScaledVector(
+      up,
+      Math.sin(theta) * offset,
+    )
+    .normalize();
+
+  return base;
+}
+
 function shoot() {
-  if (!state.active || state.over || state.reloadTimer > 0 || state.fireTimer > 0) return;
+  if (
+    !state.active ||
+    state.over ||
+    state.reloadTimer > 0 ||
+    state.fireTimer > 0
+  ) {
+    return;
+  }
+
   if (state.ammo <= 0) {
     reload();
     return;
   }
 
   state.ammo -= 1;
-  state.fireTimer = CONFIG.fireInterval;
+  state.fireTimer =
+    CONFIG.fireInterval;
+
   state.weaponKick = 1;
   state.muzzleFlash = .075;
+  state.shake =
+    Math.max(
+      state.shake,
+      .035,
+    );
+
   spawnMuzzleVfx();
 
-  const origin = camera.position.clone();
-  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-  raycaster.set(origin, direction);
+  const origin =
+    camera.position.clone();
+
+  const direction =
+    getShotDirection();
+
+  raycaster.set(
+    origin,
+    direction,
+  );
 
   const allEnemyMeshes = [];
+
   for (const enemy of enemies) {
-    if (!enemy.dying) enemy.group.traverse(o => { if (o.isMesh) allEnemyMeshes.push(o); });
+    if (enemy.dying) continue;
+
+    enemy.group.traverse(o => {
+      if (o.isMesh) {
+        allEnemyMeshes.push(o);
+      }
+    });
   }
 
-  const wallHits = raycaster.intersectObjects(obstacles, false);
-  const enemyHits = raycaster.intersectObjects(allEnemyMeshes, false);
+  const wallHits =
+    raycaster.intersectObjects(
+      obstacles,
+      false,
+    );
+
+  const enemyHits =
+    raycaster.intersectObjects(
+      allEnemyMeshes,
+      false,
+    );
+
   const ragdollMeshes = [];
-  for (const rag of ragdolls) ragdollMeshes.push(...rag.meshes);
-  const ragdollHits = raycaster.intersectObjects(ragdollMeshes, false);
 
-  let hitPoint = origin.clone().addScaledVector(direction, 90);
-  const wallDistance = wallHits[0]?.distance ?? Infinity;
-  const enemyHit = enemyHits.find(hit => hit.distance < wallDistance);
-  const ragdollHit = ragdollHits.find(hit => hit.distance < wallDistance);
-  const closestEnemyDistance = enemyHit?.distance ?? Infinity;
-  const closestRagdollDistance = ragdollHit?.distance ?? Infinity;
+  for (const rag of ragdolls) {
+    if (
+      ragdollController.active.has(rag)
+    ) {
+      ragdollMeshes.push(
+        ...rag.meshes,
+      );
+    }
+  }
 
-  if (closestEnemyDistance <= closestRagdollDistance && enemyHit) {
-    const enemy = enemies.find(e => {
-      let found = false;
-      e.group.traverse(o => { if (o === enemyHit.object) found = true; });
-      return found;
-    });
+  const ragdollHits =
+    raycaster.intersectObjects(
+      ragdollMeshes,
+      false,
+    );
+
+  const wallDistance =
+    wallHits[0]?.distance ??
+    Infinity;
+
+  const enemyHit =
+    enemyHits.find(
+      hit => hit.distance < wallDistance,
+    );
+
+  const ragdollHit =
+    ragdollHits.find(
+      hit => hit.distance < wallDistance,
+    );
+
+  const closestEnemyDistance =
+    enemyHit?.distance ??
+    Infinity;
+
+  const closestRagdollDistance =
+    ragdollHit?.distance ??
+    Infinity;
+
+  let hitPoint =
+    origin.clone()
+      .addScaledVector(
+        direction,
+        90,
+      );
+
+  if (
+    closestEnemyDistance <=
+      closestRagdollDistance &&
+    enemyHit
+  ) {
+    const enemy =
+      enemies.find(e => {
+        let found = false;
+
+        e.group.traverse(o => {
+          if (o === enemyHit.object) {
+            found = true;
+          }
+        });
+
+        return found;
+      });
 
     if (enemy) {
-      const parts = enemy.group.userData.parts;
-      const headshot = enemyHit.object === parts.head;
-      enemy.health -= headshot ? 70 : 34;
+      const hitPart =
+        getRagdollHitPart(
+          enemyHit.object,
+        );
+
+      const headshot =
+        hitPart === 'head';
+
+      enemy.health -=
+        headshot ? 70 : 34;
+
       enemy.hurtFlash = .08;
-      hitPoint = enemyHit.point;
-      spawnBurst(hitPoint, headshot ? 0xff8b93 : 0xcbd6df, headshot ? 14 : 8);
-      state.score += headshot ? 25 : 10;
-      showHitmarker(headshot);
-      if (enemy.health <= 0) removeEnemy(enemy, headshot, hitPoint, direction);
+
+      hitPoint =
+        enemyHit.point;
+
+      spawnBurst(
+        hitPoint,
+        headshot
+          ? 0xff8b93
+          : 0xcbd6df,
+        headshot ? 14 : 8,
+      );
+
+      state.score +=
+        headshot ? 25 : 10;
+
+      showHitmarker(
+        headshot,
+      );
+
+      showWorldHitMarker(
+        hitPoint,
+        headshot,
+      );
+
+      if (enemy.health <= 0) {
+        removeEnemy(
+          enemy,
+          headshot,
+          hitPoint,
+          direction,
+          hitPart,
+        );
+      }
     }
   } else if (ragdollHit) {
-    const rag = ragdolls.find(r => {
-      let found = false;
-      r.model.traverse(o => { if (o === ragdollHit.object) found = true; });
-      return found;
-    });
+    const rag =
+      ragdolls.find(
+        candidate =>
+          ragdollController.active.has(
+            candidate,
+          ) &&
+          candidate.meshes.includes(
+            ragdollHit.object,
+          ),
+      );
 
     if (rag) {
-      hitPoint = ragdollHit.point;
-      applyRagdollHit(rag, hitPoint, direction, ragdollHit.object);
-      spawnBurst(hitPoint, 0xcbd6df, 7);
+      hitPoint =
+        ragdollHit.point;
+
+      applyRagdollHit(
+        rag,
+        hitPoint,
+        direction,
+        ragdollHit.object,
+      );
+
+      spawnBurst(
+        hitPoint,
+        0xcbd6df,
+        7,
+      );
+
       showHitmarker(false);
+      showWorldHitMarker(
+        hitPoint,
+        false,
+      );
     }
   } else if (wallHits[0]) {
-    hitPoint = wallHits[0].point;
-    spawnBurst(hitPoint.clone(), 0xb8c3cc);
+    hitPoint =
+      wallHits[0].point;
+
+    spawnBurst(
+      hitPoint.clone(),
+      0xb8c3cc,
+    );
   }
 
-  addTracer(origin.clone().add(direction.clone().multiplyScalar(.8)), hitPoint);
+  addTracer(
+    origin
+      .clone()
+      .addScaledVector(
+        direction,
+        .8,
+      ),
+    hitPoint,
+  );
+
   updateHud();
 }
 
 function getRagdollHitPart(hitObject) {
   let node = hitObject;
+
   while (node) {
     if (node.name === 'RagdollHead') return 'head';
     if (node.name === 'RagdollLeftArm') return 'leftArm';
@@ -1536,7 +1805,9 @@ function getRagdollHitPart(hitObject) {
       node.name === 'HelmetVisorFrame' ||
       node.name === 'HeadsetLeft' ||
       node.name === 'HeadsetRight'
-    ) return 'head';
+    ) {
+      return 'head';
+    }
 
     node = node.parent;
   }
@@ -1544,60 +1815,34 @@ function getRagdollHitPart(hitObject) {
   return 'body';
 }
 
-function applyRagdollHit(rag, hitPoint, direction, hitObject) {
-  if (!rag || !rag.model) return;
+function applyRagdollHit(
+  rag,
+  hitPoint,
+  direction,
+  hitObject,
+) {
+  if (!rag) return;
 
-  const hitPart = getRagdollHitPart(hitObject);
-  const hitDir = direction?.clone().normalize() || new THREE.Vector3(0, 0, -1);
-
-  rag.model.updateMatrixWorld(true);
-  const bodyCenter = rag.group.getWorldPosition(new THREE.Vector3());
-  const localImpact = rag.model.worldToLocal(hitPoint.clone());
+  const hitPart =
+    getRagdollHitPart(hitObject);
 
   const force =
-    hitPart === 'head' ? 3.8 :
-    hitPart === 'leftArm' || hitPart === 'rightArm' ? 1.9 :
-    hitPart === 'leftLeg' || hitPart === 'rightLeg' ? 1.7 :
-    2.5;
+    hitPart === 'head' ? 4.2 :
+    hitPart === 'leftArm' ||
+    hitPart === 'rightArm' ? 2.2 :
+    hitPart === 'leftLeg' ||
+    hitPart === 'rightLeg' ? 1.9 :
+    2.8;
 
-  const impulse = hitDir.clone().multiplyScalar(force);
-  rag.velocity.add(impulse);
-  if (hitPart === 'head') rag.velocity.y += 1.0;
+  ragdollController.applyBulletImpulse(
+    rag,
+    hitPoint,
+    direction,
+    force,
+    hitPart,
+  );
 
-  // Kick the whole body, but don't re-randomize every limb on every shot.
-  const lever = hitPoint.clone().sub(bodyCenter);
-  const torque = lever.cross(impulse);
-  rag.angularVelocity.addScaledVector(torque, .42);
-
-  const target = {
-    leftArm: 'RagdollLeftArm',
-    rightArm: 'RagdollRightArm',
-    leftLeg: 'RagdollLeftLeg',
-    rightLeg: 'RagdollRightLeg',
-  }[hitPart];
-
-  if (target) {
-    const joint = rag.joints.find(j => j.upper.name === target);
-    if (joint) {
-      joint.upperVelocity += (Math.random() - .5) * 2.8 + localImpact.x * 1.0;
-      joint.lowerVelocity += (Math.random() - .5) * 3.1 + localImpact.y * 1.0;
-      joint.upperVelocityZ += (Math.random() - .5) * 1.8;
-      joint.lowerVelocityZ += (Math.random() - .5) * 2.0;
-    }
-  }
-
-  if (hitPart === 'upperBody' || hitPart === 'body') {
-    rag.spine.velocityX += localImpact.z * 1.0;
-    rag.spine.velocityZ -= localImpact.x * 1.0;
-  } else if (hitPart === 'head') {
-    rag.neck.velocityX += (Math.random() - .5) * 2.0;
-    rag.neck.velocityY += localImpact.x * 1.3;
-  }
-
-  rag.grounded = false;
-  rag.groundTime = 0;
-  rag.sleep = false;
-  rag.justLanded = false;
+  ragdollController.update();
 }
 
 function reload() {
@@ -1685,401 +1930,271 @@ function enemyShoot(enemy) {
 function updateEnemies(dt) {
   for (let i = enemies.length - 1; i >= 0; i -= 1) {
     const enemy = enemies[i];
+
     enemy.attackTimer -= dt;
-    enemy.hurtFlash = Math.max(0, enemy.hurtFlash - dt);
+    enemy.hurtFlash =
+      Math.max(0, enemy.hurtFlash - dt);
     enemy.strafeTimer -= dt;
 
-    const toPlayer = new THREE.Vector3().subVectors(player.position, enemy.group.position);
+    const toPlayer =
+      new THREE.Vector3()
+        .subVectors(
+          player.position,
+          enemy.group.position,
+        );
+
     toPlayer.y = 0;
+
     const dist = toPlayer.length();
 
-    if (enemy.role === 'rusher') {
-      if (dist > 2.25) {
-        toPlayer.normalize();
-        enemy.group.position.addScaledVector(toPlayer, enemy.speed * dt);
-      }
-      if (dist < 2.65 && enemy.attackTimer <= 0) {
-        enemy.attackTimer = enemy.attackCooldown;
-        damagePlayer(enemy.damage + 2);
-      }
-    } else {
-      let desired = toPlayer.clone();
-      if (enemy.role === 'rifleman') {
-        if (dist < 15) desired.multiplyScalar(-1);
-        else if (dist > 28) desired.multiplyScalar(1);
-        else desired.set(0, 0, 0);
-      } else {
-        if (dist < 19) desired.multiplyScalar(-1);
-        else if (dist > 32) desired.multiplyScalar(1);
-        else desired.set(0, 0, 0);
-      }
+    const desiredDistance =
+      enemy.role === 'rusher'
+        ? 2.25
+        : enemy.role === 'rifleman'
+          ? 24
+          : 26;
 
-      if (desired.lengthSq() > .01) {
-        desired.normalize();
-        enemy.group.position.addScaledVector(desired, enemy.speed * dt);
-      } else {
-        if (enemy.strafeTimer <= 0) {
-          enemy.strafeTimer = .8 + Math.random() * 1.4;
-          enemy.strafeSign *= -1;
-        }
-        const side = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).normalize();
-        enemy.group.position.addScaledVector(side, enemy.strafeSign * enemy.speed * .75 * dt);
+    enemy.steering?.update(
+      dt,
+      player.position,
+      {
+        speed: enemy.speed,
+        desiredDistance,
+      },
+    );
+
+    /*
+     * Ranged enemies add a mild lateral strafe while their steering agent
+     * maintains the correct combat distance.
+     */
+    if (
+      enemy.role !== 'rusher' &&
+      dist > 16 &&
+      dist < 32
+    ) {
+      if (enemy.strafeTimer <= 0) {
+        enemy.strafeTimer =
+          .8 + Math.random() * 1.4;
+        enemy.strafeSign *= -1;
       }
 
-      if (enemy.attackTimer <= 0 && dist < enemy.attackRange) {
-        enemyShoot(enemy);
-      }
-    }
-
-    enemy.group.position.x = THREE.MathUtils.clamp(enemy.group.position.x, -51, 51);
-    enemy.group.position.z = THREE.MathUtils.clamp(enemy.group.position.z, -51, 51);
-
-    // The soldier model faces local -Z, so explicitly aim that front side at the player.
-    const faceX = player.position.x - enemy.group.position.x;
-    const faceZ = player.position.z - enemy.group.position.z;
-    enemy.group.rotation.y = Math.atan2(faceX, faceZ) + Math.PI;
-
-    const parts = enemy.group.userData.parts;
-    enemy.shootRecoil = Math.max(0, enemy.shootRecoil - dt * 7);
-
-    const moveAmount = enemy.role === 'rusher' ? 1 : .48;
-    const stride = Math.sin(enemy.animTime) * moveAmount;
-    const counterStride = Math.sin(enemy.animTime + Math.PI) * moveAmount;
-    const bounce = Math.abs(Math.sin(enemy.animTime * .5)) * (enemy.role === 'rusher' ? .035 : .015);
-    const breath = Math.sin(enemy.animTime * .65 + enemy.phase) * .018;
-    const isAiming = enemy.role !== 'rusher';
-
-    // Procedural locomotion: rushers run, ranged units keep their rifle up.
-    parts.leftLeg.rotation.x = -stride * (enemy.role === 'rusher' ? .72 : .28);
-    parts.rightLeg.rotation.x = -counterStride * (enemy.role === 'rusher' ? .72 : .28);
-    parts.leftKnee.rotation.x = Math.max(0, stride) * (enemy.role === 'rusher' ? .34 : .12);
-    parts.rightKnee.rotation.x = Math.max(0, counterStride) * (enemy.role === 'rusher' ? .34 : .12);
-
-    if (isAiming) {
-      parts.leftArm.rotation.x = -.34 + counterStride * .08 + breath;
-      parts.rightArm.rotation.x = -.30 + stride * .08 - breath;
-      parts.leftArm.rotation.z = .08;
-      parts.rightArm.rotation.z = -.08;
-    } else {
-      parts.leftArm.rotation.x = -.08 + stride * .42;
-      parts.rightArm.rotation.x = -.10 + counterStride * .42;
-      parts.leftArm.rotation.z = .10;
-      parts.rightArm.rotation.z = -.10;
-    }
-
-    parts.upperBody.rotation.x = isAiming
-      ? -.035 + breath * .35
-      : -.065 + breath * .25;
-    parts.upperBody.rotation.z = Math.sin(enemy.animTime * .5 + enemy.phase) * .012;
-    parts.hips.position.y = 1.42 + bounce;
-
-    parts.head.rotation.x = Math.sin(enemy.animTime * .42 + enemy.phase) * .025;
-    parts.head.rotation.y = Math.sin(enemy.animTime * .27 + enemy.phase) * .07;
-    parts.rifle.rotation.x = .02 - enemy.shootRecoil * .16 + breath * .2;
-    parts.rifle.rotation.z = -.08 + Math.sin(enemy.animTime * .55) * .01;
-
-    enemy.walkTime += dt * (enemy.role === 'rusher' ? 11 : 7);
-    enemy.animTime += dt * (enemy.role === 'rusher' ? 12 : 6.5);
-  }
-}
-
-function updateRagdolls(dt) {
-  const subSteps = 3;
-  const step = Math.min(dt / subSteps, .018);
-
-  for (let i = ragdolls.length - 1; i >= 0; i -= 1) {
-    const rag = ragdolls[i];
-    if (rag.sleep) continue;
-
-    for (let sub = 0; sub < subSteps; sub += 1) {
-      rag.age += step;
-
-      // Phase 1: tip the whole corpse. Limbs stay strongly constrained so
-      // the body reads as one connected person while falling.
-      const fallBlend = THREE.MathUtils.clamp(1 - rag.age / .75, 0, 1);
-      const settleBlend = THREE.MathUtils.clamp((rag.age - .55) / 2.0, 0, 1);
-
-      rag.velocity.y -= CONFIG.ragdollGravity * step;
-      const horizontalDrag = rag.grounded ? 4.0 : .10;
-      rag.velocity.x *= Math.exp(-horizontalDrag * step);
-      rag.velocity.z *= Math.exp(-horizontalDrag * step);
-      rag.group.position.addScaledVector(rag.velocity, step);
-
-      const angularDrag = rag.grounded ? 3.5 : .045;
-      rag.angularVelocity.multiplyScalar(Math.exp(-angularDrag * step));
-
-      // Preserve the fall momentum strongly through the first ~0.75 sec.
-      // Then friction and joint damping gradually take over.
-      rag.group.rotation.x += rag.angularVelocity.x * step;
-      rag.group.rotation.y += rag.angularVelocity.y * step;
-      rag.group.rotation.z += rag.angularVelocity.z * step;
-
-      // ---------------- Connected limbs ----------------
-      const rootQuat = rag.group.getWorldQuaternion(new THREE.Quaternion());
-      const localDown = new THREE.Vector3(0, -1, 0)
-        .applyQuaternion(rootQuat.invert());
-
-      for (const joint of rag.joints) {
-        const gravityAngle = THREE.MathUtils.clamp(
-          Math.atan2(localDown.z, -localDown.y),
-          -.65,
-          .65
+      const side =
+        new THREE.Vector3(
+          -toPlayer.z,
+          0,
+          toPlayer.x,
         );
 
-        // Strong constraint during the fall; only after impact do we loosen.
-        const stiffnessMultiplier = THREE.MathUtils.lerp(
-          1.15,
-          .62,
-          settleBlend
-        );
-        const stiffness = joint.stiffness * stiffnessMultiplier;
-        const damping = joint.damping * THREE.MathUtils.lerp(
-          1.35,
-          .95,
-          settleBlend
-        );
+      if (side.lengthSq() > .001) {
+        side.normalize();
 
-        const upperTarget = THREE.MathUtils.clamp(
-          joint.upperRest + gravityAngle * .16,
-          -joint.upperLimit,
-          joint.upperLimit
-        );
-        const lowerTarget = THREE.MathUtils.clamp(
-          joint.lowerRest + gravityAngle * .10,
-          -joint.lowerLimit,
-          joint.lowerLimit
-        );
-
-        joint.upperVelocity += (
-          -(joint.upperAngle - upperTarget) * stiffness
-          - joint.upperVelocity * damping
-        ) * step;
-
-        joint.lowerVelocity += (
-          -(joint.lowerAngle - lowerTarget) * (stiffness * 1.08)
-          - joint.lowerVelocity * (damping * 1.05)
-        ) * step;
-
-        joint.upperVelocityZ += (
-          -joint.upperZ * stiffness * .7
-          -joint.upperVelocityZ * damping
-        ) * step;
-
-        joint.lowerVelocityZ += (
-          -joint.lowerZ * stiffness * .72
-          -joint.lowerVelocityZ * damping
-        ) * step;
-
-        joint.upperAngle += joint.upperVelocity * step;
-        joint.lowerAngle += joint.lowerVelocity * step;
-        joint.upperZ += joint.upperVelocityZ * step;
-        joint.lowerZ += joint.lowerVelocityZ * step;
-
-        joint.upperAngle = THREE.MathUtils.clamp(
-          joint.upperAngle,
-          -joint.upperLimit,
-          joint.upperLimit
-        );
-        joint.lowerAngle = THREE.MathUtils.clamp(
-          joint.lowerAngle,
-          -joint.lowerLimit,
-          joint.lowerLimit
-        );
-        joint.upperZ = THREE.MathUtils.clamp(joint.upperZ, -.7, .7);
-        joint.lowerZ = THREE.MathUtils.clamp(joint.lowerZ, -.7, .7);
-
-        joint.upper.rotation.x = joint.upperAngle;
-        joint.lower.rotation.x = joint.lowerAngle;
-        joint.upper.rotation.z = joint.upperZ;
-        joint.lower.rotation.z = joint.lowerZ;
-      }
-
-      // ---------------- Torso / head ----------------
-      const spineTargetX = THREE.MathUtils.clamp(localDown.z * .18, -.24, .24);
-      const spineTargetZ = THREE.MathUtils.clamp(-localDown.x * .18, -.24, .24);
-
-      rag.spine.velocityX += (
-        (spineTargetX - rag.spine.angleX) * rag.spine.stiffness
-        - rag.spine.velocityX * rag.spine.damping
-      ) * step;
-      rag.spine.velocityZ += (
-        (spineTargetZ - rag.spine.angleZ) * rag.spine.stiffness
-        - rag.spine.velocityZ * rag.spine.damping
-      ) * step;
-
-      rag.spine.angleX += rag.spine.velocityX * step;
-      rag.spine.angleZ += rag.spine.velocityZ * step;
-      rag.spine.angleX = THREE.MathUtils.clamp(rag.spine.angleX, -.48, .48);
-      rag.spine.angleZ = THREE.MathUtils.clamp(rag.spine.angleZ, -.40, .40);
-      rag.spine.object.rotation.x = rag.spine.angleX;
-      rag.spine.object.rotation.z = rag.spine.angleZ;
-
-      rag.pelvis.velocityX += (
-        -rag.pelvis.angleX * rag.pelvis.stiffness
-        - rag.pelvis.velocityX * rag.pelvis.damping
-      ) * step;
-      rag.pelvis.velocityZ += (
-        -rag.pelvis.angleZ * rag.pelvis.stiffness
-        - rag.pelvis.velocityZ * rag.pelvis.damping
-      ) * step;
-      rag.pelvis.angleX += rag.pelvis.velocityX * step;
-      rag.pelvis.angleZ += rag.pelvis.velocityZ * step;
-      rag.pelvis.angleX = THREE.MathUtils.clamp(rag.pelvis.angleX, -.20, .20);
-      rag.pelvis.angleZ = THREE.MathUtils.clamp(rag.pelvis.angleZ, -.18, .18);
-      rag.pelvis.object.rotation.x = rag.pelvis.angleX;
-      rag.pelvis.object.rotation.z = rag.pelvis.angleZ;
-
-      const headTargetX = THREE.MathUtils.clamp(localDown.z * .35, -0.6, 0.6);
-      const headTargetY = THREE.MathUtils.clamp(-localDown.x * .18, -.45, .45);
-      rag.neck.velocityX += (
-        (headTargetX - rag.neck.angleX) * rag.neck.stiffness
-        - rag.neck.velocityX * rag.neck.damping
-      ) * step;
-      rag.neck.velocityY += (
-        (headTargetY - rag.neck.angleY) * rag.neck.stiffness
-        - rag.neck.velocityY * rag.neck.damping
-      ) * step;
-      rag.neck.angleX += rag.neck.velocityX * step;
-      rag.neck.angleY += rag.neck.velocityY * step;
-      rag.neck.angleX = THREE.MathUtils.clamp(rag.neck.angleX, -0.7, 0.7);
-      rag.neck.angleY = THREE.MathUtils.clamp(rag.neck.angleY, -.55, .55);
-      rag.neck.object.rotation.x = rag.neck.angleX;
-      rag.neck.object.rotation.y = rag.neck.angleY;
-
-      // ---------------- Floor contact ----------------
-      rag.model.updateMatrixWorld(true);
-      rag.bounds.makeEmpty();
-
-      rag.model.traverse((part) => {
-        if (!part.isMesh || !part.visible) return;
-        part.geometry.computeBoundingBox();
-        if (!part.geometry.boundingBox) return;
-        rag.bounds.union(
-          part.geometry.boundingBox.clone().applyMatrix4(part.matrixWorld)
-        );
-      });
-
-      const clearance = .035;
-      const penetration = clearance - rag.bounds.min.y;
-
-      if (penetration > 0) {
-        rag.group.position.y += penetration;
-
-        if (!rag.grounded) {
-          rag.grounded = true;
-          rag.justLanded = true;
-          rag.groundTime = 0;
-        }
-
-        // Give the body one small rebound on a hard impact, then kill energy.
-        if (rag.velocity.y < -2.0) {
-          rag.velocity.y *= -.13;
-        } else {
-          rag.velocity.y = 0;
-        }
-
-        rag.velocity.x *= Math.exp(-6.2 * step);
-        rag.velocity.z *= Math.exp(-6.2 * step);
-        rag.angularVelocity.multiplyScalar(Math.exp(-5.2 * step));
-
-        if (rag.justLanded) {
-          for (const joint of rag.joints) {
-            joint.upperVelocity *= .52;
-            joint.lowerVelocity *= .56;
-            joint.upperVelocityZ *= .58;
-            joint.lowerVelocityZ *= .60;
-          }
-          rag.spine.velocityX *= .58;
-          rag.spine.velocityZ *= .58;
-          rag.neck.velocityX *= .60;
-          rag.neck.velocityY *= .62;
-          rag.justLanded = false;
-        }
-      } else {
-        rag.grounded = false;
-        rag.groundTime = 0;
-      }
-
-      // After the body lands, ease off the initial fall speed rather than
-      // letting it keep cartwheeling forever.
-      if (settleBlend > 0) {
-        rag.angularVelocity.multiplyScalar(
-          Math.exp(-1.35 * settleBlend * step)
+        enemy.group.position.addScaledVector(
+          side,
+          enemy.strafeSign *
+            enemy.speed *
+            .24 *
+            dt,
         );
       }
     }
 
     if (
-      rag.grounded &&
-      rag.age > 1.15 &&
-      rag.groundTime > .65 &&
-      rag.velocity.lengthSq() < .02 &&
-      rag.angularVelocity.lengthSq() < .018
+      enemy.role === 'rusher' &&
+      dist < 2.65 &&
+      enemy.attackTimer <= 0
     ) {
-      const jointsStillMoving = rag.joints.some((joint) =>
-        Math.abs(joint.upperVelocity) > .04 ||
-        Math.abs(joint.lowerVelocity) > .04 ||
-        Math.abs(joint.upperVelocityZ) > .04 ||
-        Math.abs(joint.lowerVelocityZ) > .04
+      enemy.attackTimer =
+        enemy.attackCooldown;
+
+      damagePlayer(
+        enemy.damage + 2,
       );
-      rag.sleep = !jointsStillMoving;
-    }
-  }
-
-  for (let i = droppedGuns.length - 1; i >= 0; i -= 1) {
-    const gun = droppedGuns[i];
-    gun.life -= dt;
-
-    gun.velocity.y -= CONFIG.ragdollGravity * dt;
-    gun.mesh.position.addScaledVector(gun.velocity, dt);
-    gun.mesh.rotation.x += gun.angularVelocity.x * dt;
-    gun.mesh.rotation.y += gun.angularVelocity.y * dt;
-    gun.mesh.rotation.z += gun.angularVelocity.z * dt;
-
-    gun.bounds.setFromObject(gun.mesh);
-    if (gun.bounds.min.y < .025) {
-      gun.mesh.position.y += .025 - gun.bounds.min.y;
-      gun.velocity.y = gun.velocity.y < -1 ? gun.velocity.y * -.18 : 0;
-      gun.velocity.x *= Math.exp(-4.2 * dt);
-      gun.velocity.z *= Math.exp(-4.2 * dt);
-      gun.angularVelocity.multiplyScalar(Math.exp(-4.0 * dt));
     }
 
-    if (gun.life <= 0) {
-      scene.remove(gun.mesh);
-      droppedGuns.splice(i, 1);
+    if (
+      enemy.role !== 'rusher' &&
+      enemy.attackTimer <= 0 &&
+      dist < enemy.attackRange
+    ) {
+      enemyShoot(enemy);
     }
-  }
 
-  for (let i = shellCasings.length - 1; i >= 0; i -= 1) {
-    const shell = shellCasings[i];
-    shell.life -= dt;
-    shell.velocity.y -= 12 * dt;
-    shell.mesh.position.addScaledVector(shell.velocity, dt);
-    shell.mesh.rotation.x += shell.angularVelocity.x * dt;
-    shell.mesh.rotation.y += shell.angularVelocity.y * dt;
-    shell.mesh.rotation.z += shell.angularVelocity.z * dt;
-    if (shell.mesh.position.y < .05) {
-      shell.mesh.position.y = .05;
-      shell.velocity.y *= -.22;
-      shell.velocity.x *= .75;
-      shell.velocity.z *= .75;
+    enemy.group.position.x =
+      THREE.MathUtils.clamp(
+        enemy.group.position.x,
+        -51,
+        51,
+      );
+
+    enemy.group.position.z =
+      THREE.MathUtils.clamp(
+        enemy.group.position.z,
+        -51,
+        51,
+      );
+
+    const faceX =
+      player.position.x -
+      enemy.group.position.x;
+
+    const faceZ =
+      player.position.z -
+      enemy.group.position.z;
+
+    enemy.group.rotation.y =
+      Math.atan2(faceX, faceZ) +
+      Math.PI;
+
+    const parts =
+      enemy.group.userData.parts;
+
+    enemy.shootRecoil =
+      Math.max(
+        0,
+        enemy.shootRecoil - dt * 7,
+      );
+
+    const moving =
+      enemy.steering?.velocity.lengthSq() >
+      .05;
+
+    const moveAmount =
+      enemy.role === 'rusher'
+        ? 1
+        : .48;
+
+    const stride =
+      Math.sin(enemy.animTime) *
+      moveAmount *
+      (moving ? 1 : .2);
+
+    const counterStride =
+      Math.sin(
+        enemy.animTime + Math.PI,
+      ) *
+      moveAmount *
+      (moving ? 1 : .2);
+
+    const bounce =
+      Math.abs(
+        Math.sin(enemy.animTime * .5),
+      ) *
+      (
+        enemy.role === 'rusher'
+          ? .035
+          : .015
+      );
+
+    const breath =
+      Math.sin(
+        enemy.animTime * .65 +
+        enemy.phase,
+      ) * .018;
+
+    const isAiming =
+      enemy.role !== 'rusher';
+
+    parts.leftLeg.rotation.x =
+      -stride *
+      (enemy.role === 'rusher' ? .72 : .28);
+
+    parts.rightLeg.rotation.x =
+      -counterStride *
+      (enemy.role === 'rusher' ? .72 : .28);
+
+    parts.leftKnee.rotation.x =
+      Math.max(0, stride) *
+      (enemy.role === 'rusher' ? .34 : .12);
+
+    parts.rightKnee.rotation.x =
+      Math.max(0, counterStride) *
+      (enemy.role === 'rusher' ? .34 : .12);
+
+    if (isAiming) {
+      parts.leftArm.rotation.x =
+        -.34 +
+        counterStride * .08 +
+        breath;
+
+      parts.rightArm.rotation.x =
+        -.30 +
+        stride * .08 -
+        breath;
+
+      parts.leftArm.rotation.z = .08;
+      parts.rightArm.rotation.z = -.08;
+    } else {
+      parts.leftArm.rotation.x =
+        -.08 + stride * .42;
+
+      parts.rightArm.rotation.x =
+        -.10 + counterStride * .42;
+
+      parts.leftArm.rotation.z = .10;
+      parts.rightArm.rotation.z = -.10;
     }
-    if (shell.life <= 0) {
-      scene.remove(shell.mesh);
-      shellCasings.splice(i, 1);
+
+    parts.upperBody.rotation.x =
+      isAiming
+        ? -.035 + breath * .35
+        : -.065 + breath * .25;
+
+    parts.upperBody.rotation.z =
+      Math.sin(
+        enemy.animTime * .5 +
+        enemy.phase,
+      ) * .012;
+
+    parts.hips.position.y =
+      1.42 + bounce;
+
+    if (parts.head?.isObject3D) {
+      parts.head.rotation.x =
+        Math.sin(
+          enemy.animTime * .42 +
+          enemy.phase,
+        ) * .025;
+
+      parts.head.rotation.y =
+        Math.sin(
+          enemy.animTime * .27 +
+          enemy.phase,
+        ) * .07;
     }
+
+    parts.rifle.rotation.x =
+      .02 -
+      enemy.shootRecoil * .16 +
+      breath * .2;
+
+    parts.rifle.rotation.z =
+      -.08 +
+      Math.sin(
+        enemy.animTime * .55,
+      ) * .01;
+
+    enemy.walkTime +=
+      dt *
+      (enemy.role === 'rusher'
+        ? 11
+        : 7);
+
+    enemy.animTime +=
+      dt *
+      (enemy.role === 'rusher'
+        ? 12
+        : 6.5);
   }
 }
 
-function updateWave(dt) {
-  if (state.spawnLeft > 0 || enemies.length > 0) return;
-  state.nextWaveTimer += dt;
-  if (state.nextWaveTimer >= 2) {
-    state.wave += 1;
-    state.reserve = Math.min(CONFIG.reserveAmmo + (state.wave - 1) * 10, state.reserve + 45);
-    state.health = Math.min(CONFIG.maxHealth, state.health + 12);
-    spawnWave();
+function updateRagdolls(dt) {
+  physicsWorld.step(dt);
+  ragdollController.update();
+
+  for (let i = ragdolls.length - 1; i >= 0; i -= 1) {
+    if (!ragdollController.active.has(ragdolls[i])) {
+      ragdolls.splice(i, 1);
+    }
   }
 }
 
@@ -2173,6 +2288,8 @@ function tickEffects(dt) {
     }
   }
 
+  updateWorldHitMarkers(dt);
+
   if (state.hurtFlash > 0) {
     renderer.domElement.style.filter = 'brightness(1.2) contrast(1.12) saturate(1.08)';
     els.damageOverlay.classList.add('show');
@@ -2184,9 +2301,18 @@ function tickEffects(dt) {
 
 function frame() {
   requestAnimationFrame(frame);
-  const dt = Math.min(clock.getDelta(), .05);
 
-  if (state.active && document.pointerLockElement === renderer.domElement) {
+  const dt =
+    Math.min(
+      clock.getDelta(),
+      .05,
+    );
+
+  if (
+    state.active &&
+    document.pointerLockElement ===
+      renderer.domElement
+  ) {
     movePlayer(dt);
     updateEnemies(dt);
     updateWave(dt);
@@ -2198,14 +2324,34 @@ function frame() {
   updateRagdolls(dt);
   updateWeapon(dt);
 
-  state.shake = Math.max(0, state.shake - dt * 1.9);
-  if (state.shake > 0 && state.active) {
-    camera.position.x += (Math.random()-.5) * state.shake;
-    camera.position.y += (Math.random()-.5) * state.shake;
-    camera.rotation.z += (Math.random()-.5) * state.shake * .7;
+  state.shake =
+    Math.max(
+      0,
+      state.shake - dt * 1.9,
+    );
+
+  if (
+    state.shake > 0 &&
+    state.active
+  ) {
+    camera.position.x +=
+      (Math.random() - .5) *
+      state.shake;
+
+    camera.position.y +=
+      (Math.random() - .5) *
+      state.shake;
+
+    camera.rotation.z +=
+      (Math.random() - .5) *
+      state.shake *
+      .7;
   }
 
-  renderer.render(scene, camera);
+  renderer.render(
+    scene,
+    camera,
+  );
 }
 
 function setWaveChoice(value) {
@@ -2224,6 +2370,82 @@ function showMenuView(view) {
   els.optionsMenu.classList.toggle('hidden', view !== 'options');
 }
 
+let directorWaveInitialized = false;
+
+const waveDirectorSpawnPoints = [
+  new THREE.Vector3(-12, 0, 1),
+  new THREE.Vector3(-6, 0, -7),
+  new THREE.Vector3(0, 0, -11),
+  new THREE.Vector3(6, 0, -7),
+  new THREE.Vector3(12, 0, 1),
+  new THREE.Vector3(-17, 0, -14),
+  new THREE.Vector3(17, 0, -14),
+  new THREE.Vector3(0, 0, -22),
+];
+
+function getWaveSpawnPoints() {
+  return waveDirectorSpawnPoints.map(
+    point => {
+      const next = point.clone();
+
+      if (
+        next.distanceTo(player.position) <
+        12
+      ) {
+        next.z -= 8;
+      }
+
+      return next;
+    },
+  );
+}
+
+waveDirector = new WaveDirector({
+  camera,
+  player,
+  obstacles,
+  getSpawnPoints:
+    getWaveSpawnPoints,
+  spawnEnemy:
+    (index, spawnPosition) =>
+      spawnEnemy(
+        index,
+        spawnPosition,
+      ),
+  getAliveCount:
+    () => enemies.length,
+  startWave: state.wave,
+  intermissionSeconds: 2,
+  baseSpawnCount: 4,
+  spawnGrowth: 2,
+  maxWaveSpawn: 18,
+  maxEnemies: 28,
+  spawnInterval: .10,
+  onWaveChanged: (wave) => {
+    if (
+      directorWaveInitialized &&
+      wave !== state.selectedWave
+    ) {
+      state.reserve =
+        Math.min(
+          CONFIG.reserveAmmo +
+            (wave - 1) * 10,
+          state.reserve + 45,
+        );
+
+      state.health =
+        Math.min(
+          CONFIG.maxHealth,
+          state.health + 12,
+        );
+    }
+
+    state.wave = wave;
+    directorWaveInitialized = true;
+    updateHud();
+  },
+});
+
 for (const button of els.waveChoices) {
   button.addEventListener('click', () => setWaveChoice(button.dataset.waveChoice));
 }
@@ -2237,22 +2459,22 @@ setWaveChoice('1');
 showMenuView('main');
 
 function enterGame() {
-  // Reset the arena state first, but defer enemy construction until the
-  // browser has painted the game screen. This keeps the START button
-  // responsive even with the high-detail soldier models.
   resetGame(false);
-  renderer.domElement.style.display = 'block';
+
+  renderer.domElement.style.display =
+    'block';
+
   els.start.classList.add('hidden');
   els.pause.classList.add('hidden');
   els.gameOver.classList.add('hidden');
   els.hud.classList.remove('hidden');
 
+  if (waveDirector) {
+    waveDirector.wave = state.wave;
+    waveDirector.start();
+  }
+
   renderer.domElement.requestPointerLock?.();
-  requestAnimationFrame(() => {
-    if (state.active && !state.over && enemies.length === 0 && state.spawnLeft === 0) {
-      spawnWave();
-    }
-  });
 }
 
 els.startButton.addEventListener('click', enterGame);
