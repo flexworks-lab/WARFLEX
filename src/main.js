@@ -12,6 +12,7 @@ import { configureAtmosphere } from './world/Atmosphere.js?v=readability-2026100
 import { NavMeshService } from './ai/NavMeshService.js?v=wide-map-20261003';
 import { NavMeshAgent } from './ai/NavMeshAgent.js?v=wide-map-20261003';
 import { MapEditor } from './dev/MapEditor.js?v=88daa5da65639c54065c2129254c5168e1bee5fb';
+import { Sky } from 'three/addons/objects/Sky.js';
 
 const CONFIG = {
   maxHealth: 100,
@@ -78,11 +79,32 @@ const els = {
   combatCallout: document.querySelector('#combat-callout'),
   comboCount: document.querySelector('#combo-count'),
   weaponPickupPrompt: document.querySelector('#weapon-pickup-prompt'),
+  pauseRestartButton: document.querySelector('#pause-restart-button'),
+  pauseQuitButton: document.querySelector('#pause-quit-button'),
 };
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x111a22);
-scene.fog = new THREE.Fog(0x111a22, 58, 260);
+scene.background = new THREE.Color(0x91b8d2);
+scene.fog = new THREE.Fog(0x91b8d2, 105, 340);
+
+const sky = new Sky();
+sky.scale.setScalar(450);
+sky.frustumCulled = false;
+scene.add(sky);
+
+const skyUniforms = sky.material.uniforms;
+skyUniforms.turbidity.value = 5.2;
+skyUniforms.rayleigh.value = 1.45;
+skyUniforms.mieCoefficient.value = 0.0042;
+skyUniforms.mieDirectionalG.value = 0.78;
+
+const skySun = new THREE.Vector3();
+skySun.setFromSphericalCoords(
+  1,
+  THREE.MathUtils.degToRad(58),
+  THREE.MathUtils.degToRad(125),
+);
+skyUniforms.sunPosition.value.copy(skySun);
 
 const camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.05, 320);
 camera.rotation.order = 'YXZ';
@@ -6866,7 +6888,37 @@ if (startRequestedBeforeBoot) {
   startRequestedBeforeBoot = false;
   enterGame();
 }
-els.resumeButton.addEventListener('click', () => renderer.domElement.requestPointerLock());
+els.resumeButton.addEventListener('click', () => {
+  renderer.domElement.requestPointerLock?.();
+});
+
+els.pauseRestartButton?.addEventListener('click', () => {
+  els.pause.classList.add('hidden');
+  enterGame(editorPlaytestActive);
+});
+
+els.pauseQuitButton?.addEventListener('click', () => {
+  document.exitPointerLock?.();
+  waveDirector?.stop?.();
+  state.active = false;
+  state.over = false;
+  state.aiming = false;
+  keys.clear();
+
+  for (const enemy of enemies) scene.remove(enemy.group);
+  enemies.length = 0;
+  ragdollController.dispose();
+  ragdolls.length = 0;
+
+  renderer.domElement.style.display = 'none';
+  gunViewportRenderer.domElement.style.display = 'block';
+  els.hud.classList.add('hidden');
+  els.pause.classList.add('hidden');
+  els.gameOver.classList.add('hidden');
+  els.start.classList.remove('hidden');
+  showMenuView('main');
+  refreshMapList();
+});
 els.restartButton.addEventListener('click', () => enterGame(editorPlaytestActive));
 els.updateReload.addEventListener('click', () => {
   if (pendingUpdate?.version) localStorage.setItem(UPDATE_STORAGE_KEY, pendingUpdate.version);
