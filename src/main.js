@@ -289,6 +289,9 @@ function showRuntimeError(error, context = 'Runtime error') {
     font: '12px/1.45 monospace',
     whiteSpace: 'pre-wrap',
     pointerEvents: 'auto',
+    userSelect: 'text',
+    webkitUserSelect: 'text',
+    cursor: 'text',
   });
   if (!existing) document.body.appendChild(panel);
 }
