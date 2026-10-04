@@ -13,6 +13,7 @@ import { NavMeshService } from './ai/NavMeshService.js?v=wide-map-20261003';
 import { NavMeshAgent } from './ai/NavMeshAgent.js?v=wide-map-20261003';
 import { MapEditor } from './dev/MapEditor.js?v=88daa5da65639c54065c2129254c5168e1bee5fb';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { Multiplayer } from './systems/Multiplayer.js?v=pvp-20261004';
 
 const CONFIG = {
   maxHealth: 100,
@@ -81,6 +82,10 @@ const els = {
   weaponPickupPrompt: document.querySelector('#weapon-pickup-prompt'),
   pauseRestartButton: document.querySelector('#pause-restart-button'),
   pauseQuitButton: document.querySelector('#pause-quit-button'),
+  multiplayerMenu: document.querySelector('#multiplayer-menu'),
+  multiplayerUsername: document.querySelector('#multiplayer-username'),
+  multiplayerConnect: document.querySelector('#multiplayer-connect'),
+  backFromMultiplayer: document.querySelector('#back-from-multiplayer'),
 };
 
 const scene = new THREE.Scene();
@@ -364,6 +369,7 @@ const state = {
   slideDirection: new THREE.Vector3(),
   combo: 0,
   comboTimer: 0,
+  gameMode: 'waves',
 };
 
 const player = {
@@ -372,6 +378,12 @@ const player = {
 };
 
 const ENEMY_GROUND_Y = 0.12;
+
+let multiplayerActive = false;
+const savedMultiplayerUsername = localStorage.getItem('WARFLEX_USERNAME') || 'PLAYER';
+if (els.multiplayerUsername) els.multiplayerUsername.value = savedMultiplayerUsername;
+
+let multiplayer;
 
 const UPDATE_STORAGE_KEY = 'warfex:lastSeenUpdate';
 let pendingUpdate = null;
@@ -5809,6 +5821,18 @@ function shoot() {
     wallHits[0]?.distance ??
     Infinity;
 
+  const multiplayerHit = multiplayerActive
+    ? multiplayer.raycastPlayers(origin, direction, wallDistance)
+    : null;
+  if (multiplayerActive && multiplayerHit) {
+    showHitmarker(multiplayerHit.headshot);
+    showWorldHitMarker(multiplayerHit.point, multiplayerHit.headshot);
+    spawnBurst(multiplayerHit.point, multiplayerHit.headshot ? 0xff8b93 : 0xcbd6df, multiplayerHit.headshot ? 14 : 8);
+    multiplayer.sendShot(origin, direction, multiplayerHit);
+  } else if (multiplayerActive) {
+    multiplayer.sendShot(origin, direction, null);
+  }
+
   const enemyHit =
     enemyHits.find(
       hit => hit.distance < wallDistance,
@@ -5835,6 +5859,7 @@ function shoot() {
       );
 
   if (
+    !multiplayerHit &&
     closestEnemyDistance <=
       closestRagdollDistance &&
     enemyHit
@@ -6071,6 +6096,20 @@ function showHitmarker(headshot) {
   showHitmarker.timer = setTimeout(() => els.hitmarker.classList.remove('show'), 80);
 }
 
+function handleRemoteShot(origin, direction) {
+  const end = camera.position.clone();
+  addTracer(origin, end, 0xff5666, .065);
+}
+
+multiplayer = new Multiplayer({
+  THREE,
+  scene,
+  localPlayer: player,
+  getUsername: () => els.multiplayerUsername?.value?.trim() || localStorage.getItem('WARFLEX_USERNAME') || 'PLAYER',
+  damagePlayer,
+  onRemoteShot: handleRemoteShot,
+});
+
 function damagePlayer(amount) {
   if (state.damageCooldown > 0 || state.over) return;
   state.damageCooldown = .22;
@@ -6078,7 +6117,15 @@ function damagePlayer(amount) {
   state.hurtFlash = .18;
   state.shake = Math.max(state.shake, .13);
   updateHud();
-  if (state.health <= 0) endGame();
+  if (state.health <= 0) {
+    if (multiplayerActive) {
+      state.health = CONFIG.maxHealth;
+      player.position.set((Math.random() - .5) * 70, 1.65, 20 + Math.random() * 45);
+      state.damageCooldown = 1.0;
+    } else {
+      endGame();
+    }
+  }
 }
 
 function enemyHasLineOfSight(enemy) {
@@ -6753,13 +6800,14 @@ function frame() {
   updateBoundaryGrid();
   mapEditor.update(dt);
   updateLiveClouds(dt);
-
+  multiplayer?.update(dt);
+  if (multiplayerActive) multiplayer?.sendState(performance.now(), state.yaw, state.health);
 
   const hasPointerLock =
     document.pointerLockElement ===
     renderer.domElement;
 
-  if (state.active && !state.over) {
+  if (state.active && !state.over && !multiplayerActive) {
     // Keep wave spawning alive even if pointer-lock briefly drops.
     updateWave(dt);
   }
@@ -6769,7 +6817,7 @@ function frame() {
     hasPointerLock
   ) {
     movePlayer(dt);
-    updateEnemies(dt);
+    if (!multiplayerActive) updateEnemies(dt);
     tickEffects(dt);
   } else {
     tickEffects(dt);
@@ -6983,6 +7031,8 @@ for (const button of els.waveChoices) {
 }
 
 els.wavesButton.addEventListener('click', () => { refreshMapList(); showMenuView('waves'); });
+els.backFromMultiplayer?.addEventListener('click', () => showMenuView('main'));
+els.multiplayerConnect?.addEventListener('click', () => enterMultiplayer());
 els.optionsButton.addEventListener('click', () => showMenuView('options'));
 els.backFromWaves.addEventListener('click', () => showMenuView('main'));
 els.backFromOptions.addEventListener('click', () => showMenuView('main'));
@@ -7028,10 +7078,47 @@ function exitEditorPlaytest() {
   mapEditor.toast('BACK IN EDITOR');
 }
 
+async function enterMultiplayer() {
+  if (mapEditor.enabled) return;
+  const username = (els.multiplayerUsername?.value || 'PLAYER').trim().slice(0,18) || 'PLAYER';
+  localStorage.setItem('WARFLEX_USERNAME', username);
+  state.gameMode = 'multiplayer';
+  multiplayerActive = true;
+  state.selectedMapId = state.selectedMapId || getCurrentMapId() || 'builtin';
+  activateSelectedMap();
+  renderer.domElement.style.display = 'block';
+  els.start.classList.add('hidden');
+  els.pause.classList.add('hidden');
+  els.gameOver.classList.add('hidden');
+  els.hud.classList.remove('hidden');
+  if (els.wave) els.wave.textContent = 'PVP';
+
+  try {
+    await multiplayer.connect();
+    resetGame(false);
+    state.gameMode = 'multiplayer';
+    multiplayerActive = true;
+    state.active = true;
+    state.over = false;
+    waveDirector?.stop?.();
+    renderer.domElement.requestPointerLock?.();
+  } catch (error) {
+    multiplayerActive = false;
+    state.gameMode = 'waves';
+    state.active = false;
+    els.hud.classList.add('hidden');
+    els.start.classList.remove('hidden');
+    showMenuView('main');
+    alert('WARFLEX multiplayer is not online yet. ' + (error?.message || 'SERVER UNAVAILABLE'));
+  }
+}
+
 function enterGame(fromEditorPlaytest = false) {
   if (!fromEditorPlaytest) {
     activateSelectedMap();
   }
+  multiplayerActive = false;
+  state.gameMode = 'waves';
   // Put the UI into gameplay state first. Optional systems must not be able
   // to prevent the player from entering the arena.
   renderer.domElement.style.display = 'block';
@@ -7079,7 +7166,7 @@ function enterGame(fromEditorPlaytest = false) {
     updateHud();
   }
 
-  if (waveDirector) {
+  if (waveDirector && !multiplayerActive) {
     try {
       waveDirector.wave = state.wave;
       waveDirector.start();
@@ -7112,6 +7199,9 @@ els.pauseRestartButton?.addEventListener('click', () => {
 els.pauseQuitButton?.addEventListener('click', () => {
   document.exitPointerLock?.();
   waveDirector?.stop?.();
+  multiplayerActive = false;
+  state.gameMode = 'waves';
+  multiplayer?.disconnect();
   state.active = false;
   state.over = false;
   state.aiming = false;
