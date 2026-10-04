@@ -47,6 +47,8 @@ canvas { display: block; }
 #update-dismiss:hover { color: #fff; background: transparent; transform: none; }
 
 .screen {
+  z-index: 50;
+  pointer-events: auto;
   position: fixed;
   inset: 0;
   display: grid;
@@ -437,6 +439,9 @@ body {
 }
 
 .gothic-panel {
+  position: relative;
+  z-index: 51;
+  pointer-events: auto;
   width: 100%;
   max-width: none;
   min-height: calc(100dvh - 48px);
