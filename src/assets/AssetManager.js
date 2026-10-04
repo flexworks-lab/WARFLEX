@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
-import { SkeletonUtils } from 'three/addons/utils/SkeletonUtils.js';
+import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 
 export class AssetManager {
   constructor(renderer) {
@@ -57,7 +57,7 @@ export class AssetManager {
   async cloneGLTF(url) {
     const asset = await this.loadGLTF(url);
     return {
-      scene: SkeletonUtils.clone(asset.scene),
+      scene: cloneSkeleton(asset.scene),
       animations: asset.animations,
     };
   }
