@@ -63,6 +63,7 @@ function createSegmentBody({
   mass,
   world,
   collisionGroup,
+  scale = 1,
 }) {
   const position = findWorldPosition(object);
   const quaternion = findWorldQuaternion(object);
@@ -88,7 +89,9 @@ function createSegmentBody({
         halfExtents.z,
       )
     ),
-    cannonVec(offset),
+    cannonVec(
+      offset.clone().multiplyScalar(scale),
+    ),
   );
 
   world.addBody(body);
@@ -260,6 +263,11 @@ export class RagdollController {
 
     const collisionGroup = this.physicsWorld.ragdollGroup;
 
+    const visualScale = Math.max(
+      .01,
+      Math.abs(root.scale.x),
+    );
+
     const rootBody = createSegmentBody({
       object: root,
       offset: new THREE.Vector3(0, 0.82, 0),
@@ -267,6 +275,7 @@ export class RagdollController {
       mass: 7,
       world: this.world,
       collisionGroup,
+      scale: visualScale,
     });
     bodies.set('root', rootBody);
 
