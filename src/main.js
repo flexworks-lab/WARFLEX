@@ -11,6 +11,7 @@ import { applyBakedLightmap } from './world/BakedLighting.js?v=modulefix-2026100
 import { configureAtmosphere } from './world/Atmosphere.js?v=readability-20261003';
 import { NavMeshService } from './ai/NavMeshService.js?v=wide-map-20261003';
 import { NavMeshAgent } from './ai/NavMeshAgent.js?v=wide-map-20261003';
+import { MapEditor } from './dev/MapEditor.js?v=editor-20261004';
 
 const CONFIG = {
   maxHealth: 100,
@@ -367,9 +368,19 @@ async function checkForUpdates(initial = false) {
   }
 }
 
+const MAP_WIDTH = 260;
+const MAP_DEPTH = 150;
+const HALF_W = MAP_WIDTH * 0.5;
+const HALF_D = MAP_DEPTH * 0.5;
+
 const fallbackArenaRoot = new THREE.Group();
 fallbackArenaRoot.name = 'FallbackArena';
 scene.add(fallbackArenaRoot);
+
+const editorMapRoot = new THREE.Group();
+editorMapRoot.name = 'WARFLEX_EDITOR_MAP_ROOT';
+editorMapRoot.visible = false;
+scene.add(editorMapRoot);
 
 function makeBox(
   size,
@@ -2193,6 +2204,23 @@ const physicsWorld = new PhysicsWorld({
 });
 const fallbackPhysicsBodies =
   physicsWorld.syncArena(obstacles);
+
+
+const mapEditor = new MapEditor({
+  THREE,
+  scene,
+  camera,
+  renderer,
+  root: editorMapRoot,
+  fallbackRoot: fallbackArenaRoot,
+  obstacles,
+  onPlaytest: () => {
+    mapEditor.close();
+    editorMapRoot.visible = true;
+    fallbackArenaRoot.visible = false;
+    window.WARFLEX_START_GAME?.();
+  },
+});
 
 const ragdollController = new RagdollController({
   scene,
@@ -4519,6 +4547,11 @@ function resetGame(spawnImmediately = true) {
 
   player.position.set(18, 1.65, 58);
   camera.position.set(0, 0, 0);
+
+if (mapEditor.enabled) {
+  renderer.domElement.style.display = 'block';
+  gunViewportRenderer.domElement.style.display = 'none';
+}
   camera.rotation.set(0, 0, 0);
   camera.fov = CONFIG.defaultFov;
   camera.updateProjectionMatrix();
@@ -6404,6 +6437,8 @@ function frame() {
     );
 
   updateBoundaryGrid();
+  mapEditor.update(dt);
+
 
   const hasPointerLock =
     document.pointerLockElement ===
@@ -6465,9 +6500,9 @@ function frame() {
     !state.over;
 
   gunViewportRenderer.domElement.style.display =
-    showGameplayWeapon || showMenuWeapon
-      ? 'block'
-      : 'none';
+    mapEditor.enabled
+      ? 'none'
+      : (showGameplayWeapon || showMenuWeapon ? 'block' : 'none');
 
   gunViewportRenderer.render(
     gunViewportScene,
