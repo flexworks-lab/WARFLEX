@@ -77,18 +77,18 @@ const CombatGradeShader = {
 
       color *= mix(
         vec3(1.0),
-        vec3(.91, .97, 1.07),
-        shadow * .15
+        vec3(.95, .985, 1.04),
+        shadow * .08
       );
 
       color *= mix(
         vec3(1.0),
-        vec3(1.06, 1.015, .95),
-        highlight * .10
+        vec3(1.045, 1.01, .96),
+        highlight * .08
       );
 
       color =
-        (color - .5) * 1.10 + .5;
+        (color - .5) * 1.04 + .5;
 
       float grain =
         hash21(
@@ -96,7 +96,7 @@ const CombatGradeShader = {
           vec2(tTime * 13.0, tTime * 9.0)
         ) - .5;
 
-      color += grain * .009;
+      color += grain * .006;
 
       float vignette =
         1.0 -
@@ -106,7 +106,7 @@ const CombatGradeShader = {
 
       gl_FragColor =
         vec4(
-          max(color, vec3(.004, .006, .008)),
+          max(color, vec3(.012, .016, .022)),
           texture2D(tDiffuse, vUv).a
         );
     }
@@ -186,12 +186,12 @@ function makeAtmosphereApi(
 
 export function configureAtmosphere(scene, renderer, camera) {
   scene.background =
-    new THREE.Color(0x05070a);
+    new THREE.Color(0x101822);
 
   scene.fog =
     new THREE.FogExp2(
-      0x070a0e,
-      0.012,
+      0x111a24,
+      0.008,
     );
 
   let composer;
