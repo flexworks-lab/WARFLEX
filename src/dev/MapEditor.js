@@ -29,7 +29,7 @@ export class MapEditor {
     this.transformControls.setSpace('world');
     this.transformControls.setSize(0.9);
     this.transformControls.addEventListener('dragging-changed', (e) => { this.transformDragging = Boolean(e.value); });
-    this.transformControls.addEventListener('objectChange', () => { if(this.transformDragging) this.refreshInspector(); this.refreshColliders(); });
+    this.transformControls.addEventListener('objectChange', () => { this.applySnapToSelection(); this.refreshInspector(); this.refreshColliders(); this.dirty=true; });
     this.gizmo = this.transformControls.getHelper();
     this.gizmo.visible = false;
     scene.add(this.gizmo);
@@ -48,6 +48,7 @@ export class MapEditor {
   }
 
   open() {
+    this.mapSyncHandler=()=>{this.refreshMapInfo();this.refreshHierarchy();}; window.addEventListener('storage',this.mapSyncHandler); window.addEventListener('warfex-map-library-changed',this.mapSyncHandler);
     this.root.visible = true;
     this.fallbackRoot.visible = false;
     this.grid.visible = true;
@@ -66,6 +67,7 @@ export class MapEditor {
     this.refreshHierarchy();
     this.refreshInspector();
     this.refreshMapInfo();
+    this.syncCurrentMapToServer();
     this.toast('WARFLEX EDITOR ACTIVE');
     document.body.classList.add('warfex-editor-active');
     document.querySelector('#hud')?.classList.add('hidden');
@@ -76,6 +78,7 @@ export class MapEditor {
   }
 
   close() {
+    window.removeEventListener('storage',this.mapSyncHandler); window.removeEventListener('warfex-map-library-changed',this.mapSyncHandler);
     this.enabled=false;
     this.keys.clear();
     this.gizmo.visible=false;
@@ -198,6 +201,8 @@ export class MapEditor {
   }
 
   selectOnly(o){ this.selected.clear(); if(o)this.selected.add(o); this.attachGizmo(); this.refreshAll(); }
+  applySnapToSelection(){ if(!this.snap||!this.selected.size)return; for(const o of this.selected){if(this.transform==='translate')this.snapObject(o); else if(this.transform==='rotate'){const q=this.rotSnap*Math.PI/180;o.rotation.x=Math.round(o.rotation.x/q)*q;o.rotation.y=Math.round(o.rotation.y/q)*q;o.rotation.z=Math.round(o.rotation.z/q)*q;} } }
+  markDirty(){this.dirty=true; this.refreshStatus();}
   toggle(o){ if(this.selected.has(o))this.selected.delete(o); else this.selected.add(o); this.attachGizmo(); this.refreshAll(); }
   clear(){ this.selected.clear(); this.gizmo.visible=false; this.transformControls.detach(); this.refreshAll(); }
   selectable(o){ while(o&&o!==this.root){ if(o.userData.editorSelectable)return o; o=o.parent; } return null; }
@@ -285,8 +290,10 @@ export class MapEditor {
   async importFile(file){if(!file)return;try{this.loadJson(JSON.parse(await file.text()));this.toast('MAP IMPORTED');}catch(e){console.error(e);this.toast('IMPORT FAILED');}}
   deserializeNode(n){let o;if(n.type==='group'){o=new this.THREE.Group();o.userData.editorSelectable=true;}else{o=this.primitive(n.spec?.type||'box',n.name);if(n.spec?.color!==undefined)o.material.color.setHex(n.spec.color);o.userData.editorSpec=n.spec||o.userData.editorSpec;}o.name=n.name||'PART';o.position.fromArray(n.position||[0,0,0]);o.rotation.set(...(n.rotation||[0,0,0]));o.scale.fromArray(n.scale||[1,1,1]);for(const c of n.children||[])o.add(this.deserializeNode(c));return o;}
   loadJson(data){for(const c of [...this.root.children])c.removeFromParent();for(const n of data.objects||[])this.root.add(this.deserializeNode(n));this.clear();this.refreshAll();}
+  broadcastMapLibrary(list){try{localStorage.setItem('WARFLEX_MAP_SYNC',JSON.stringify({version:Date.now(),maps:list}));}catch{} window.dispatchEvent(new CustomEvent('warfex-map-library-changed',{detail:list}));}
   getMapLibrary(){try{const raw=localStorage.getItem('WARFLEX_MAP_LIBRARY');const data=raw?JSON.parse(raw):[];return Array.isArray(data)?data:[];}catch{return [];}}
-  setMapLibrary(list){localStorage.setItem('WARFLEX_MAP_LIBRARY',JSON.stringify(list));}
+  setMapLibrary(list){localStorage.setItem('WARFLEX_MAP_LIBRARY',JSON.stringify(list)); this.broadcastMapLibrary(list);}
+  syncCurrentMapToServer(){ /* same-origin shared state hook; hosted deployments can replace this with a backend endpoint */ }
   mapAction(action){
     const input=this.ui?.querySelector('#we-map-name');
     const name=(input?.value||this.mapName||'Untitled Map').trim()||'Untitled Map';
