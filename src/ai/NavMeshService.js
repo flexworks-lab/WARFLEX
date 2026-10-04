@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-import { Pathfinding } from 'three-pathfinding';
-
 const DEFAULT_ZONE = 'WARFLEX';
 
 export class NavMeshService {
@@ -10,14 +8,19 @@ export class NavMeshService {
   }) {
     this.assetManager = assetManager;
     this.zoneId = zoneId;
-    this.pathfinding =
-      new Pathfinding();
+    this.pathfinding = null;
     this.ready = false;
 
     this.navRoot = null;
   }
 
   async load(url) {
+    const { Pathfinding } =
+      await import('three-pathfinding');
+
+    this.pathfinding =
+      new Pathfinding();
+
     const asset =
       await this.assetManager.loadGLTF(url);
 
