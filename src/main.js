@@ -5376,6 +5376,8 @@ function resetGame(spawnImmediately = true) {
       ? -1
       : Number(window.__WARFLEX_SELECTED_WAVE || state.selectedWave || 1);
 
+  setActiveWeapon(0, { resetAmmo: true });
+
   Object.assign(state, {
     active: true,
     over: false,
@@ -7438,7 +7440,7 @@ function updateWeapon(dt) {
     state.weaponKick * .010 +
     state.weaponRecoilYaw * .20;
 
-  weapon.children.forEach((child) => {
+  weapon.traverse((child) => {
     if (child.isMesh) child.frustumCulled = false;
   });
 
@@ -7463,7 +7465,7 @@ function updateWeapon(dt) {
     if (state.reloadTimer > 0) {
       const progress =
         1 -
-        state.reloadTimer / CONFIG.reloadTime;
+        state.reloadTimer / getCurrentWeaponDef().reloadTime;
 
       const drop = THREE.MathUtils.smoothstep(
         progress,
@@ -7520,7 +7522,7 @@ function updateWeapon(dt) {
   if (state.reloadTimer > 0) {
     const progress =
       1 -
-      state.reloadTimer / CONFIG.reloadTime;
+      state.reloadTimer / getCurrentWeaponDef().reloadTime;
     const reloadArc =
       Math.sin(progress * Math.PI);
 
