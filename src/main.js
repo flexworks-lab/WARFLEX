@@ -526,6 +526,7 @@ const MAP_WIDTH = 260;
 const MAP_DEPTH = 150;
 const HALF_W = MAP_WIDTH * 0.5;
 const HALF_D = MAP_DEPTH * 0.5;
+const BLANK_BASE_MAP = true;
 
 const fallbackArenaRoot = new THREE.Group();
 fallbackArenaRoot.name = 'FallbackArena';
@@ -1006,6 +1007,34 @@ function addArena() {
     mat(0x171c1e, 0.99, 0.01),
   );
   floor.castShadow = false;
+
+  // The built-in/base map is intentionally blank so the map editor can be
+  // used to author the entire battlefield from scratch. Keep only the floor
+  // and invisible perimeter colliders for a clean playable canvas.
+  if (BLANK_BASE_MAP) {
+    addCollision(
+      [MAP_WIDTH, 10, 1.5],
+      [0, 5, -HALF_D],
+      'BaseNorthBoundary',
+    );
+    addCollision(
+      [MAP_WIDTH, 10, 1.5],
+      [0, 5, HALF_D],
+      'BaseSouthBoundary',
+    );
+    addCollision(
+      [1.5, 10, MAP_DEPTH],
+      [-HALF_W, 5, 0],
+      'BaseWestBoundary',
+    );
+    addCollision(
+      [1.5, 10, MAP_DEPTH],
+      [HALF_W, 5, 0],
+      'BaseEastBoundary',
+    );
+    console.info('[WARFLEX] Blank base map enabled.');
+    return;
+  }
 
   const sectors = [
     [-93, 39, 52, 38, 0x454b4c],
@@ -3696,7 +3725,7 @@ function installImportedWeaponModel(target, sourceScene, {
   return model;
 }
 
-async function loadImportedAK4Weapon() {
+window.__WARFLEX_LOAD_AK4__ = async function loadImportedAK4Weapon() {
   try {
     const url = new URL(
       './assets/guns/ak4/source/AK4.glb',
@@ -4266,7 +4295,8 @@ const syncWorldWeaponAnchor = () => {
 
 syncWorldWeaponAnchor();
 
-void loadImportedAK4Weapon();
+void Promise.resolve()
+  .then(() => window.__WARFLEX_LOAD_AK4__?.());
 
 function createDroppedWeaponMesh() {
   const mesh = weapon.clone(true);
