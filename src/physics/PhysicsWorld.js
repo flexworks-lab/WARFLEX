@@ -72,8 +72,10 @@ export class PhysicsWorld {
   syncArena(obstacles = []) {
     const bodies = [];
 
+    // The fallback battlefield is 260m x 150m. Keep the physics floor
+    // larger than the playable footprint so ragdolls never fall off the map.
     bodies.push(
-      this.addGround(),
+      this.addGround(264, 154, -0.5),
     );
 
     for (const obstacle of obstacles) {
