@@ -2223,6 +2223,7 @@ const mapEditor = new MapEditor({
   onPlaytest: () => {
     // Switch from the editor to a playable custom-map scene without
     // restoring the built-in fallback obstacles.
+    editorPlaytestActive = true;
     mapEditor.enabled = false;
     mapEditor.keys.clear();
     mapEditor.gizmo.visible = false;
@@ -2234,6 +2235,36 @@ const mapEditor = new MapEditor({
     obstacles.splice(0, fallbackObstacleCount);
     editorMapRoot.visible = true;
     fallbackArenaRoot.visible = false;
+
+    editorPlaytestExitButton?.remove();
+    editorPlaytestExitButton = document.createElement('button');
+    editorPlaytestExitButton.id = 'warfex-exit-playtest';
+    editorPlaytestExitButton.type = 'button';
+    editorPlaytestExitButton.textContent = 'EXIT PLAYTEST';
+    Object.assign(editorPlaytestExitButton.style, {
+      position: 'fixed',
+      top: '14px',
+      right: '14px',
+      zIndex: '100001',
+      padding: '10px 16px',
+      border: '1px solid #52636b',
+      borderRadius: '3px',
+      background: 'rgba(18,23,27,.94)',
+      color: '#fff',
+      font: '700 11px Arial,sans-serif',
+      letterSpacing: '.08em',
+      cursor: 'pointer',
+      boxShadow: '0 4px 16px rgba(0,0,0,.45)',
+    });
+    editorPlaytestExitButton.addEventListener('mouseenter', () => {
+      editorPlaytestExitButton.style.background = 'rgba(48,61,69,.98)';
+    });
+    editorPlaytestExitButton.addEventListener('mouseleave', () => {
+      editorPlaytestExitButton.style.background = 'rgba(18,23,27,.94)';
+    });
+    editorPlaytestExitButton.addEventListener('click', exitEditorPlaytest);
+    document.body.appendChild(editorPlaytestExitButton);
+
     enterGame(true);
   },
 });
@@ -2245,6 +2276,8 @@ const ragdollController = new RagdollController({
 });
 
 let waveDirector = null;
+let editorPlaytestActive = false;
+let editorPlaytestExitButton = null;
 
 const mapLoader = new MapLoader({
   scene,
@@ -6729,6 +6762,38 @@ showMenuView('main');
 refreshMapList();
 updateMenuSelection(0, false);
 
+function exitEditorPlaytest() {
+  editorPlaytestActive = false;
+  editorPlaytestExitButton?.remove();
+  editorPlaytestExitButton = null;
+
+  try { document.exitPointerLock?.(); } catch {}
+
+  waveDirector?.stop?.();
+  for (const enemy of enemies) scene.remove(enemy.group);
+  enemies.length = 0;
+  ragdollController.dispose();
+  ragdolls.length = 0;
+
+  state.active = false;
+  state.over = false;
+  editorMapRoot.visible = true;
+  fallbackArenaRoot.visible = false;
+  renderer.domElement.style.display = 'block';
+
+  mapEditor.enabled = true;
+  mapEditor.keys.clear();
+  mapEditor.grid.visible = true;
+  mapEditor.createUI();
+  mapEditor.refreshAll();
+  document.body.classList.add('warfex-editor-active');
+  document.querySelector('#hud')?.classList.add('hidden');
+  document.querySelector('#pause-screen')?.classList.add('hidden');
+  document.querySelector('#game-over')?.classList.add('hidden');
+  document.querySelector('#start-screen')?.classList.add('hidden');
+  mapEditor.toast('BACK IN EDITOR');
+}
+
 function enterGame(fromEditorPlaytest = false) {
   if (!fromEditorPlaytest) {
     activateSelectedMap();
@@ -6802,7 +6867,7 @@ if (startRequestedBeforeBoot) {
   enterGame();
 }
 els.resumeButton.addEventListener('click', () => renderer.domElement.requestPointerLock());
-els.restartButton.addEventListener('click', enterGame);
+els.restartButton.addEventListener('click', () => enterGame(editorPlaytestActive));
 els.updateReload.addEventListener('click', () => {
   if (pendingUpdate?.version) localStorage.setItem(UPDATE_STORAGE_KEY, pendingUpdate.version);
   location.reload();
