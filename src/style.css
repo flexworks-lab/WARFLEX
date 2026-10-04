@@ -1724,3 +1724,49 @@ body {
   -webkit-user-select: text !important;
   cursor: text;
 }
+
+/* FORCE-MARKABLE ERROR TEXT */
+#warfex-boot-status,
+#warfex-debug-error,
+#warfex-copy-error {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  cursor: text !important;
+  pointer-events: auto !important;
+}
+
+#warfex-copy-error-text {
+  display: block;
+  width: 100%;
+  min-height: 120px;
+  max-height: 42vh;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 0;
+  outline: none;
+  resize: vertical;
+  overflow: auto;
+  background: rgba(0,0,0,.36);
+  color: #fff;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  cursor: text !important;
+  pointer-events: auto !important;
+  -webkit-touch-callout: default;
+}
+
+#warfex-copy-error-text:focus {
+  border-color: rgba(255,255,255,.34);
+}
+
+#warfex-copy-error-text::selection,
+#warfex-debug-error::selection,
+#warfex-boot-status::selection {
+  background: rgba(120,180,255,.55);
+  color: #fff;
+}
