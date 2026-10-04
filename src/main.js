@@ -3687,6 +3687,14 @@ function installImportedWeaponModel(target, sourceScene, {
         const clone = material.clone();
         clone.envMapIntensity =
           Math.max(clone.envMapIntensity ?? 1, 1.15);
+
+        // The menu fade system controls opacity directly. Imported GLTF
+        // materials are normally opaque, so explicitly enable transparency.
+        clone.transparent = true;
+        clone.opacity = 1;
+        clone.depthWrite = true;
+        clone.side = THREE.DoubleSide;
+
         return clone;
       });
 
@@ -4167,12 +4175,19 @@ function setMenuGunOpacity(gun, opacity) {
 
     for (const material of materials) {
       if ('opacity' in material) {
+        material.transparent = true;
         material.opacity = opacity;
+        material.depthWrite = opacity > .5;
       }
     }
   });
 
   gun.visible = opacity > .001;
+
+  // Imported weapons can be skinned models whose top-level group visibility
+  // is independent of their mesh children.
+  const imported = gun.userData?.importedWeaponModel;
+  if (imported) imported.visible = opacity > .001;
 }
 
 function updateMenuGuns(dt) {
