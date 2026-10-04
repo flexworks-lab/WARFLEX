@@ -1207,14 +1207,203 @@ function addArena() {
   const mat = (color, roughness = 0.78, metalness = 0.08) =>
     new THREE.MeshStandardMaterial({ color, roughness, metalness });
 
-  const asphalt = mat(0x242b2f, 0.96, 0.02);
-  const concrete = mat(0x747879, 0.91, 0.05);
-  const concreteDark = mat(0x555b5c, 0.94, 0.04);
-  const concreteEdge = mat(0x383e40, 0.90, 0.08);
-  const steel = mat(0x56636a, 0.58, 0.66);
-  const steelDark = mat(0x1b2327, 0.72, 0.72);
+  const surfaceTextureCache = new Map();
+
+  const makeSurfaceTexture = (kind) => {
+    if (surfaceTextureCache.has(kind)) return surfaceTextureCache.get(kind);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    const image = ctx.createImageData(canvas.width, canvas.height);
+    const data = image.data;
+
+    const hash = (x, y, seed) => {
+      const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 37.719) * 43758.5453;
+      return n - Math.floor(n);
+    };
+
+    const baseByKind = {
+      grass: [224, 232, 218],
+      concrete: [210, 214, 208],
+      paintedMetal: [226, 230, 228],
+      corrugatedMetal: [220, 224, 223],
+      rustSteel: [218, 218, 211],
+      asphalt: [178, 183, 180],
+      rock: [190, 194, 191],
+      wood: [210, 191, 165],
+      rubber: [105, 108, 108],
+    };
+
+    const base = baseByKind[kind] || baseByKind.paintedMetal;
+
+    for (let y = 0; y < 512; y += 1) {
+      for (let x = 0; x < 512; x += 1) {
+        const coarse = hash(Math.floor(x / 9), Math.floor(y / 9), kind.length);
+        const fine = hash(x, y, 17 + kind.length);
+        const grain = Math.sin((x + y * 0.37) * 0.075) * 5;
+        const v = Math.round(
+          THREE.MathUtils.clamp(
+            0.88 + coarse * 0.16 + fine * 0.035 + grain / 255,
+            0.62,
+            1.08,
+          ) * 255,
+        );
+        const p = (y * 512 + x) * 4;
+        data[p] = Math.min(255, (base[0] * v) / 255);
+        data[p + 1] = Math.min(255, (base[1] * v) / 255);
+        data[p + 2] = Math.min(255, (base[2] * v) / 255);
+        data[p + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(image, 0, 0);
+
+    const seam = 'rgba(20,24,25,.22)';
+    const dirt = 'rgba(40,35,28,.16)';
+    const rust = 'rgba(115,62,38,.24)';
+
+    if (kind === 'paintedMetal' || kind === 'corrugatedMetal' || kind === 'rustSteel') {
+      ctx.fillStyle = seam;
+      const spacing = kind === 'corrugatedMetal' ? 18 : 64;
+      for (let x = 0; x <= 512; x += spacing) {
+        ctx.fillRect(x, 0, kind === 'corrugatedMetal' ? 3 : 2, 512);
+      }
+      for (let y = 0; y <= 512; y += kind === 'paintedMetal' ? 96 : 128) {
+        ctx.fillRect(0, y, 512, 2);
+      }
+
+      if (kind !== 'corrugatedMetal') {
+        ctx.fillStyle = rust;
+        for (let i = 0; i < 34; i += 1) {
+          const x = hash(i, 2, 9) * 512;
+          const y = hash(i, 3, 14) * 512;
+          const w = 8 + hash(i, 4, 18) * 34;
+          const h = 3 + hash(i, 5, 22) * 18;
+          ctx.fillRect(x, y, w, h);
+        }
+      }
+    }
+
+    if (kind === 'concrete') {
+      ctx.strokeStyle = 'rgba(42,45,43,.17)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 26; i += 1) {
+        const x = hash(i, 11, 20) * 512;
+        const y = hash(i, 12, 21) * 512;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 8 + hash(i, 13, 22) * 55, y + (hash(i, 14, 23) - .5) * 34);
+        ctx.stroke();
+      }
+      ctx.fillStyle = dirt;
+      for (let i = 0; i < 60; i += 1) {
+        const x = hash(i, 31, 17) * 512;
+        const y = hash(i, 32, 19) * 512;
+        const r = 3 + hash(i, 33, 23) * 12;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    if (kind === 'asphalt') {
+      ctx.fillStyle = 'rgba(30,34,35,.30)';
+      for (let i = 0; i < 900; i += 1) {
+        const x = hash(i, 41, 7) * 512;
+        const y = hash(i, 42, 8) * 512;
+        const s = .6 + hash(i, 43, 9) * 2.2;
+        ctx.fillRect(x, y, s, s);
+      }
+      ctx.strokeStyle = 'rgba(15,18,19,.24)';
+      for (let i = 0; i < 15; i += 1) {
+        const x = hash(i, 51, 13) * 512;
+        const y = hash(i, 52, 14) * 512;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 18 + hash(i, 53, 15) * 85, y + (hash(i, 54, 16) - .5) * 16);
+        ctx.stroke();
+      }
+    }
+
+    if (kind === 'rock') {
+      ctx.fillStyle = 'rgba(34,38,38,.22)';
+      for (let i = 0; i < 180; i += 1) {
+        const x = hash(i, 61, 18) * 512;
+        const y = hash(i, 62, 19) * 512;
+        const r = 2 + hash(i, 63, 20) * 10;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    if (kind === 'wood') {
+      ctx.strokeStyle = 'rgba(75,48,31,.22)';
+      ctx.lineWidth = 4;
+      for (let y = 12; y < 512; y += 24) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.bezierCurveTo(120, y - 8, 250, y + 12, 512, y - 2);
+        ctx.stroke();
+      }
+    }
+
+    if (kind === 'rubber') {
+      ctx.strokeStyle = 'rgba(220,220,220,.08)';
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 42; i += 1) {
+        const x = i * 13;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + 100, 512);
+        ctx.stroke();
+      }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
+    texture.needsUpdate = true;
+    surfaceTextureCache.set(kind, texture);
+    return texture;
+  };
+
+  const texturedMat = (
+    color,
+    kind = 'paintedMetal',
+    roughness = 0.78,
+    metalness = 0.08,
+    repeat = [1, 1],
+    bumpScale = 0.018,
+  ) => {
+    const texture = makeSurfaceTexture(kind).clone();
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(repeat[0], repeat[1]);
+    texture.needsUpdate = true;
+
+    return new THREE.MeshStandardMaterial({
+      color,
+      map: texture,
+      bumpMap: texture,
+      bumpScale,
+      roughness,
+      metalness,
+    });
+  };
+
+  const asphalt = texturedMat(0x242b2f, 'asphalt', 0.98, 0.02, [8, 5], 0.045);
+  const concrete = texturedMat(0x747879, 'concrete', 0.91, 0.05, [3, 3], 0.032);
+  const concreteDark = texturedMat(0x555b5c, 'concrete', 0.95, 0.04, [3, 3], 0.036);
+  const concreteEdge = texturedMat(0x383e40, 'concrete', 0.92, 0.08, [2.5, 2.5], 0.030);
+  const steel = texturedMat(0x56636a, 'paintedMetal', 0.58, 0.66, [3, 2], 0.016);
+  const steelDark = texturedMat(0x1b2327, 'rustSteel', 0.72, 0.72, [3, 3], 0.020);
   const black = mat(0x11171a, 0.55, 0.72);
-  const rubber = mat(0x0c1012, 0.96, 0.02);
+  const rubber = texturedMat(0x0c1012, 'rubber', 0.97, 0.02, [5, 4], 0.010);
   const tan = mat(0x766a55, 0.88, 0.04);
   const hazardYellow = mat(0xc59d3d, 0.68, 0.26);
   const warningRed = mat(0x8b3d35, 0.72, 0.24);
