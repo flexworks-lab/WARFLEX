@@ -21,6 +21,10 @@ export class MapEditor {
     this.transform = 'translate';
     this.look = false;
     this.pan = false;
+    this.directDragging = false;
+    this.dragPlane = new this.THREE.Plane();
+    this.dragOffset = new this.THREE.Vector3();
+    this.dragPoint = new this.THREE.Vector3();
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this.euler = new THREE.Euler(0,0,0,'YXZ');
@@ -64,6 +68,7 @@ export class MapEditor {
     window.addEventListener('keyup',this.boundKeyUp);
     window.addEventListener('contextmenu',e=>{if(this.enabled&&!e.target?.closest?.('#warfex-editor'))e.preventDefault();});
     this.createUI();
+    this.ensureRequiredSpawns();
     this.refreshHierarchy();
     this.refreshInspector();
     this.refreshMapInfo();
@@ -113,7 +118,7 @@ export class MapEditor {
 
     heading('PARTS');
     const parts=grid();
-    [['BOX','box'],['WALL','wall'],['FLOOR','floor'],['PILLAR','pillar'],['BEAM','beam'],['CYLINDER','cylinder'],['SPHERE','sphere'],['RAMP','ramp']].forEach(([label,type])=>addButton(parts,label,()=>this.addPart(type)));
+    [['BOX','box'],['WALL','wall'],['WORLD WALL','worldWall'],['FLOOR','floor'],['PILLAR','pillar'],['BEAM','beam'],['CYLINDER','cylinder'],['SPHERE','sphere'],['RAMP','ramp'],['SPAWN POINT','spawnPoint'],['ENEMY SPAWN','enemySpawn']].forEach(([label,type])=>addButton(parts,label,()=>this.addPart(type)));
     heading('PREBUILDS');
     const prefabs=grid();
     [['ROOM','room'],['WAREHOUSE','warehouse'],['BUNKER','bunker'],['CONTAINER','container'],['CONTAINER STACK','containerStack'],['GATE','gate'],['TOWER','tower'],['HESCO','hesco'],['ROAD','road'],['TANK PAD','tankPad'],['CHECKPOINT','checkpoint'],['FUEL TANK','fuel']].forEach(([label,type])=>addButton(prefabs,label,()=>this.addPrefab(type)));
@@ -169,11 +174,15 @@ export class MapEditor {
     else if(type==='cylinder') g=new T.CylinderGeometry(1,1,2,24);
     else if(type==='sphere') g=new T.SphereGeometry(1.2,24,16);
     else if(type==='ramp') g=new T.BoxGeometry(4,2.2,5);
+    else if(type==='worldWall') g=new T.BoxGeometry(1,10,36);
+    else if(type==='spawnPoint') g=new T.CylinderGeometry(.55,.55,.12,24);
+    else if(type==='enemySpawn') g=new T.CylinderGeometry(.48,.48,.12,6);
     else if(type==='pillar') g=new T.BoxGeometry(.55,4,.55);
     else if(type==='beam') g=new T.BoxGeometry(5,.35,.35);
     else g=new T.BoxGeometry(2,2,2);
-    const m=new T.Mesh(g,this.material()); m.name=name||type.toUpperCase(); m.castShadow=true; m.receiveShadow=true;
-    m.userData.editorSelectable=true; m.userData.editorSpec={type:type,color:m.material.color.getHex(),roughness:m.material.roughness,metalness:m.material.metalness,solid:type!=='sphere'};
+    const markerMat = type==='spawnPoint' ? new T.MeshStandardMaterial({color:0x2dd4bf,emissive:0x0d8f7d,emissiveIntensity:1.5,roughness:.35,metalness:.1}) : type==='enemySpawn' ? new T.MeshStandardMaterial({color:0xff5a6b,emissive:0x8f1827,emissiveIntensity:1.5,roughness:.35,metalness:.1}) : type==='worldWall' ? new T.MeshStandardMaterial({color:0x56616a,roughness:.8,metalness:.2}) : null;
+    const m=new T.Mesh(g,markerMat||this.material()); m.name=name||type.toUpperCase(); m.castShadow=true; m.receiveShadow=true;
+    m.userData.editorSelectable=true; m.userData.editorSpec={type:type,color:m.material.color.getHex(),roughness:m.material.roughness,metalness:m.material.metalness,solid:type!=='sphere'&&type!=='spawnPoint'&&type!=='enemySpawn',spawnType:(type==='spawnPoint'?'player':type==='enemySpawn'?'enemy':null),worldWall:type==='worldWall'};
     if(type==='ramp') m.rotation.z=-.22; return m;
   }
 
@@ -209,22 +218,40 @@ export class MapEditor {
 
   onDown(e){
     if(!this.enabled||e.target?.closest?.('#warfex-editor'))return;
-    if(this.transformDragging)return;
     if(e.button===2){this.look=true;e.preventDefault();e.stopPropagation();return;}
     if(e.button===1){this.pan=true;e.preventDefault();e.stopPropagation();return;}
     if(e.button!==0)return;
-    const r=this.renderer.domElement.getBoundingClientRect(); this.pointer.x=((e.clientX-r.left)/r.width)*2-1; this.pointer.y=-((e.clientY-r.top)/r.height)*2+1;
+    const r=this.renderer.domElement.getBoundingClientRect();
+    this.pointer.x=((e.clientX-r.left)/r.width)*2-1; this.pointer.y=-((e.clientY-r.top)/r.height)*2+1;
     this.raycaster.setFromCamera(this.pointer,this.camera);
     const hit=this.raycaster.intersectObjects(this.root.children,true).map(x=>this.selectable(x.object)).find(Boolean);
-    if(!hit)this.clear(); else if(e.shiftKey)this.toggle(hit); else this.selectOnly(hit);
+    if(!hit){this.clear();e.preventDefault();e.stopPropagation();return;}
+    if(e.shiftKey){this.toggle(hit);e.preventDefault();e.stopPropagation();return;}
+    if(!this.selected.has(hit))this.selectOnly(hit);
+    if(this.transform==='translate' && this.selected.size===1){
+      const o=hit;
+      const normal=this.camera.getWorldDirection(new this.THREE.Vector3()).normalize();
+      this.dragPlane.setFromNormalAndCoplanarPoint(normal,o.getWorldPosition(new this.THREE.Vector3()));
+      if(this.raycaster.ray.intersectPlane(this.dragPlane,this.dragPoint)){this.dragOffset.copy(o.position).sub(this.dragPoint);this.directDragging=true;this.transformDragging=true;}
+    }
     e.preventDefault();e.stopPropagation();
   }
   onMove(e){
-    if(!this.enabled||this.transformDragging)return;
+    if(!this.enabled)return;
+    if(this.directDragging && this.selected.size===1){
+      const r=this.renderer.domElement.getBoundingClientRect();
+      this.pointer.x=((e.clientX-r.left)/r.width)*2-1; this.pointer.y=-((e.clientY-r.top)/r.height)*2+1;
+      this.raycaster.setFromCamera(this.pointer,this.camera);
+      if(this.raycaster.ray.intersectPlane(this.dragPlane,this.dragPoint)){
+        const o=[...this.selected][0];o.position.copy(this.dragPoint).add(this.dragOffset);this.snapObject(o);this.markDirty();this.refreshInspector();this.refreshColliders();
+      }
+      e.preventDefault();e.stopPropagation();return;
+    }
+    if(this.transformDragging)return;
     if(this.look){this.euler.setFromQuaternion(this.camera.quaternion);this.euler.y-=e.movementX*this.sensitivity;this.euler.x-=e.movementY*this.sensitivity;this.euler.x=this.THREE.MathUtils.clamp(this.euler.x,-Math.PI*.49,Math.PI*.49);this.camera.quaternion.setFromEuler(this.euler);e.preventDefault();e.stopPropagation();return;}
     if(this.pan){const right=new this.THREE.Vector3(1,0,0).applyQuaternion(this.camera.quaternion);const up=new this.THREE.Vector3(0,1,0).applyQuaternion(this.camera.quaternion);this.camera.position.addScaledVector(right,-e.movementX*.018*this.speed);this.camera.position.addScaledVector(up,e.movementY*.018*this.speed);e.preventDefault();e.stopPropagation();}
   }
-  onUp(e){if(e.button===2)this.look=false;if(e.button===1)this.pan=false;}
+  onUp(e){if(e.button===0){this.directDragging=false;this.transformDragging=false;}if(e.button===2)this.look=false;if(e.button===1)this.pan=false;}
   onWheel(e){if(!this.enabled||e.target?.closest?.('#warfex-editor'))return;this.speed=this.THREE.MathUtils.clamp(this.speed+(e.deltaY<0?2:-2),1,200);const i=this.ui?.querySelector('#we-speed');if(i)i.value=this.speed;e.preventDefault();e.stopPropagation();}
 
   onKeyDown(e){
@@ -294,11 +321,15 @@ export class MapEditor {
   getMapLibrary(){try{const raw=localStorage.getItem('WARFLEX_MAP_LIBRARY');const data=raw?JSON.parse(raw):[];return Array.isArray(data)?data:[];}catch{return [];}}
   setMapLibrary(list){localStorage.setItem('WARFLEX_MAP_LIBRARY',JSON.stringify(list)); this.broadcastMapLibrary(list);}
   syncCurrentMapToServer(){ /* same-origin shared state hook; hosted deployments can replace this with a backend endpoint */ }
+  hasSpawn(type){let found=false;this.root.traverse(o=>{if(o.userData?.editorSpec?.spawnType===type)found=true;});return found;}
+  validateMap(){const missing=[];if(!this.hasSpawn('player'))missing.push('PLAYER SPAWN');if(!this.hasSpawn('enemy'))missing.push('ENEMY SPAWN');return missing;}
+  ensureRequiredSpawns(){if(!this.hasSpawn('player')){const o=this.primitive('spawnPoint','PLAYER SPAWN');o.position.set(0,.08,8);this.root.add(o);}if(!this.hasSpawn('enemy')){const o=this.primitive('enemySpawn','ENEMY SPAWN');o.position.set(0,.08,-18);this.root.add(o);}}
   mapAction(action){
     const input=this.ui?.querySelector('#we-map-name');
     const name=(input?.value||this.mapName||'Untitled Map').trim()||'Untitled Map';
     this.mapName=name;
     if(action==='saveMapRecord'){
+      const missing=this.validateMap();if(missing.length){this.toast('MISSING: '+missing.join(' + '));return;}
       const list=this.getMapLibrary(); const existing=list.find(m=>m.name.toLowerCase()===name.toLowerCase());
       const record={id:existing?.id||('custom-'+Date.now()),name,hidden:existing?.hidden===true,playable:true,updatedAt:new Date().toISOString(),data:this.serializeMap()};
       if(existing) Object.assign(existing,record); else list.push(record); this.setMapLibrary(list); localStorage.setItem('WARFLEX_CUSTOM_MAP',JSON.stringify(record.data)); this.toast('MAP SAVED: '+name); this.refreshMapInfo(); return;
@@ -334,6 +365,16 @@ if(typeof document!=='undefined'&&new URLSearchParams(location.search).get('edit
 #warfex-editor .we-right{right:0;width:318px;border-left:1px solid #34383d;border-right:0}
 #warfex-editor .we-left h4,#warfex-editor .we-right h4{color:#c4cbd0;border-bottom:1px solid #34383d;margin:10px 0 7px;padding:5px 4px;font-size:10px}
 #warfex-editor .we-grid{gap:3px}
+#warfex-editor .we-left{box-shadow:4px 0 18px #0006}#warfex-editor .we-right{box-shadow:-4px 0 18px #0006}
+#warfex-editor .we-grid button{min-height:31px;transition:background .12s,transform .08s,border-color .12s}#warfex-editor .we-grid button:active{transform:translateY(1px)}
+#warfex-editor .we-topbar:before{content:'FILE   EDIT   VIEW   MODEL   TEST   MAP';position:absolute;left:12px;top:31px;color:#8e969d;font-size:9px;letter-spacing:.1em}
+#warfex-editor .we-topbar>div:first-child strong{color:#f1f4f6}
+#warfex-editor .we-right{background:linear-gradient(180deg,#202327,#191b1e)}#warfex-editor .we-left{background:linear-gradient(180deg,#202327,#191b1e)}
+#warfex-editor .we-row.selected{box-shadow:inset 3px 0 #5eb8ff}
+#warfex-editor .we-status{background:#15171a;border:1px solid #30353a;padding:8px}
+#warfex-editor .we-help{padding:8px;background:#181a1d;border:1px solid #2d3237}
+#warfex-editor .we-name:focus,#warfex-editor .we-field input:focus{outline:1px solid #5eb8ff;border-color:#5eb8ff}
+
 #warfex-editor .we-grid button,#warfex-editor .we-actions button{font-family:Inter,system-ui,sans-serif}
 #warfex-editor .we-grid button{background:#24282c;border:1px solid #3a3f44;border-radius:2px;padding:8px 5px}
 #warfex-editor .we-row{color:#b8c0c6;padding:6px 7px;border:0;border-radius:2px}
