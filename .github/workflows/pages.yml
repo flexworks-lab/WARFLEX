@@ -33,7 +33,16 @@ jobs:
           node --check src/physics/RagdollController.js
           node --check src/systems/WaveDirector.js
           node --check src/systems/SteeringAgent.js
+          node --check src/assets/AssetManager.js
+          node --check src/world/MapLoader.js
+          node --check src/world/PropInstancer.js
+          node --check src/world/BakedLighting.js
+          node --check src/world/Atmosphere.js
+          node --check src/ai/NavMeshService.js
+          node --check src/ai/NavMeshAgent.js
           grep -q '"cannon-es":' index.html
+          grep -q '"three-pathfinding":' index.html
+          grep -q '"three/addons/":' index.html
           grep -q "./src/main.js?v=${GITHUB_SHA}" index.html
           test -s src/main.js
 
