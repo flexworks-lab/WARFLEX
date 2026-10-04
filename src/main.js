@@ -3657,9 +3657,14 @@ function installImportedWeaponModel(target, sourceScene, {
     const n = String(child.name || '').toLowerCase();
 
     if (
-      n.includes('hand') ||
-      n.includes('forearm') ||
-      n.endsWith('arm')
+      !n.startsWith('armature') &&
+      (
+        n.includes('hand') ||
+        n.includes('forearm') ||
+        n.includes('sleeve') ||
+        n === 'arm' ||
+        n.endsWith('_arm')
+      )
     ) {
       child.visible = false;
     }
