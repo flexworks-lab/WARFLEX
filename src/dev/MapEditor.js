@@ -335,4 +335,4 @@ if(typeof document!=='undefined'&&new URLSearchParams(location.search).get('edit
 #warfex-editor .we-field input,#warfex-editor .we-name,#warfex-editor .we-options input[type=number]{background:#111315;border:1px solid #42474d;border-radius:2px}
 #warfex-editor .we-status{font-family:ui-monospace,monospace}
 #warfex-editor:after{content:'OUTPUT  |  READY';position:absolute;left:0;right:0;bottom:0;height:24px;display:flex;align-items:center;padding:0 10px;background:#17191c;border-top:1px solid #34383d;color:#7f8991;font:10px ui-monospace,monospace;letter-spacing:.08em;pointer-events:auto}
-` + ';document.head.appendChild(style);}
+`;document.head.appendChild(style);}
