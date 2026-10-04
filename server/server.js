@@ -114,10 +114,16 @@ wss.on('connection',(ws)=>{
         health:target.health,
       });
       if(target.health<=0){
-        target.health=100;
-        target.position={x:(Math.random()-.5)*70,y:1.65,z:20+Math.random()*45};
-        broadcast({type:'player_respawned',player:target});
+        target.health=0;
+        broadcast({type:'player_died',player:target});
       }
+      return;
+    }
+
+    if(msg.type==='respawn'){
+      p.health=100;
+      p.position={x:(Math.random()-.5)*70,y:1.65,z:20+Math.random()*45};
+      broadcast({type:'player_respawned',player:p});
     }
   });
 
