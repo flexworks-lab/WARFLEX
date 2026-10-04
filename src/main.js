@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { PhysicsWorld } from './physics/PhysicsWorld.js?v=physics-ground-20261003';
 import { RagdollController } from './physics/RagdollController.js?v=modulefix-20261004';
@@ -284,13 +283,6 @@ const atmosphere = configureAtmosphere(
 );
 
 const assetManager = new AssetManager(renderer);
-
-// Explicitly bundle every external file referenced by the AK47 GLTF.
-// Vite only sees these URLs because they are declared as module assets.
-const AK47_GLB_URL = new URL(
-  './assets/ak47.glb',
-  import.meta.url,
-).href;
 
 // Bright outdoor daylight rig: a strong sun plus soft sky/ground fill
 // keeps the arena readable while preserving directional shadows.
@@ -3607,238 +3599,7 @@ function createWeapon() {
 const weapon = createWeapon();
 weapon.visible = false;
 
-const menuGunPairs = []; // AK47 menu import rebuilt on clean containers
-
-function installImportedWeaponModel(target, sourceScene, {
-  keepHands = true,
-  scaleTarget = 3.05,
-  animations = [],
-} = {}) {
-  const keepNames = new Set([
-    'WeaponLeftHand',
-    'WeaponRightHand',
-    'WeaponLeftHandGrip',
-    'WeaponRightHandGrip',
-    'WeaponLeftArm',
-    'WeaponRightArm',
-    'WeaponMuzzleLight',
-    'WeaponMuzzleFlash',
-  ]);
-
-  for (const child of [...target.children]) {
-    if (keepNames.has(child.name)) {
-      if (!keepHands && child.name.startsWith('Weapon')) {
-        target.remove(child);
-      }
-      continue;
-    }
-    target.remove(child);
-  }
-
-  const model = SkeletonUtils.clone(sourceScene);
-  model.name = 'ImportedAk47Model';
-  target.userData.importedWeaponAnimations = animations;
-
-  const bounds = new THREE.Box3().setFromObject(model);
-  const size = bounds.getSize(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z, .001);
-  model.scale.setScalar(scaleTarget / maxDim);
-  model.updateMatrixWorld(true);
-
-  // Keep the imported weapon comfortably inside the near clip plane.
-  target.userData.importedWeaponScale = model.scale.x;
-
-  model.updateMatrixWorld(true);
-  const fittedBounds = new THREE.Box3().setFromObject(model);
-  const center = fittedBounds.getCenter(new THREE.Vector3());
-  model.position.sub(center);
-
-  // The glTF already contains the exporter coordinate conversion on its
-  // Armature node. Do not rotate the whole rig a second time.
-  model.rotation.set(0, 0, 0);
-
-  model.position.y -= .06;
-  model.position.z -= .06;
-  model.visible = true;
-
-  let magazine = null;
-  let muzzle = null;
-
-  model.traverse((child) => {
-    const n = String(child.name || '').toLowerCase();
-
-    if (
-      !n.startsWith('armature') &&
-      (
-        n.includes('hand') ||
-        n.includes('forearm') ||
-        n.includes('sleeve') ||
-        n === 'arm' ||
-        n.endsWith('_arm')
-      )
-    ) {
-      child.visible = false;
-    }
-
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
-      child.frustumCulled = false;
-
-      const materials = Array.isArray(child.material)
-        ? child.material
-        : [child.material];
-
-      const cloned = materials.map((material) => {
-        if (!material) return material;
-        const clone = material.clone();
-        clone.envMapIntensity =
-          Math.max(clone.envMapIntensity ?? 1, 1.15);
-
-        if (clone.color) {
-          clone.color.set(0xffffff);
-        }
-        clone.toneMapped = true;
-
-        // The menu fade system controls opacity directly. Imported GLTF
-        // materials are normally opaque, so explicitly enable transparency.
-        clone.transparent = true;
-        clone.opacity = 1;
-        clone.depthWrite = true;
-        clone.side = THREE.DoubleSide;
-
-        return clone;
-      });
-
-      child.material = Array.isArray(child.material)
-        ? cloned
-        : cloned[0];
-    }
-
-    if (!magazine && (
-      n.includes('magazine') ||
-      n.includes('mag') ||
-      n.includes('clip')
-    )) {
-      magazine = child;
-    }
-
-    if (!muzzle && (
-      n.includes('muzzle') ||
-      n.includes('flashhider') ||
-      n.includes('flash_hider') ||
-      n.includes('muzzlebrake') ||
-      n.includes('muzzle_brake')
-    )) {
-      muzzle = child;
-    }
-  });
-
-  if (magazine) magazine.name = 'MagazineMesh';
-
-  const muzzleAnchor = new THREE.Object3D();
-  muzzleAnchor.name = 'ImportedMuzzleAnchor';
-
-  if (muzzle) {
-    muzzle.updateWorldMatrix(true, false);
-    const world = new THREE.Vector3();
-    muzzle.getWorldPosition(world);
-    model.worldToLocal(world);
-    muzzleAnchor.position.copy(world);
-  } else {
-    const localBounds =
-      new THREE.Box3().setFromObject(model);
-    muzzleAnchor.position.set(
-      (localBounds.min.x + localBounds.max.x) * .5,
-      (localBounds.min.y + localBounds.max.y) * .5,
-      localBounds.min.z - .055,
-    );
-  }
-
-  model.add(muzzleAnchor);
-  target.add(model);
-  target.userData.importedWeaponModel = model;
-
-  if (Array.isArray(target.userData.importedWeaponActions)) {
-    target.userData.importedWeaponActions.forEach((action) => action.stop());
-  }
-
-  target.userData.importedWeaponActions = [];
-  if (Array.isArray(target.userData.importedWeaponAnimations) &&
-      target.userData.importedWeaponAnimations.length) {
-    const mixer = new THREE.AnimationMixer(model);
-    target.userData.importedWeaponMixer = mixer;
-    for (const clip of target.userData.importedWeaponAnimations) {
-      const action = mixer.clipAction(clip);
-      action.clampWhenFinished = false;
-      target.userData.importedWeaponActions.push(action);
-    }
-  }
-
-  target.userData.muzzle = muzzleAnchor;
-
-  return model;
-}
-
-window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
-  try {
-    const asset = await assetManager.loadGLTF(AK47_GLB_URL);
-
-    let importedMeshCount = 0;
-    asset.scene.traverse((node) => {
-      if (node.isMesh) importedMeshCount += 1;
-    });
-    if (!importedMeshCount) {
-      throw new Error('AK47 GLTF loaded but contains no mesh geometry.');
-    }
-
-    installImportedWeaponModel(
-      weapon,
-      asset.scene,
-      { keepHands: true, scaleTarget: 3.35, animations: asset.animations },
-    );
-
-    for (const pair of menuGunPairs) {
-      installImportedWeaponModel(
-        pair.hero,
-        asset.scene,
-        { keepHands: false, scaleTarget: 3.35, animations: [] },
-      );
-      installImportedWeaponModel(
-        pair.secondary,
-        asset.scene,
-        { keepHands: false, scaleTarget: 3.35, animations: [] },
-      );
-
-      // The menu's old procedural transform is not suitable for the imported
-      // model. Give the real AK a known, explicit menu transform.
-      // Single-model import test: keep the real AK permanently visible.
-      pair.hero.scale.setScalar(1);
-      pair.hero.position.set(1.45, -.05, -3.35);
-      pair.hero.rotation.set(-.12, .58, .06);
-      pair.hero.visible = true;
-      pair.hero.userData.forceImportedVisible = true;
-
-      pair.secondary.visible = false;
-    }
-
-    syncWorldWeaponAnchor();
-    weapon.visible = state.active && !state.over;
-  } catch (error) {
-    console.error(
-      '[WARFLEX] Failed to load AK47 GLB model; using fallback weapon.',
-      error,
-    );
-
-    const status = document.querySelector('#warfex-boot-status');
-    if (status) {
-      status.textContent =
-        'WARFLEX AK47 IMPORT ERROR: ' +
-        (error?.message || String(error));
-      status.style.display = 'block';
-    }
-  }
-}
+const menuGunPairs = [];
 
 const menuToonGradient =
   new THREE.DataTexture(
@@ -4087,18 +3848,26 @@ function prepareMenuGun(
 for (let i = 0; i < menuGunPalettes.length; i += 1) {
   const palette = menuGunPalettes[i];
 
-  const hero = new THREE.Group();
-  hero.name = 'MenuAK47Hero_' + i;
+  const hero = prepareMenuGun(
+    weapon,
+    palette,
+    1,
+    i,
+  );
+  hero.name = 'MenuRifleHero_' + i;
   hero.position.set(2.65, -.05, -3.20);
   hero.rotation.set(-.12, .62 + i * .22, .06);
 
-  const secondary = new THREE.Group();
-  secondary.name = 'MenuAK47Secondary_' + i;
+  const secondary = prepareMenuGun(
+    weapon,
+    palette,
+    .78,
+    i,
+  );
+  secondary.name = 'MenuRifleSecondary_' + i;
   secondary.position.set(3.65, -.82, -4.55);
   secondary.rotation.set(-.12, -.42 - i * .08, .06);
-  secondary.scale.setScalar(.78);
 
-  gunViewportScene.add(hero, secondary);
   menuGunPairs.push({ hero, secondary, palette });
 }
 
@@ -4177,8 +3946,6 @@ let menuGunCurrent = 0;
 let menuGunPrevious = -1;
 
 function setMenuGunOpacity(gun, opacity) {
-  if (gun.userData?.forceImportedVisible) opacity = 1;
-
   gun.traverse((child) => {
     if (!child.isMesh || !child.material) return;
 
@@ -4197,10 +3964,6 @@ function setMenuGunOpacity(gun, opacity) {
 
   gun.visible = opacity > .001;
 
-  // Imported weapons can be skinned models whose top-level group visibility
-  // is independent of their mesh children.
-  const imported = gun.userData?.importedWeaponModel;
-  if (imported) imported.visible = opacity > .001;
 }
 
 function updateMenuGuns(dt) {
@@ -4245,13 +4008,6 @@ function updateMenuGuns(dt) {
 
   for (let i = 0; i < menuGunPairs.length; i += 1) {
     const pair = menuGunPairs[i];
-
-    if (pair.hero.userData?.forceImportedVisible) {
-      setMenuGunOpacity(pair.hero, 1);
-      pair.hero.visible = true;
-      pair.secondary.visible = false;
-      continue;
-    }
 
     const isCurrent = i === menuGunCurrent;
     const isPrevious = i === menuGunPrevious;
@@ -4365,9 +4121,6 @@ const syncWorldWeaponAnchor = () => {
 };
 
 syncWorldWeaponAnchor();
-
-void Promise.resolve()
-  .then(() => window.__WARFLEX_LOAD_AK47__?.());
 
 function createDroppedWeaponMesh() {
   const mesh = weapon.clone(true);
@@ -6961,46 +6714,6 @@ function updateWave(dt) {
   waveDirector?.update(dt);
 }
 
-function updateImportedWeaponAnimations(dt) {
-  const mixer = weapon.userData.importedWeaponMixer;
-  const actions = weapon.userData.importedWeaponActions;
-  if (!mixer || !actions?.length) return;
-
-  let desired = null;
-  if (state.reloadTimer > 0) {
-    desired = actions.find((a) => /reload/i.test(a._clip?.name || '')) || null;
-  } else if (state.sprintBlend > .5) {
-    desired = actions.find((a) => /run cycle/i.test(a._clip?.name || '')) || null;
-  } else if (movingForImportedAnimation()) {
-    desired = actions.find((a) => /walk/i.test(a._clip?.name || '')) || null;
-  } else {
-    desired =
-      actions.find((a) => /idle/i.test(a._clip?.name || '')) ||
-      actions.find((a) => /draw/i.test(a._clip?.name || '')) ||
-      null;
-  }
-
-  for (const action of actions) {
-    const shouldPlay = action === desired;
-    if (shouldPlay) {
-      if (!action.isRunning()) action.reset().play();
-    } else if (action.isRunning()) {
-      action.fadeOut(.08);
-    }
-  }
-
-  mixer.update(dt);
-}
-
-function movingForImportedAnimation() {
-  return (
-    keys.has('KeyW') ||
-    keys.has('KeyA') ||
-    keys.has('KeyS') ||
-    keys.has('KeyD')
-  );
-}
-
 function updateWeapon(dt) {
   if (multiplayerDeathActive) {
     weapon.visible = false;
@@ -7064,8 +6777,6 @@ function updateWeapon(dt) {
     0,
     state.muzzleFlash - dt,
   );
-
-  updateImportedWeaponAnimations(dt);
 
   const targetAim =
     state.aiming && state.active && !state.over
