@@ -2770,22 +2770,67 @@ setWaveChoice('1');
 showMenuView('main');
 
 function enterGame() {
-  resetGame(false);
-
-  renderer.domElement.style.display =
-    'block';
-
+  // Put the UI into gameplay state first. Optional systems must not be able
+  // to prevent the player from entering the arena.
+  renderer.domElement.style.display = 'block';
   els.start.classList.add('hidden');
   els.pause.classList.add('hidden');
   els.gameOver.classList.add('hidden');
   els.hud.classList.remove('hidden');
 
-  if (waveDirector) {
-    waveDirector.wave = state.wave;
-    waveDirector.start();
+  try {
+    resetGame(false);
+  } catch (error) {
+    console.error('[WARFLEX] resetGame failed during start:', error);
+    // A first launch has no enemies/ragdolls that need cleanup. Restore only
+    // the minimum gameplay state and continue into the arena.
+    Object.assign(state, {
+      active: true,
+      over: false,
+      yaw: 0,
+      pitch: 0,
+      verticalVelocity: 0,
+      onGround: true,
+      health: CONFIG.maxHealth,
+      ammo: CONFIG.magSize,
+      reserve: CONFIG.reserveAmmo,
+      kills: 0,
+      score: 0,
+      wave: Number(state.selectedWave) > 0 ? Number(state.selectedWave) : 1,
+      reloadTimer: 0,
+      damageCooldown: 0,
+      hurtFlash: 0,
+      weaponKick: 0,
+      muzzleFlash: 0,
+      shake: 0,
+      slideTimer: 0,
+      slideCooldown: 0,
+      slideQueued: false,
+      combo: 0,
+      comboTimer: 0,
+    });
+    player.position.set(0, 1.65, 18);
+    camera.position.set(0, 0, 0);
+    camera.rotation.set(0, 0, 0);
+    camera.fov = CONFIG.defaultFov;
+    camera.updateProjectionMatrix();
+    updateHud();
   }
 
-  renderer.domElement.requestPointerLock?.();
+  if (waveDirector) {
+    try {
+      waveDirector.wave = state.wave;
+      waveDirector.start();
+    } catch (error) {
+      console.error('[WARFLEX] wave director failed during start:', error);
+    }
+  }
+
+  try {
+    renderer.domElement.requestPointerLock?.();
+  } catch (error) {
+    console.warn('[WARFLEX] Pointer lock unavailable:', error);
+  }
 }
 
 window.WARFLEX_START_GAME = enterGame;
