@@ -18,12 +18,22 @@ export class AssetManager {
     );
     this.gltfLoader.setDRACOLoader(this.dracoLoader);
 
-    this.ktx2Loader = new KTX2Loader();
-    this.ktx2Loader.setTranscoderPath(
-      'https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/libs/basis/'
-    );
-    this.ktx2Loader.detectSupport(renderer);
-    this.gltfLoader.setKTX2Loader(this.ktx2Loader);
+    this.ktx2Loader = null;
+
+    try {
+      const ktx2Loader = new KTX2Loader();
+      ktx2Loader.setTranscoderPath(
+        'https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/libs/basis/'
+      );
+      ktx2Loader.detectSupport(renderer);
+      this.ktx2Loader = ktx2Loader;
+      this.gltfLoader.setKTX2Loader(ktx2Loader);
+    } catch (error) {
+      console.warn(
+        '[WARFLEX] KTX2 texture support unavailable; continuing without it.',
+        error,
+      );
+    }
   }
 
   async loadGLTF(url) {
@@ -139,6 +149,6 @@ export class AssetManager {
 
     this.cache.clear();
     this.dracoLoader.dispose();
-    this.ktx2Loader.dispose();
+    this.ktx2Loader?.dispose?.();
   }
 }
