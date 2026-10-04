@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { PhysicsWorld } from './physics/PhysicsWorld.js?v=modulefix-20261004';
 import { RagdollController } from './physics/RagdollController.js?v=modulefix-20261004';
 import { WaveDirector } from './systems/WaveDirector.js?v=modulefix-20261004';
@@ -576,12 +577,12 @@ function createWeapon() {
   weapon.name = 'MK-01_3D_RIFLE';
 
   const dark = createMaterial(0x11151a, .82, .28);
-  const bodyMat = createMaterial(0x303943, .76, .32);
-  const bodyDark = createMaterial(0x20262d, .78, .3);
+  const bodyMat = createMaterial(0x293139, .82, .25);
+  const bodyDark = createMaterial(0x171d23, .84, .24);
   const metal = createMaterial(0x9da8b2, .72, .25);
   const accent = createMaterial(0xd6dde4, .52, .24);
   const rubber = createMaterial(0x0c1014, .05, .88);
-  const polymer = createMaterial(0x242b32, .18, .58);
+  const polymer = createMaterial(0x1d252c, .22, .48);
   const glass = new THREE.MeshStandardMaterial({
     color: 0x071116,
     emissive: 0x2f9abf,
@@ -590,21 +591,56 @@ function createWeapon() {
     roughness: .1,
   });
 
-  const addBox = (size, position, material, rotation = [0,0,0], name = '') => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+  const addBox = (
+    size,
+    position,
+    material,
+    rotation = [0,0,0],
+    name = '',
+    bevel = .035,
+  ) => {
+    // Beveled edges turn the old blocky primitives into proper hard-surface
+    // weapon pieces with real specular edge highlights.
+    const minSize = Math.min(...size);
+    const radius = Math.min(
+      bevel,
+      Math.max(.006, minSize * .22),
+    );
+
+    const geometry = new RoundedBoxGeometry(
+      size[0],
+      size[1],
+      size[2],
+      3,
+      radius,
+    );
+
+    const mesh = new THREE.Mesh(
+      geometry,
+      material,
+    );
+
     mesh.position.set(...position);
     mesh.rotation.set(...rotation);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+
     if (name) mesh.name = name;
+
     weapon.add(mesh);
     return mesh;
   };
 
   const addCyl = (rt, rb, height, position, material, rotation = [0,0,0], radial = 12, name = '') => {
     const mesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(rt, rb, height, radial, 1),
-      material
+      new THREE.CylinderGeometry(
+        rt,
+        rb,
+        height,
+        Math.max(20, radial),
+        2,
+      ),
+      material,
     );
     mesh.position.set(...position);
     mesh.rotation.set(...rotation);
