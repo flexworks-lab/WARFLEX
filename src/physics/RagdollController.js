@@ -261,6 +261,24 @@ export class RagdollController {
 
     const headAssembly = moveMeshAssemblyToHead(source);
 
+    // Capture every ragdoll object's local scale after the hierarchy has been
+    // rearranged. Physics should move/rotate these objects, never resize them.
+    const localScales = new Map();
+
+    const captureScales = (object) => {
+      if (!object) return;
+
+      object.traverse((child) => {
+        localScales.set(
+          child,
+          child.scale.clone(),
+        );
+      });
+    };
+
+    captureScales(source);
+    captureScales(headAssembly);
+
     const parts = source.userData.parts;
 
     const bodies = new Map();
@@ -460,6 +478,9 @@ export class RagdollController {
       headAssembly,
       bodies,
       constraints,
+      localScales,
+      rootScale: root.scale.clone(),
+      sourceScale: source.scale.clone(),
       meshes: [],
       createdAt: performance.now(),
       cleanupSeconds: this.cleanupSeconds,
@@ -578,7 +599,18 @@ export class RagdollController {
         position,
         quaternion,
       );
+
+      // Never let the physics/world transform change a part's visual size.
+      const savedScale = ragdoll.localScales.get(object);
+      if (savedScale) {
+        object.scale.copy(savedScale);
+        object.updateMatrix();
+      }
     }
+
+    // The root and source are also locked to their original visual scales.
+    ragdoll.root.scale.copy(ragdoll.rootScale);
+    ragdoll.model.scale.copy(ragdoll.sourceScale);
 
     ragdoll.root.position.set(
       ragdoll.bodies.get('root').position.x,
