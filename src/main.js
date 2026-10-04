@@ -3766,7 +3766,29 @@ async function loadAK47Weapon() {
 
     syncWorldWeaponAnchor();
     weapon.visible = state.active && !state.over;
-    console.info('[WARFLEX] AK47 GLB loaded as the active rifle.');
+
+    const status = document.querySelector('#warfex-boot-status');
+    if (status) {
+      status.textContent =
+        'WARFLEX AK47 LOAD OK · ' +
+        meshCount +
+        ' MESH' +
+        (meshCount === 1 ? '' : 'ES');
+      status.style.display = 'block';
+      status.style.background = 'rgba(0,70,20,.92)';
+    }
+
+    window.WARFLEX_DEBUG = window.WARFLEX_DEBUG || {};
+    window.WARFLEX_DEBUG.ak47 = {
+      loaded: true,
+      meshCount,
+      sceneName: asset.scene.name || '',
+    };
+
+    console.info(
+      '[WARFLEX] AK47 GLB loaded as the active rifle.',
+      { meshCount, scene: asset.scene.name || '' },
+    );
   } catch (error) {
     console.error('[WARFLEX] AK47 GLB failed to load; keeping fallback rifle.', error);
 
@@ -3776,6 +3798,14 @@ async function loadAK47Weapon() {
         'WARFLEX AK47 IMPORT ERROR: ' +
         (error?.message || String(error));
       status.style.display = 'block';
+      status.style.background = 'rgba(80,0,0,.94)';
+    }
+
+    window.WARFLEX_DEBUG = window.WARFLEX_DEBUG || {};
+    window.WARFLEX_DEBUG.ak47 = {
+      loaded: false,
+      error: error?.message || String(error),
+    };
     }
   }
 }
