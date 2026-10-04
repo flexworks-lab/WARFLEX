@@ -14,6 +14,7 @@ export class MapEditor {
     this.selected = new Set();
     this.keys = new Set();
     this.speed = 18;
+    this.mapName = 'Untitled Map';
     this.sensitivity = 0.0022;
     this.snap = 0.5;
     this.rotSnap = 15;
@@ -27,6 +28,8 @@ export class MapEditor {
     this.transformControls.setMode('translate');
     this.transformControls.setSpace('world');
     this.transformControls.setSize(0.9);
+    this.transformControls.addEventListener('dragging-changed', (e) => { this.transformDragging = Boolean(e.value); });
+    this.transformControls.addEventListener('objectChange', () => { if(this.transformDragging) this.refreshInspector(); this.refreshColliders(); });
     this.gizmo = this.transformControls.getHelper();
     this.gizmo.visible = false;
     scene.add(this.gizmo);
@@ -52,16 +55,17 @@ export class MapEditor {
     this.camera.position.set(22,10,62);
     this.camera.rotation.order = 'YXZ';
     this.lookAt(new this.THREE.Vector3(0,1.4,0));
-    window.addEventListener('pointerdown',this.boundDown,true);
-    window.addEventListener('pointermove',this.boundMove,true);
-    window.addEventListener('pointerup',this.boundUp,true);
-    window.addEventListener('wheel',this.boundWheel,{capture:true,passive:false});
-    window.addEventListener('keydown',this.boundKeyDown,true);
-    window.addEventListener('keyup',this.boundKeyUp,true);
-    window.addEventListener('contextmenu',e=>e.preventDefault(),true);
+    window.addEventListener('pointerdown',this.boundDown);
+    window.addEventListener('pointermove',this.boundMove);
+    window.addEventListener('pointerup',this.boundUp);
+    window.addEventListener('wheel',this.boundWheel,{passive:false});
+    window.addEventListener('keydown',this.boundKeyDown);
+    window.addEventListener('keyup',this.boundKeyUp);
+    window.addEventListener('contextmenu',e=>{if(this.enabled&&!e.target?.closest?.('#warfex-editor'))e.preventDefault();});
     this.createUI();
     this.refreshHierarchy();
     this.refreshInspector();
+    this.refreshMapInfo();
     this.toast('WARFLEX EDITOR ACTIVE');
     document.body.classList.add('warfex-editor-active');
     document.querySelector('#hud')?.classList.add('hidden');
@@ -125,6 +129,13 @@ export class MapEditor {
     checkSetting('SHOW GRID','we-grid',this.grid.visible,(v)=>{this.grid.visible=v;});
     checkSetting('SHOW BUILT-IN MAP','we-built',this.fallbackRoot.visible,(v)=>{this.fallbackRoot.visible=v;});
     checkSetting('COLLISION PREVIEW','we-collision',true,(v)=>{this.collisionPreview=v;this.refreshColliders();});
+
+    heading('MAP');
+    const mapBox=document.createElement('div'); mapBox.className='we-map-tools'; left.appendChild(mapBox);
+    const mapName=document.createElement('input'); mapName.id='we-map-name'; mapName.placeholder='Map name'; mapName.value=this.mapName||'Untitled Map'; mapName.className='we-name'; mapBox.appendChild(mapName);
+    const mapRow=document.createElement('div'); mapRow.className='we-grid'; mapBox.appendChild(mapRow);
+    [['SAVE AS MAP','saveMapRecord'],['SET CURRENT','setCurrentMap'],['ADD TO SELECTION','addMapSelection'],['HIDE MAP','hideMap'],['DELETE MAP','deleteMap']].forEach(([label,action])=>addButton(mapRow,label,()=>this.mapAction(action)));
+    const mapInfo=document.createElement('div'); mapInfo.id='we-map-info'; mapInfo.className='we-help'; mapBox.appendChild(mapInfo);
 
     const help=document.createElement('div'); help.className='we-help';
     help.innerHTML='<b>CAMERA</b><span>WASD move • Q/E vertical • RMB look • MMB pan • wheel speed</span><b>EDITING</b><span>Click select • Shift-click multi • Ctrl+D duplicate • Delete remove</span><span>G group • F focus • Alt+W move • Alt+E rotate • Alt+R scale</span><span>Arrow keys nudge • PageUp/PageDown vertical</span>';
@@ -193,6 +204,7 @@ export class MapEditor {
 
   onDown(e){
     if(!this.enabled||e.target?.closest?.('#warfex-editor'))return;
+    if(this.transformDragging)return;
     if(e.button===2){this.look=true;e.preventDefault();e.stopPropagation();return;}
     if(e.button===1){this.pan=true;e.preventDefault();e.stopPropagation();return;}
     if(e.button!==0)return;
@@ -203,7 +215,7 @@ export class MapEditor {
     e.preventDefault();e.stopPropagation();
   }
   onMove(e){
-    if(!this.enabled)return;
+    if(!this.enabled||this.transformDragging)return;
     if(this.look){this.euler.setFromQuaternion(this.camera.quaternion);this.euler.y-=e.movementX*this.sensitivity;this.euler.x-=e.movementY*this.sensitivity;this.euler.x=this.THREE.MathUtils.clamp(this.euler.x,-Math.PI*.49,Math.PI*.49);this.camera.quaternion.setFromEuler(this.euler);e.preventDefault();e.stopPropagation();return;}
     if(this.pan){const right=new this.THREE.Vector3(1,0,0).applyQuaternion(this.camera.quaternion);const up=new this.THREE.Vector3(0,1,0).applyQuaternion(this.camera.quaternion);this.camera.position.addScaledVector(right,-e.movementX*.018*this.speed);this.camera.position.addScaledVector(up,e.movementY*.018*this.speed);e.preventDefault();e.stopPropagation();}
   }
@@ -273,9 +285,32 @@ export class MapEditor {
   async importFile(file){if(!file)return;try{this.loadJson(JSON.parse(await file.text()));this.toast('MAP IMPORTED');}catch(e){console.error(e);this.toast('IMPORT FAILED');}}
   deserializeNode(n){let o;if(n.type==='group'){o=new this.THREE.Group();o.userData.editorSelectable=true;}else{o=this.primitive(n.spec?.type||'box',n.name);if(n.spec?.color!==undefined)o.material.color.setHex(n.spec.color);o.userData.editorSpec=n.spec||o.userData.editorSpec;}o.name=n.name||'PART';o.position.fromArray(n.position||[0,0,0]);o.rotation.set(...(n.rotation||[0,0,0]));o.scale.fromArray(n.scale||[1,1,1]);for(const c of n.children||[])o.add(this.deserializeNode(c));return o;}
   loadJson(data){for(const c of [...this.root.children])c.removeFromParent();for(const n of data.objects||[])this.root.add(this.deserializeNode(n));this.clear();this.refreshAll();}
+  getMapLibrary(){try{const raw=localStorage.getItem('WARFLEX_MAP_LIBRARY');const data=raw?JSON.parse(raw):[];return Array.isArray(data)?data:[];}catch{return [];}}
+  setMapLibrary(list){localStorage.setItem('WARFLEX_MAP_LIBRARY',JSON.stringify(list));}
+  mapAction(action){
+    const input=this.ui?.querySelector('#we-map-name');
+    const name=(input?.value||this.mapName||'Untitled Map').trim()||'Untitled Map';
+    this.mapName=name;
+    if(action==='saveMapRecord'){
+      const list=this.getMapLibrary(); const existing=list.find(m=>m.name.toLowerCase()===name.toLowerCase());
+      const record={id:existing?.id||('custom-'+Date.now()),name,hidden:existing?.hidden===true,playable:true,updatedAt:new Date().toISOString(),data:this.serializeMap()};
+      if(existing) Object.assign(existing,record); else list.push(record); this.setMapLibrary(list); localStorage.setItem('WARFLEX_CUSTOM_MAP',JSON.stringify(record.data)); this.toast('MAP SAVED: '+name); this.refreshMapInfo(); return;
+    }
+    const list=this.getMapLibrary(); const record=list.find(m=>m.name.toLowerCase()===name.toLowerCase());
+    if(!record){this.toast('SAVE MAP FIRST');return;}
+    if(action==='setCurrentMap'){localStorage.setItem('WARFLEX_CURRENT_MAP',record.id);this.toast('CURRENT MAP: '+record.name);}
+    if(action==='addMapSelection'){record.hidden=false;record.playable=true;this.setMapLibrary(list);this.toast('ADDED TO MAP SELECTION');}
+    if(action==='hideMap'){record.hidden=true;record.playable=false;this.setMapLibrary(list);this.toast('MAP HIDDEN');}
+    if(action==='deleteMap'){this.setMapLibrary(list.filter(m=>m.id!==record.id));if(localStorage.getItem('WARFLEX_CURRENT_MAP')===record.id)localStorage.removeItem('WARFLEX_CURRENT_MAP');this.toast('MAP DELETED');}
+    this.refreshMapInfo();
+  }
+  refreshMapInfo(){const el=this.ui?.querySelector('#we-map-info');if(!el)return;const list=this.getMapLibrary();const name=(this.ui?.querySelector('#we-map-name')?.value||this.mapName||'').trim().toLowerCase();const m=list.find(x=>x.name.toLowerCase()===name);el.innerHTML=m?('ID <b>'+m.id+'</b><br>VISIBLE <b>'+(!m.hidden)+'</b><br>CURRENT <b>'+(localStorage.getItem('WARFLEX_CURRENT_MAP')===m.id)+'</b>'): 'Not saved to map library yet.';}
+  getMapById(id){return this.getMapLibrary().find(m=>m.id===id)||null;}
+  getCurrentMap(){const id=localStorage.getItem('WARFLEX_CURRENT_MAP');return id?this.getMapById(id):null;}
+  loadMapRecord(id){const m=this.getMapById(id);if(!m?.data)return false;this.mapName=m.name;this.loadJson(m.data);return true;}
   copy(){this.clip=this.serializeMap().objects.filter((x)=>this.selected.has(this.findByName(x.name)));}
   toast(msg){const t=this.ui?.querySelector('#we-toast');if(!t)return;t.textContent=msg;t.classList.add('show');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>t.classList.remove('show'),1500);}
 }
 
 if(typeof document!=='undefined'&&new URLSearchParams(location.search).get('editor')==='WARFLEX_DEV'){
-  const style=document.createElement('style');style.textContent='body.warfex-editor-active{cursor:default!important;overflow:hidden}#warfex-editor{position:fixed;inset:0;z-index:10000;pointer-events:none;color:#e7edf0;font:12px/1.2 Arial,sans-serif}#warfex-editor .we-topbar,#warfex-editor .we-left,#warfex-editor .we-right,#warfex-editor #we-toast{pointer-events:auto}.we-topbar{position:absolute;left:10px;right:10px;top:10px;min-height:42px;display:flex;align-items:center;justify-content:space-between;padding:7px 10px;gap:10px;background:rgba(9,14,17,.95);border:1px solid #33454c}.we-topbar span{color:#7999a3;font-size:9px;letter-spacing:.12em}.we-actions{display:flex;gap:4px;flex-wrap:wrap}.we-left,.we-right{position:absolute;top:62px;bottom:10px;width:300px;overflow:auto;background:rgba(9,14,17,.95);border:1px solid #33454c;padding:10px;box-sizing:border-box}.we-left{left:10px}.we-right{right:10px}.we-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px}.we-grid button,#warfex-editor .we-actions button{background:#1b272d;border:1px solid #3c525b;color:#edf3f5;padding:7px;font-size:10px;letter-spacing:.06em;cursor:pointer}.we-grid button:hover,#warfex-editor .we-actions button:hover{background:#2a3b43}.we-options{display:grid;gap:6px;margin:8px 0 12px}.we-options label{display:flex;justify-content:space-between;color:#a9bbc0;font-size:10px}.we-options input[type=number]{width:88px;background:#10181c;border:1px solid #33454c;color:#fff;padding:5px}.we-help{display:grid;gap:4px;color:#789198;font-size:9px}.we-help b{color:#b7c7cb;margin-top:6px}.we-left h4,.we-right h4{font-size:10px;letter-spacing:.14em;color:#a7bdc3;border-bottom:1px solid #26363c;padding-bottom:5px}.we-row{display:block;width:100%;border:0;border-bottom:1px solid #1d292e;background:transparent;color:#a9bcc1;text-align:left;padding-top:7px;padding-bottom:7px;cursor:pointer}.we-row.selected{background:#29424b;color:#fff}.we-field{display:grid;grid-template-columns:55px 1fr;gap:6px;align-items:center;margin:4px 0;color:#91a5ab;font-size:10px}.we-field input,.we-name{width:100%;box-sizing:border-box;background:#10181c;border:1px solid #33454c;color:#fff;padding:6px}.we-name{margin-bottom:7px}.we-check{display:flex;gap:7px;color:#a9bbc0;font-size:10px;margin:8px 0}.we-empty{padding:10px;border:1px dashed #304149;color:#6d848b}.we-status{color:#90a6ad;line-height:1.7}.we-status b{color:#e1eaed}.we-toast{position:absolute;left:50%;bottom:22px;transform:translate(-50%,8px);opacity:0;background:#0a1013;border:1px solid #49616a;padding:9px 14px;font-size:10px;letter-spacing:.08em;transition:.15s}.we-toast.show{opacity:1;transform:translate(-50%,0)}';document.head.appendChild(style);}
+  const style=document.createElement('style');style.textContent='body.warfex-editor-active{cursor:default!important;overflow:hidden};#warfex-editor .we-map-tools{display:grid;gap:6px;margin-bottom:10px}#warfex-editor .we-map-tools .we-grid{grid-template-columns:1fr 1fr}.we-map-tools .we-name{margin:0}#warfex-editor{position:fixed;inset:0;z-index:10000;pointer-events:none;color:#e7edf0;font:12px/1.2 Arial,sans-serif}#warfex-editor .we-topbar,#warfex-editor .we-left,#warfex-editor .we-right,#warfex-editor #we-toast{pointer-events:auto}.we-topbar{position:absolute;left:10px;right:10px;top:10px;min-height:42px;display:flex;align-items:center;justify-content:space-between;padding:7px 10px;gap:10px;background:rgba(9,14,17,.95);border:1px solid #33454c}.we-topbar span{color:#7999a3;font-size:9px;letter-spacing:.12em}.we-actions{display:flex;gap:4px;flex-wrap:wrap}.we-left,.we-right{position:absolute;top:62px;bottom:10px;width:300px;overflow:auto;background:rgba(9,14,17,.95);border:1px solid #33454c;padding:10px;box-sizing:border-box}.we-left{left:10px}.we-right{right:10px}.we-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px}.we-grid button,#warfex-editor .we-actions button{background:#1b272d;border:1px solid #3c525b;color:#edf3f5;padding:7px;font-size:10px;letter-spacing:.06em;cursor:pointer}.we-grid button:hover,#warfex-editor .we-actions button:hover{background:#2a3b43}.we-options{display:grid;gap:6px;margin:8px 0 12px}.we-options label{display:flex;justify-content:space-between;color:#a9bbc0;font-size:10px}.we-options input[type=number]{width:88px;background:#10181c;border:1px solid #33454c;color:#fff;padding:5px}.we-help{display:grid;gap:4px;color:#789198;font-size:9px}.we-help b{color:#b7c7cb;margin-top:6px}.we-left h4,.we-right h4{font-size:10px;letter-spacing:.14em;color:#a7bdc3;border-bottom:1px solid #26363c;padding-bottom:5px}.we-row{display:block;width:100%;border:0;border-bottom:1px solid #1d292e;background:transparent;color:#a9bcc1;text-align:left;padding-top:7px;padding-bottom:7px;cursor:pointer}.we-row.selected{background:#29424b;color:#fff}.we-field{display:grid;grid-template-columns:55px 1fr;gap:6px;align-items:center;margin:4px 0;color:#91a5ab;font-size:10px}.we-field input,.we-name{width:100%;box-sizing:border-box;background:#10181c;border:1px solid #33454c;color:#fff;padding:6px}.we-name{margin-bottom:7px}.we-check{display:flex;gap:7px;color:#a9bbc0;font-size:10px;margin:8px 0}.we-empty{padding:10px;border:1px dashed #304149;color:#6d848b}.we-status{color:#90a6ad;line-height:1.7}.we-status b{color:#e1eaed}.we-toast{position:absolute;left:50%;bottom:22px;transform:translate(-50%,8px);opacity:0;background:#0a1013;border:1px solid #49616a;padding:9px 14px;font-size:10px;letter-spacing:.08em;transition:.15s}.we-toast.show{opacity:1;transform:translate(-50%,0)}';document.head.appendChild(style);}
