@@ -1,15 +1,15 @@
 import * as THREE from 'three';
-import { PhysicsWorld } from './physics/PhysicsWorld.js';
-import { RagdollController } from './physics/RagdollController.js';
-import { WaveDirector } from './systems/WaveDirector.js';
-import { SteeringAgent } from './systems/SteeringAgent.js';
-import { AssetManager } from './assets/AssetManager.js';
-import { MapLoader } from './world/MapLoader.js';
-import { PropInstancer } from './world/PropInstancer.js';
-import { applyBakedLightmap } from './world/BakedLighting.js';
-import { configureAtmosphere } from './world/Atmosphere.js';
-import { NavMeshService } from './ai/NavMeshService.js';
-import { NavMeshAgent } from './ai/NavMeshAgent.js';
+import { PhysicsWorld } from './physics/PhysicsWorld.js?v=modulefix-20261004';
+import { RagdollController } from './physics/RagdollController.js?v=modulefix-20261004';
+import { WaveDirector } from './systems/WaveDirector.js?v=modulefix-20261004';
+import { SteeringAgent } from './systems/SteeringAgent.js?v=modulefix-20261004';
+import { AssetManager } from './assets/AssetManager.js?v=modulefix-20261004';
+import { MapLoader } from './world/MapLoader.js?v=modulefix-20261004';
+import { PropInstancer } from './world/PropInstancer.js?v=modulefix-20261004';
+import { applyBakedLightmap } from './world/BakedLighting.js?v=modulefix-20261004';
+import { configureAtmosphere } from './world/Atmosphere.js?v=modulefix-20261004';
+import { NavMeshService } from './ai/NavMeshService.js?v=modulefix-20261004';
+import { NavMeshAgent } from './ai/NavMeshAgent.js?v=modulefix-20261004';
 
 const CONFIG = {
   maxHealth: 100,
