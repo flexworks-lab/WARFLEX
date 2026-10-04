@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { PhysicsWorld } from './physics/PhysicsWorld.js?v=physics-ground-20261003';
 import { RagdollController } from './physics/RagdollController.js?v=modulefix-20261004';
@@ -283,6 +284,11 @@ const atmosphere = configureAtmosphere(
 );
 
 const assetManager = new AssetManager(renderer);
+
+const AK47_GLB_URL = new URL(
+  './assets/ak47.glb',
+  import.meta.url,
+).href;
 
 // Bright outdoor daylight rig: a strong sun plus soft sky/ground fill
 // keeps the arena readable while preserving directional shadows.
@@ -3601,6 +3607,162 @@ weapon.visible = false;
 
 const menuGunPairs = [];
 
+function installAK47Model(target, sourceScene, {
+  keepProceduralHands = true,
+  scaleTarget = 3.35,
+  animations = [],
+} = {}) {
+  const keepNames = new Set([
+    'WeaponLeftHand',
+    'WeaponRightHand',
+    'WeaponLeftHandGrip',
+    'WeaponRightHandGrip',
+    'WeaponLeftArm',
+    'WeaponRightArm',
+    'WeaponMuzzleLight',
+    'WeaponMuzzleFlash',
+  ]);
+
+  for (const child of [...target.children]) {
+    if (keepProceduralHands && keepNames.has(child.name)) continue;
+    target.remove(child);
+  }
+
+  const model = SkeletonUtils.clone(sourceScene);
+  model.name = 'AK47_GLTF';
+  model.visible = true;
+
+  model.traverse((node) => {
+    node.visible = true;
+    if (node.isMesh) {
+      node.castShadow = false;
+      node.receiveShadow = false;
+      node.frustumCulled = false;
+
+      const materials = Array.isArray(node.material)
+        ? node.material
+        : [node.material];
+
+      node.material = materials.map((material) => {
+        const next = material?.clone?.() || material;
+        if (next) {
+          next.side = THREE.DoubleSide;
+          next.transparent = false;
+          next.opacity = 1;
+          if ('color' in next && next.color) next.color.set(0xffffff);
+        }
+        return next;
+      });
+      if (!Array.isArray(node.material)) node.material = node.material[0];
+    }
+  });
+
+  const bounds = new THREE.Box3().setFromObject(model);
+  const size = bounds.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z, 0.001);
+  model.scale.setScalar(scaleTarget / maxDim);
+  model.updateMatrixWorld(true);
+
+  const fitted = new THREE.Box3().setFromObject(model);
+  const center = fitted.getCenter(new THREE.Vector3());
+  model.position.sub(center);
+  model.position.y -= 0.06;
+  model.position.z -= 0.06;
+
+  // The imported model replaces the procedural rifle body, so its own hands
+  // are hidden when the old procedural first-person hands are retained.
+  if (keepProceduralHands) {
+    model.traverse((node) => {
+      const n = String(node.name || '').toLowerCase();
+      if (
+        n.includes('hand') ||
+        n.includes('forearm') ||
+        n.includes('sleeve')
+      ) {
+        node.visible = false;
+      }
+    });
+  }
+
+  target.add(model);
+  target.userData.ak47Model = model;
+  target.userData.ak47Mixer = null;
+  target.userData.ak47Actions = [];
+
+  if (animations.length) {
+    const mixer = new THREE.AnimationMixer(model);
+    target.userData.ak47Mixer = mixer;
+
+    for (const clip of animations) {
+      const action = mixer.clipAction(clip);
+      action.play();
+      action.paused = true;
+      target.userData.ak47Actions.push(action);
+    }
+  }
+
+  return model;
+}
+
+async function loadAK47Weapon() {
+  try {
+    const asset = await assetManager.loadGLTF(AK47_GLB_URL);
+
+    let meshCount = 0;
+    asset.scene.traverse((node) => {
+      if (node.isMesh) meshCount += 1;
+    });
+    if (!meshCount) {
+      throw new Error('ak47.glb loaded but contains no mesh geometry.');
+    }
+
+    installAK47Model(
+      weapon,
+      asset.scene,
+      {
+        keepProceduralHands: true,
+        scaleTarget: 3.35,
+        animations: asset.animations,
+      },
+    );
+
+    for (const pair of menuGunPairs) {
+      installAK47Model(
+        pair.hero,
+        asset.scene,
+        {
+          keepProceduralHands: false,
+          scaleTarget: 3.35,
+          animations: [],
+        },
+      );
+      installAK47Model(
+        pair.secondary,
+        asset.scene,
+        {
+          keepProceduralHands: false,
+          scaleTarget: 3.35,
+          animations: [],
+        },
+      );
+    }
+
+    syncWorldWeaponAnchor();
+    weapon.visible = state.active && !state.over;
+    console.info('[WARFLEX] AK47 GLB loaded as the active rifle.');
+  } catch (error) {
+    console.error('[WARFLEX] AK47 GLB failed to load; keeping fallback rifle.', error);
+
+    const status = document.querySelector('#warfex-boot-status');
+    if (status) {
+      status.textContent =
+        'WARFLEX AK47 IMPORT ERROR: ' +
+        (error?.message || String(error));
+      status.style.display = 'block';
+    }
+  }
+}
+
 const menuToonGradient =
   new THREE.DataTexture(
     new Uint8Array([
@@ -3870,7 +4032,6 @@ for (let i = 0; i < menuGunPalettes.length; i += 1) {
 
   menuGunPairs.push({ hero, secondary, palette });
 }
-
 menuGunLights.key =
   new THREE.PointLight(
     0xffffff,
@@ -4121,6 +4282,8 @@ const syncWorldWeaponAnchor = () => {
 };
 
 syncWorldWeaponAnchor();
+
+void loadAK47Weapon();
 
 function createDroppedWeaponMesh() {
   const mesh = weapon.clone(true);
@@ -6714,6 +6877,26 @@ function updateWave(dt) {
   waveDirector?.update(dt);
 }
 
+function updateAK47Animation(dt) {
+  const mixer = weapon.userData.ak47Mixer;
+  const actions = weapon.userData.ak47Actions;
+  if (!mixer || !actions?.length) return;
+
+  const desired =
+    state.reloadTimer > 0
+      ? actions.find((action) => /reload/i.test(action._clip?.name || ''))
+      : actions.find((action) => /run|walk/i.test(action._clip?.name || '')) ||
+        actions.find((action) => /idle|shoot|draw/i.test(action._clip?.name || ''));
+
+  for (const action of actions) {
+    const active = action === desired;
+    action.paused = !active;
+    if (active && !action.isRunning()) action.reset().play();
+  }
+
+  mixer.update(dt);
+}
+
 function updateWeapon(dt) {
   if (multiplayerDeathActive) {
     weapon.visible = false;
@@ -6721,6 +6904,8 @@ function updateWeapon(dt) {
   }
 
   weapon.visible = true;
+
+  updateAK47Animation(dt);
 
   const moving =
     keys.has('KeyW') ||
