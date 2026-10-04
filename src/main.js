@@ -3576,7 +3576,13 @@ const physicsWorld = new PhysicsWorld({
   maxSubSteps: 3,
 });
 const fallbackPhysicsBodies =
-  physicsWorld.syncArena(obstacles);
+  physicsWorld.syncArena(obstacles, {
+    width: MAP_WIDTH - 8,
+    depth: MAP_DEPTH - 8,
+    resolutionX: 64,
+    resolutionZ: 40,
+    sampleHeight: getSimpleTerrainHeight,
+  });
 
 
 const mapEditor = new MapEditor({
