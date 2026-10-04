@@ -838,3 +838,74 @@ body {
     opacity: .58;
   }
 }
+
+
+/* Menu weapon presentation */
+.menu-static-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(circle at 72% 48%, rgba(255,255,255,.08) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 83% 30%, rgba(180,215,232,.07) 0 1px, transparent 1.4px),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255,255,255,.028) 0,
+      rgba(255,255,255,.028) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  background-size: 11px 11px, 17px 17px, auto;
+  filter: contrast(1.15);
+  animation: menuStaticJitter .11s steps(2,end) infinite;
+}
+
+@keyframes menuStaticJitter {
+  0% { transform: translate(0,0); }
+  25% { transform: translate(-.7px,.4px); }
+  50% { transform: translate(.5px,-.3px); }
+  75% { transform: translate(.25px,.6px); }
+  100% { transform: translate(-.35px,-.5px); }
+}
+
+/* Smaller, quieter navigation text */
+.menu-nav button,
+.back-button,
+.gothic-panel .deploy-button,
+.wave-choice {
+  font-size: clamp(13px, 1.35vw, 18px) !important;
+  font-weight: 700 !important;
+  letter-spacing: .14em !important;
+}
+
+.menu-nav {
+  gap: 4px !important;
+}
+
+.menu-nav button {
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+
+.menu-nav button::before {
+  left: -15px;
+  width: 6px;
+}
+
+/* Keep the cinematic right-side weapon showcase dominant without obscuring it. */
+.gun-viewport-canvas {
+  filter:
+    saturate(1.12)
+    contrast(1.07)
+    brightness(1.07)
+    drop-shadow(0 18px 46px rgba(0,0,0,.28));
+}
+
+@media (max-width: 700px) {
+  .menu-static-overlay {
+    opacity: .04 !important;
+  }
+}
