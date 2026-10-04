@@ -377,11 +377,6 @@ const atmosphere = configureAtmosphere(
 
 const assetManager = new AssetManager(renderer);
 
-const AK47_GLB_URL = new URL(
-  './assets/ak47.glb',
-  import.meta.url,
-).href;
-
 // Bright outdoor daylight rig: a strong sun plus soft sky/ground fill
 // keeps the arena readable while preserving directional shadows.
 const worldHemiLight = new THREE.HemisphereLight(
@@ -780,7 +775,8 @@ const MAP_WIDTH = 260;
 const MAP_DEPTH = 150;
 const HALF_W = MAP_WIDTH * 0.5;
 const HALF_D = MAP_DEPTH * 0.5;
-const BLANK_BASE_MAP = true;
+const BLANK_BASE_MAP = false;
+const SIMPLE_SLOPE_MAP = true;
 
 const fallbackArenaRoot = new THREE.Group();
 fallbackArenaRoot.name = 'FallbackArena';
@@ -790,6 +786,94 @@ const editorMapRoot = new THREE.Group();
 editorMapRoot.name = 'WARFLEX_EDITOR_MAP_ROOT';
 editorMapRoot.visible = false;
 scene.add(editorMapRoot);
+
+function getSimpleTerrainHeight(x, z) {
+  const edgeX = THREE.MathUtils.clamp(1 - Math.max(0, Math.abs(x) - HALF_W * .72) / (HALF_W * .28), 0, 1);
+  const edgeZ = THREE.MathUtils.clamp(1 - Math.max(0, Math.abs(z) - HALF_D * .72) / (HALF_D * .28), 0, 1);
+  const edgeFade = Math.min(edgeX, edgeZ);
+
+  const rolling =
+    Math.sin(x * .045 + .7) * Math.cos(z * .052 - .45) * 1.05 +
+    Math.sin(x * .083 - z * .031) * .52;
+
+  const hillA = Math.exp(-(
+    ((x + 54) * (x + 54)) / 1500 +
+    ((z - 7) * (z - 7)) / 1050
+  )) * 5.2;
+
+  const hillB = Math.exp(-(
+    ((x - 48) * (x - 48)) / 1700 +
+    ((z + 20) * (z + 20)) / 1350
+  )) * 4.2;
+
+  const ridge = Math.exp(-(
+    ((x + 5) * (x + 5)) / 5200 +
+    ((z - 4) * (z - 4)) / 180
+  )) * 2.1;
+
+  const basin = Math.exp(-(
+    ((x - 4) * (x - 4)) / 2800 +
+    ((z + 38) * (z + 38)) / 980
+  )) * 2.0;
+
+  return THREE.MathUtils.clamp(
+    (rolling * .50 + hillA + hillB + ridge - basin) * edgeFade,
+    -0.28,
+    6.6,
+  );
+}
+
+function getGroundHeightAt(x, z) {
+  return SIMPLE_SLOPE_MAP &&
+    fallbackArenaRoot.visible &&
+    !editorMapRoot.visible
+    ? getSimpleTerrainHeight(x, z)
+    : 0;
+}
+
+function createSimpleSlopeTerrain() {
+  const width = MAP_WIDTH - 8;
+  const depth = MAP_DEPTH - 8;
+  const nx = 72;
+  const nz = 42;
+  const positions = [];
+  const indices = [];
+  const row = nx + 1;
+
+  for (let iz = 0; iz <= nz; iz += 1) {
+    const z = THREE.MathUtils.lerp(-depth * .5, depth * .5, iz / nz);
+    for (let ix = 0; ix <= nx; ix += 1) {
+      const x = THREE.MathUtils.lerp(-width * .5, width * .5, ix / nx);
+      positions.push(x, getSimpleTerrainHeight(x, z), z);
+    }
+  }
+
+  for (let iz = 0; iz < nz; iz += 1) {
+    for (let ix = 0; ix < nx; ix += 1) {
+      const a = iz * row + ix;
+      const b = a + 1;
+      const c = a + row;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x2b3438,
+    roughness: .98,
+    metalness: .02,
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'WARFLEX_SIMPLE_SLOPE_TERRAIN';
+  mesh.receiveShadow = true;
+  fallbackArenaRoot.add(mesh);
+}
 
 function makeBox(
   size,
@@ -1265,28 +1349,30 @@ function addArena() {
   // The built-in/base map is intentionally blank so the map editor can be
   // used to author the entire battlefield from scratch. Keep only the floor
   // and invisible perimeter colliders for a clean playable canvas.
-  if (BLANK_BASE_MAP) {
-    addCollision(
-      [MAP_WIDTH, 10, 1.5],
-      [0, 5, -HALF_D],
-      'BaseNorthBoundary',
-    );
-    addCollision(
-      [MAP_WIDTH, 10, 1.5],
-      [0, 5, HALF_D],
-      'BaseSouthBoundary',
-    );
-    addCollision(
-      [1.5, 10, MAP_DEPTH],
-      [-HALF_W, 5, 0],
-      'BaseWestBoundary',
-    );
-    addCollision(
-      [1.5, 10, MAP_DEPTH],
-      [HALF_W, 5, 0],
-      'BaseEastBoundary',
-    );
-    console.info('[WARFLEX] Blank base map enabled.');
+  if (SIMPLE_SLOPE_MAP) {
+    createSimpleSlopeTerrain();
+
+    addCollision([MAP_WIDTH, 10, 1.5], [0, 5, -HALF_D], 'SlopeNorthBoundary');
+    addCollision([MAP_WIDTH, 10, 1.5], [0, 5, HALF_D], 'SlopeSouthBoundary');
+    addCollision([1.5, 10, MAP_DEPTH], [-HALF_W, 5, 0], 'SlopeWestBoundary');
+    addCollision([1.5, 10, MAP_DEPTH], [HALF_W, 5, 0], 'SlopeEastBoundary');
+
+    const cover = [
+      [-44, 12, 8.0, 1.8, 1.6],
+      [38, 8, 9.5, 2.0, 1.8],
+      [-12, -19, 7.0, 1.7, 1.5],
+      [52, -31, 6.5, 2.0, 1.8],
+      [-64, -34, 8.5, 1.6, 1.4],
+      [6, 31, 10.0, 1.7, 1.5],
+    ];
+
+    for (const [x, z, w, d, h] of cover) {
+      const y = getSimpleTerrainHeight(x, z);
+      box(fallbackArenaRoot, [w, h, d], [x, y + h * .5, z], mat(0x4b5458, .92, .06), Math.random() * Math.PI, .05);
+      addCollision([w, h, d], [x, y + h * .5, z], 'SlopeCover');
+    }
+
+    console.info('[WARFLEX] Simple procedural slope map enabled.');
     return;
   }
 
@@ -4009,46 +4095,71 @@ const stripPreviewModel = (source, index) => {
   preview.name = 'LoadoutPreview_' + WEAPON_DEFS[index].id;
   preview.visible = true;
 
+  const hiddenParts = new Set([
+    'WeaponLeftArm',
+    'WeaponRightArm',
+    'WeaponLeftHand',
+    'WeaponRightHand',
+    'WeaponLeftHandGrip',
+    'WeaponRightHandGrip',
+    'WeaponMuzzleLight',
+    'WeaponMuzzleFlash',
+  ]);
+
   preview.traverse((node) => {
-    if (
-      node.name === 'WeaponLeftArm' ||
-      node.name === 'WeaponRightArm' ||
-      node.name === 'WeaponLeftHand' ||
-      node.name === 'WeaponRightHand' ||
-      node.name === 'WeaponLeftHandGrip' ||
-      node.name === 'WeaponRightHandGrip' ||
-      node.name === 'WeaponMuzzleLight' ||
-      node.name === 'WeaponMuzzleFlash'
-    ) {
-      node.visible = false;
-    }
+    node.visible = !hiddenParts.has(node.name);
+    if (!node.isMesh) return;
 
-    if (node.isMesh) {
-      node.frustumCulled = false;
-      node.castShadow = false;
-      node.receiveShadow = false;
+    node.frustumCulled = false;
+    node.castShadow = false;
+    node.receiveShadow = false;
+    node.renderOrder = 40;
 
-      const materials = Array.isArray(node.material)
-        ? node.material
-        : [node.material];
+    const materials = Array.isArray(node.material)
+      ? node.material
+      : [node.material];
 
-      node.material = materials.map((material) => {
-        const next = material?.clone?.() || material;
-        if (next) {
-          next.transparent = false;
-          next.opacity = 1;
-          next.depthWrite = true;
-          next.depthTest = false;
-          if (next.color) next.color.multiplyScalar(1.0);
+    const cloned = materials.map((material) => {
+      const next = material?.clone?.() || material;
+      if (!next) return next;
+
+      next.transparent = false;
+      next.opacity = 1;
+      next.depthWrite = true;
+      next.depthTest = false;
+      next.side = THREE.DoubleSide;
+
+      if (next.color) {
+        const hsl = {};
+        next.color.getHSL(hsl);
+        if (hsl.l < .14) {
+          next.color.multiplyScalar(1.8);
+        } else if (hsl.l < .35) {
+          next.color.multiplyScalar(1.25);
         }
-        return next;
-      });
+      }
 
-      if (!Array.isArray(node.material)) node.material = node.material[0];
-    }
+      return next;
+    });
+
+    node.material =
+      Array.isArray(node.material)
+        ? cloned
+        : cloned[0];
   });
 
-  preview.position.z = -4.15;
+  preview.updateWorldMatrix(true, true);
+  const bounds = new THREE.Box3().setFromObject(preview);
+  const size = bounds.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z, .001);
+  const fitScale = THREE.MathUtils.clamp(3.15 / maxDim, .34, 1.9);
+
+  const center = bounds.getCenter(new THREE.Vector3());
+  preview.position.sub(center);
+  preview.position.z = -3.25;
+  preview.userData.loadoutFitScale = fitScale;
+  preview.scale.setScalar(fitScale * .72);
+
   loadoutPreviewRoot.add(preview);
   loadoutPreviewModels.push(preview);
   return preview;
@@ -4076,7 +4187,9 @@ function updateLoadoutPreview(dt) {
       : offset * 2.35;
     const targetY = selected ? -.62 : -1.25;
     const targetZ = selected ? -3.25 : -4.35;
-    const targetScale = selected ? 1.08 : .56;
+    const fitScale = model.userData.loadoutFitScale || 1;
+    const targetScale =
+      fitScale * (selected ? 1.34 : .70);
 
     model.position.x = THREE.MathUtils.damp(
       model.position.x,
@@ -4104,6 +4217,7 @@ function updateLoadoutPreview(dt) {
       dt,
     );
     model.scale.setScalar(scale);
+    model.visible = true;
 
     model.rotation.x = THREE.MathUtils.damp(
       model.rotation.x,
@@ -4276,175 +4390,6 @@ const weaponAmmoState = new Map(
 );
 
 const menuGunPairs = [];
-
-function installAK47Model(target, sourceScene, {
-  keepProceduralHands = true,
-  scaleTarget = 3.35,
-  animations = [],
-} = {}) {
-  const keepNames = new Set([
-    'WeaponLeftHand',
-    'WeaponRightHand',
-    'WeaponLeftHandGrip',
-    'WeaponRightHandGrip',
-    'WeaponLeftArm',
-    'WeaponRightArm',
-    'WeaponMuzzleLight',
-    'WeaponMuzzleFlash',
-  ]);
-
-  for (const child of [...target.children]) {
-    if (keepProceduralHands && keepNames.has(child.name)) continue;
-    target.remove(child);
-  }
-
-  const model = SkeletonUtils.clone(sourceScene);
-  model.name = 'AK47_GLTF';
-  model.visible = true;
-
-  model.traverse((node) => {
-    node.visible = true;
-    if (node.isMesh) {
-      node.castShadow = false;
-      node.receiveShadow = false;
-      node.frustumCulled = false;
-      node.renderOrder = 1000;
-
-      const materials = Array.isArray(node.material)
-        ? node.material
-        : [node.material];
-
-      node.material = materials.map((material) => {
-        const next = material?.clone?.() || material;
-        if (next) {
-          next.side = THREE.DoubleSide;
-          next.transparent = false;
-          next.opacity = 1;
-          // First-person weapon should never be hidden by world geometry.
-          next.depthTest = false;
-          next.depthWrite = false;
-          if ('color' in next && next.color) next.color.set(0xffffff);
-        }
-        return next;
-      });
-      if (!Array.isArray(node.material)) node.material = node.material[0];
-    }
-  });
-
-  // First normalize the imported asset from its real world-space bounds.
-  // Some GLB exporters leave rotation/scale on the root/armature, so centering
-  // before attaching it to the weapon can produce the wrong local position.
-  let bounds = new THREE.Box3().setFromObject(model);
-  const size = bounds.getSize(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z, 0.001);
-  model.scale.setScalar(scaleTarget / maxDim);
-
-  // Attach first, then center in the weapon/menu container's coordinate space.
-  target.add(model);
-  target.updateWorldMatrix(true, true);
-  model.updateWorldMatrix(true, true);
-
-  bounds = new THREE.Box3().setFromObject(model);
-  const centerWorld = bounds.getCenter(new THREE.Vector3());
-  const centerTarget = target.worldToLocal(centerWorld.clone());
-  model.position.sub(centerTarget);
-  model.position.y -= 0.06;
-  model.position.z -= 0.06;
-  model.renderOrder = 1000;
-
-  // The imported model replaces the procedural rifle body, so its own hands
-  // are hidden when the old procedural first-person hands are retained.
-  if (keepProceduralHands) {
-    model.traverse((node) => {
-      const n = String(node.name || '').toLowerCase();
-      if (
-        n.includes('hand') ||
-        n.includes('forearm') ||
-        n.includes('sleeve')
-      ) {
-        node.visible = false;
-      }
-    });
-  }
-
-  target.add(model);
-  target.userData.ak47Model = model;
-  target.userData.ak47Mixer = null;
-  target.userData.ak47Actions = [];
-
-  if (animations.length) {
-    const mixer = new THREE.AnimationMixer(model);
-    target.userData.ak47Mixer = mixer;
-
-    for (const clip of animations) {
-      const action = mixer.clipAction(clip);
-      action.play();
-      action.paused = true;
-      target.userData.ak47Actions.push(action);
-    }
-  }
-
-  return model;
-}
-
-async function loadAK47Weapon() {
-  try {
-    const asset = await assetManager.loadGLTF(AK47_GLB_URL);
-
-    let meshCount = 0;
-    asset.scene.traverse((node) => {
-      if (node.isMesh) meshCount += 1;
-    });
-    if (!meshCount) {
-      throw new Error('ak47.glb loaded but contains no mesh geometry.');
-    }
-
-    installAK47Model(
-      weapon,
-      asset.scene,
-      {
-        keepProceduralHands: true,
-        scaleTarget: 3.35,
-        animations: asset.animations,
-      },
-    );
-
-    for (const pair of menuGunPairs) {
-      installAK47Model(
-        pair.hero,
-        asset.scene,
-        {
-          keepProceduralHands: false,
-          scaleTarget: 3.35,
-          animations: [],
-        },
-      );
-      installAK47Model(
-        pair.secondary,
-        asset.scene,
-        {
-          keepProceduralHands: false,
-          scaleTarget: 3.35,
-          animations: [],
-        },
-      );
-    }
-
-    syncWorldWeaponAnchor();
-    weapon.visible = state.active && !state.over;
-    console.info('[WARFLEX] AK47 GLB loaded as the active rifle.');
-  } catch (error) {
-    console.error('[WARFLEX] AK47 GLB failed to load; keeping fallback rifle.', error);
-
-    const status = document.querySelector('#warfex-boot-status');
-    if (status) {
-      status.textContent =
-        'WARFLEX AK47 IMPORT ERROR: ' +
-        (error?.message || String(error));
-      status.style.display = 'block';
-    }
-  }
-}
 
 const menuToonGradient =
   new THREE.DataTexture(
@@ -5191,7 +5136,11 @@ function updateDroppedWeapons(dt) {
       drop.mesh.rotation.z +=
         drop.angularVelocity.z * dt;
 
-      const floorY = .10;
+      const floorY =
+        getGroundHeightAt(
+          drop.mesh.position.x,
+          drop.mesh.position.z,
+        ) + .10;
 
       if (
         drop.mesh.position.y <=
@@ -5820,7 +5769,13 @@ function resetGame(spawnImmediately = true) {
     player.position.copy(customPlayerSpawn);
     player.position.y += 1.65;
   } else {
-    player.position.set(18, 1.65, 58);
+    const spawnX = 18;
+    const spawnZ = 58;
+    player.position.set(
+      spawnX,
+      getGroundHeightAt(spawnX, spawnZ) + 1.65,
+      spawnZ,
+    );
   }
   camera.position.set(0, 0, 0);
 
@@ -6067,7 +6022,9 @@ function spawnEnemy(index = 0, spawnPosition = null) {
 
   group.position.copy(spawn);
   // Living enemies are kinematic; keep their feet planted on the flat arena.
-  group.position.y = ENEMY_GROUND_Y;
+  group.position.y =
+    getGroundHeightAt(group.position.x, group.position.z) +
+    ENEMY_GROUND_Y;
   group.scale.setScalar(
     group.userData.baseScale || .54,
   );
@@ -6608,10 +6565,21 @@ function movePlayer(dt) {
     keys.delete('Space');
   }
 
+  const groundEyeY =
+    getGroundHeightAt(player.position.x, player.position.z) + 1.65;
+
+  if (state.onGround && state.verticalVelocity <= 0) {
+    player.position.y = groundEyeY;
+  }
+
   state.verticalVelocity -= CONFIG.gravity * dt;
   player.position.y += state.verticalVelocity * dt;
-  if (player.position.y <= 1.65) {
-    player.position.y = 1.65;
+
+  const landingGroundY =
+    getGroundHeightAt(player.position.x, player.position.z) + 1.65;
+
+  if (player.position.y <= landingGroundY) {
+    player.position.y = landingGroundY;
     state.verticalVelocity = 0;
     state.onGround = true;
   }
@@ -7165,7 +7133,11 @@ function respawnMultiplayer() {
   state.pitch = 0;
   state.verticalVelocity = 0;
   state.onGround = true;
-  player.position.set((Math.random() - .5) * 70, 1.65, 20 + Math.random() * 45);
+  {
+    const x = (Math.random() - .5) * 70;
+    const z = 20 + Math.random() * 45;
+    player.position.set(x, getGroundHeightAt(x, z) + 1.65, z);
+  }
   camera.position.copy(player.position);
   camera.rotation.set(0, 0, 0);
   camera.fov = CONFIG.defaultFov;
@@ -7250,7 +7222,9 @@ function updateEnemies(dt) {
     const enemy = enemies[i];
 
     // Do not let navigation/animation accumulate vertical drift.
-    enemy.group.position.y = ENEMY_GROUND_Y;
+    enemy.group.position.y =
+      getGroundHeightAt(enemy.group.position.x, enemy.group.position.z) +
+      ENEMY_GROUND_Y;
 
     enemy.attackTimer -= dt;
     enemy.hurtFlash =
@@ -8019,7 +7993,11 @@ function tickEffects(dt) {
       shell.mesh.rotation.z +=
         shell.angularVelocity.z * dt;
 
-      const floorY = .028;
+      const floorY =
+        getGroundHeightAt(
+          shell.mesh.position.x,
+          shell.mesh.position.z,
+        ) + .028;
 
       if (shell.mesh.position.y <= floorY) {
         shell.mesh.position.y = floorY;
