@@ -159,9 +159,20 @@ function moveMeshAssemblyToHead(model) {
   const worldHeadPosition = findWorldPosition(head);
   const worldHeadQuaternion = findWorldQuaternion(head);
 
-  assembly.position.copy(worldHeadPosition);
-  assembly.quaternion.copy(worldHeadQuaternion);
-  model.parent.add(assembly);
+  const parent = model.parent;
+  parent.add(assembly);
+
+  const localHeadPosition = parent.worldToLocal(
+    worldHeadPosition.clone(),
+  );
+
+  const parentWorldQuaternion =
+    parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+
+  assembly.position.copy(localHeadPosition);
+  assembly.quaternion.copy(
+    parentWorldQuaternion.multiply(worldHeadQuaternion),
+  );
 
   const parts = [
     head,
@@ -221,6 +232,7 @@ export class RagdollController {
     hitPoint,
     direction,
     headshot = false,
+    hitPart = 'upperBody',
   } = {}) {
     const source = enemy?.group;
     if (!source) return null;
@@ -272,8 +284,6 @@ export class RagdollController {
 
     const leftArm = parts?.leftArm;
     const rightArm = parts?.rightArm;
-    const leftElbow = parts?.leftKnee?.parent;
-    const rightElbow = parts?.rightKnee?.parent;
 
     if (leftArm) {
       bodies.set('leftArm', createSegmentBody({
@@ -453,29 +463,21 @@ export class RagdollController {
         hitPoint,
         direction,
         headshot ? 7.5 : 5.5,
-        enemy.group.userData.parts,
+        hitPart,
       );
     }
 
     this.active.add(ragdoll);
 
-    // The render model is now owned by the ragdoll root.
-    this.scene.remove(root);
-    this.scene.add(root);
-
     return ragdoll;
   }
 
-  applyBulletImpulse(ragdoll, hitPoint, direction, strength, parts = null) {
+  applyBulletImpulse(ragdoll, hitPoint, direction, strength, hitPart = 'upperBody') {
     if (!ragdoll) return;
-
-    const localName = parts
-      ? this.#bodyKeyFromParts(parts, hitPoint)
-      : 'upperBody';
 
     const body = bodyForHitPart(
       ragdoll,
-      localName,
+      hitPart,
     );
 
     if (!body) return;
@@ -487,8 +489,8 @@ export class RagdollController {
     );
 
     const worldPoint = cannonVec(hitPoint);
-
     const localPoint = new CANNON.Vec3();
+
     body.pointToLocalFrame(
       worldPoint,
       localPoint,
@@ -499,14 +501,27 @@ export class RagdollController {
       localPoint,
     );
 
+    // Transfer a little of the impact to connected parts so the body reacts
+    // immediately instead of looking like only one rigid segment was hit.
+    const kick = impulse.clone().scale(0.12);
+
     for (const part of ragdoll.bodies.values()) {
+      if (part === body) {
+        part.wakeUp();
+        continue;
+      }
+
+      part.applyImpulse(
+        kick,
+        new CANNON.Vec3(),
+      );
       part.wakeUp();
     }
 
     ragdoll.sleep = false;
   }
 
-  #bodyKeyFromParts(parts, hitPoint) {
+  #(parts, hitPoint) {
     if (!parts) return 'upperBody';
 
     const head = parts.head;
