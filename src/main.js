@@ -1124,6 +1124,83 @@ function resetGame(spawnImmediately = true) {
   }
 }
 
+function resetGame(spawnImmediately = true) {
+  for (const enemy of enemies) scene.remove(enemy.group);
+  enemies.length = 0;
+
+  for (const tracer of tracers) scene.remove(tracer.mesh);
+  tracers.length = 0;
+
+  for (const particle of particles) scene.remove(particle.mesh);
+  particles.length = 0;
+
+  ragdollController.dispose();
+  ragdolls.length = 0;
+
+  for (const gun of droppedGuns) scene.remove(gun.mesh);
+  droppedGuns.length = 0;
+
+  for (const shell of shellCasings) scene.remove(shell.mesh);
+  shellCasings.length = 0;
+
+  const selected =
+    window.__WARFLEX_SELECTED_WAVE === 'endless'
+      ? -1
+      : Number(window.__WARFLEX_SELECTED_WAVE || state.selectedWave || 1);
+
+  Object.assign(state, {
+    active: true,
+    over: false,
+    yaw: 0,
+    pitch: 0,
+    verticalVelocity: 0,
+    onGround: true,
+    health: CONFIG.maxHealth,
+    ammo: CONFIG.magSize,
+    reserve: CONFIG.reserveAmmo,
+    kills: 0,
+    score: 0,
+    wave: selected > 0 ? selected : 1,
+    spawnLeft: 0,
+    nextWaveTimer: 0,
+    fireTimer: 0,
+    reloadTimer: 0,
+    damageCooldown: 0,
+    hurtFlash: 0,
+    walkTime: 0,
+    weaponKick: 0,
+    muzzleFlash: 0,
+    shake: 0,
+    selectedWave: selected,
+    slideTimer: 0,
+    slideCooldown: 0,
+    slideQueued: false,
+    slideDirection: new THREE.Vector3(),
+    combo: 0,
+    comboTimer: 0,
+  });
+
+  player.position.set(0, 1.65, 18);
+  camera.position.set(0, 0, 0);
+  camera.rotation.set(0, 0, 0);
+  camera.fov = CONFIG.defaultFov;
+  camera.updateProjectionMatrix();
+
+  weapon.position.set(.43, -.48, -1.03);
+  weapon.rotation.set(-.03, -.04, -.015);
+
+  updateHud();
+
+  if (waveDirector) {
+    waveDirector.wave = state.wave;
+    waveDirector.stop();
+  }
+
+  if (spawnImmediately && waveDirector) {
+    waveDirector.start();
+  }
+}
+
 function getSpawnPoint(index) {
   // Put the first wave in a clear forward arc so enemies are immediately
   // visible after spawning instead of appearing mostly behind the player.
