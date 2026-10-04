@@ -54,6 +54,11 @@ const WEAPON_DEFS = [
     spread: .24,
     recoil: .020,
     kick: 1.15,
+    recoilPattern: [
+      [1.00, 0.00], [1.06, 0.18], [1.12, -0.12], [1.18, 0.24],
+      [1.24, -0.20], [1.30, 0.30], [1.36, -0.28], [1.42, 0.20],
+      [1.48, -0.34], [1.54, 0.34], [1.60, -0.18], [1.66, 0.26],
+    ],
   },
   {
     id: 'shotgun',
@@ -68,6 +73,7 @@ const WEAPON_DEFS = [
     spread: 3.2,
     recoil: .055,
     kick: 1.8,
+    recoilPattern: [[1.00, 0.00]],
   },
   {
     id: 'sniper',
@@ -82,6 +88,7 @@ const WEAPON_DEFS = [
     spread: .08,
     recoil: .07,
     kick: 2.2,
+    recoilPattern: [[1.00, 0.00]],
   },
   {
     id: 'pistol',
@@ -96,6 +103,7 @@ const WEAPON_DEFS = [
     spread: .38,
     recoil: .014,
     kick: .7,
+    recoilPattern: [[1.00, 0.00]],
   },
   {
     id: 'smg',
@@ -110,6 +118,12 @@ const WEAPON_DEFS = [
     spread: .62,
     recoil: .012,
     kick: .82,
+    recoilPattern: [
+      [0.82, 0.00], [0.90, -0.26], [0.98, 0.34], [1.06, -0.38],
+      [1.14, 0.42], [1.22, -0.48], [1.30, 0.52], [1.38, -0.56],
+      [1.46, 0.60], [1.54, -0.50], [1.62, 0.42], [1.70, -0.34],
+      [1.78, 0.28], [1.86, -0.20], [1.94, 0.16], [2.02, -0.10],
+    ],
   },
 ];
 
@@ -453,6 +467,8 @@ const state = {
   weaponKick: 0,
   weaponRecoilPitch: 0,
   weaponRecoilYaw: 0,
+  recoilShotIndex: 0,
+  recoilBurstTimer: 0,
   weaponSwayX: 0,
   weaponSwayY: 0,
   sprintBlend: 0,
@@ -7177,6 +7193,8 @@ function resetGame(spawnImmediately = true) {
     weaponKick: 0,
     weaponRecoilPitch: 0,
     weaponRecoilYaw: 0,
+    recoilShotIndex: 0,
+    recoilBurstTimer: 0,
     weaponSwayX: 0,
     weaponSwayY: 0,
     sprintBlend: 0,
@@ -8099,6 +8117,56 @@ function movePlayer(dt) {
   camera.updateProjectionMatrix();
 }
 
+function getRecoilPatternStep(weaponDef) {
+  const pattern = weaponDef.recoilPattern?.length
+    ? weaponDef.recoilPattern
+    : [[1, 0]];
+
+  if (state.recoilBurstTimer <= 0) {
+    state.recoilShotIndex = 0;
+  }
+
+  const index = Math.min(
+    state.recoilShotIndex,
+    pattern.length - 1,
+  );
+
+  const [vertical, horizontal] = pattern[index];
+  return {
+    vertical,
+    horizontal,
+  };
+}
+
+function applyShotPatternToDirection(direction, weaponDef) {
+  const step = getRecoilPatternStep(weaponDef);
+
+  const right = new THREE.Vector3()
+    .crossVectors(
+      direction,
+      new THREE.Vector3(0, 1, 0),
+    );
+
+  if (right.lengthSq() < .00001) right.set(1, 0, 0);
+  right.normalize();
+
+  const up = new THREE.Vector3()
+    .crossVectors(right, direction)
+    .normalize();
+
+  const verticalKick =
+    THREE.MathUtils.degToRad(step.vertical * weaponDef.recoil * 0.42);
+  const horizontalKick =
+    THREE.MathUtils.degToRad(step.horizontal * weaponDef.recoil * 0.30);
+
+  direction
+    .addScaledVector(up, -verticalKick)
+    .addScaledVector(right, horizontalKick)
+    .normalize();
+
+  return step;
+}
+
 function getShotDirection() {
   const base =
     new THREE.Vector3(0, 0, -1)
@@ -8262,10 +8330,17 @@ function shoot() {
   state.fireTimer =
     weaponDef.fireInterval;
 
+  const recoilStep = getRecoilPatternStep(weaponDef);
+  state.recoilBurstTimer = 0.34;
+  state.recoilShotIndex += 1;
+
   state.weaponKick = weaponDef.kick;
   state.weaponRecoilPitch +=
-    weaponDef.recoil + Math.random() * weaponDef.recoil * .3;
-  state.weaponRecoilYaw += (Math.random() - .5) * .010;
+    weaponDef.recoil * recoilStep.vertical +
+    Math.random() * weaponDef.recoil * .10;
+  state.weaponRecoilYaw +=
+    recoilStep.horizontal * weaponDef.recoil * .18 +
+    (Math.random() - .5) * weaponDef.recoil * .035;
   state.muzzleFlash = .105;
   state.shake =
     Math.max(
@@ -8280,6 +8355,8 @@ function shoot() {
 
   const direction =
     getShotDirection();
+
+  applyShotPatternToDirection(direction, weaponDef);
 
   raycaster.set(
     origin,
@@ -9761,6 +9838,11 @@ function updateWeapon(dt) {
     state.active && !state.over ? 1 : 0,
     10,
     dt,
+  );
+
+  state.recoilBurstTimer = Math.max(
+    0,
+    state.recoilBurstTimer - dt,
   );
 
   state.weaponKick = THREE.MathUtils.damp(
