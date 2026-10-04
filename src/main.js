@@ -1627,7 +1627,7 @@ function addArena() {
     };
 
     const dirtMat = mat(0x5c4935, .98, .01);
-    const stoneMat = mat(0x56615d, .92, .04);
+    const stoneMat = texturedMat(0x56615d, 'rock', .92, .04, [2.2, 2.2], .055);
     const steelMat = mat(0x4a575d, .58, .70);
     const steelDarkMat = mat(0x20282c, .72, .72);
     const rubberMat = mat(0x0d1214, .97, .01);
@@ -1663,47 +1663,192 @@ function addArena() {
       addPatch(patch[0], patch[1], patch[2], patch[3], dirtMat, patch[4]);
     }
 
-    // Real rock silhouettes break the terrain at long distance.
-    const rockGeometry = new THREE.DodecahedronGeometry(.72, 1);
+    // High-density rock system: overwhelmingly small field stones and pebbles,
+    // with only a few large hero rocks. This keeps the battlefield grounded
+    // without turning the whole map into giant boulders.
+    stoneMat.vertexColors = true;
+
+    const rockGeometry = new THREE.IcosahedronGeometry(.24, 2);
     const rocks = new THREE.InstancedMesh(
       rockGeometry,
       stoneMat,
-      150,
+      620,
     );
-    rocks.name = 'WARFLEX_RockScatter';
+    rocks.name = 'WARFLEX_RockScatter_Small';
     rocks.castShadow = true;
     rocks.receiveShadow = true;
+
+    const pebbleGeometry = new THREE.IcosahedronGeometry(.10, 1);
+    const pebbles = new THREE.InstancedMesh(
+      pebbleGeometry,
+      stoneMat,
+      900,
+    );
+    pebbles.name = 'WARFLEX_RockScatter_Pebbles';
+    pebbles.castShadow = true;
+    pebbles.receiveShadow = true;
+
     const rockDummy = new THREE.Object3D();
+    const rockColor = new THREE.Color();
+
+    const rockClusterCenters = [
+      [-105, 50], [-82, 58], [-55, 52], [-24, 58], [18, 55],
+      [52, 58], [88, 54], [112, 44], [-112, 18], [-103, -10],
+      [-90, -38], [-56, -55], [-15, -62], [22, -58], [58, -61],
+      [92, -50], [111, -24], [116, 8], [-116, -44], [-116, 40],
+    ];
 
     for (let i = 0; i < rocks.count; i += 1) {
       const seed = i + 1601.1;
-      const x =
-        (seeded(seed) * 2 - 1) *
-        (HALF_W - 8);
-      const z =
-        (seeded(seed + 5.2) * 2 - 1) *
-        (HALF_D - 8);
+      const center = rockClusterCenters[i % rockClusterCenters.length];
+      const spread = 4.5 + seeded(seed + 1.8) * 12.5;
+      const angle = seeded(seed + 2.4) * Math.PI * 2;
+      const x = THREE.MathUtils.clamp(
+        center[0] + Math.cos(angle) * spread,
+        -HALF_W + 4,
+        HALF_W - 4,
+      );
+      const z = THREE.MathUtils.clamp(
+        center[1] + Math.sin(angle) * spread,
+        -HALF_D + 4,
+        HALF_D - 4,
+      );
       const y = getSimpleTerrainHeight(x, z);
-      const s = .32 + seeded(seed + 12.7) * 1.45;
+      const s = .10 + seeded(seed + 12.7) * .34;
 
-      rockDummy.position.set(x, y + s * .28, z);
+      rockDummy.position.set(x, y + s * .26, z);
       rockDummy.rotation.set(
-        seeded(seed + 18.2) * .45,
+        seeded(seed + 18.2) * .7,
         seeded(seed + 21.4) * Math.PI * 2,
-        seeded(seed + 24.7) * .35,
+        seeded(seed + 24.7) * .6,
       );
       rockDummy.scale.set(
-        s * 1.25,
-        s * (.55 + seeded(seed + 29.7) * .75),
-        s,
+        s * (0.82 + seeded(seed + 28.7) * .52),
+        s * (.52 + seeded(seed + 29.7) * .58),
+        s * (.78 + seeded(seed + 30.7) * .48),
       );
       rockDummy.updateMatrix();
       rocks.setMatrixAt(i, rockDummy.matrix);
+
+      rockColor.setHSL(
+        .16 + seeded(seed + 31.4) * .06,
+        .07 + seeded(seed + 32.4) * .10,
+        .25 + seeded(seed + 33.4) * .18,
+      );
+      rocks.setColorAt(i, rockColor);
+    }
+
+    for (let i = 0; i < pebbles.count; i += 1) {
+      const seed = i + 3401.4;
+      const center = rockClusterCenters[i % rockClusterCenters.length];
+      const spread = 6 + seeded(seed + 1.8) * 16;
+      const angle = seeded(seed + 2.4) * Math.PI * 2;
+      const x = THREE.MathUtils.clamp(
+        center[0] + Math.cos(angle) * spread,
+        -HALF_W + 3,
+        HALF_W - 3,
+      );
+      const z = THREE.MathUtils.clamp(
+        center[1] + Math.sin(angle) * spread,
+        -HALF_D + 3,
+        HALF_D - 3,
+      );
+      const y = getSimpleTerrainHeight(x, z);
+      const s = .035 + seeded(seed + 12.2) * .085;
+
+      rockDummy.position.set(x, y + s * .22, z);
+      rockDummy.rotation.set(
+        seeded(seed + 18.5) * 1.4,
+        seeded(seed + 21.5) * Math.PI * 2,
+        seeded(seed + 24.5) * 1.2,
+      );
+      rockDummy.scale.set(
+        s * (0.8 + seeded(seed + 28.5) * .7),
+        s * (.55 + seeded(seed + 29.5) * .65),
+        s * (0.8 + seeded(seed + 30.5) * .7),
+      );
+      rockDummy.updateMatrix();
+      pebbles.setMatrixAt(i, rockDummy.matrix);
+      rockColor.setHSL(.17, .08, .30 + seeded(seed + 33.5) * .14);
+      pebbles.setColorAt(i, rockColor);
     }
 
     rocks.instanceMatrix.needsUpdate = true;
+    pebbles.instanceMatrix.needsUpdate = true;
+    rocks.instanceColor.needsUpdate = true;
+    pebbles.instanceColor.needsUpdate = true;
     rocks.computeBoundingSphere();
+    pebbles.computeBoundingSphere();
     fallbackArenaRoot.add(rocks);
+    fallbackArenaRoot.add(pebbles);
+
+    const largeRockMat = texturedMat(0x4c5552, 'rock', .96, .02, [1.6, 1.6], .085);
+    largeRockMat.vertexColors = true;
+    const largeRockGeometry = new THREE.IcosahedronGeometry(1, 3);
+    const largeRocks = new THREE.InstancedMesh(
+      largeRockGeometry,
+      largeRockMat,
+      18,
+    );
+    largeRocks.name = 'WARFLEX_RockScatter_HeroBoulders';
+    largeRocks.castShadow = true;
+    largeRocks.receiveShadow = true;
+
+    for (let i = 0; i < largeRocks.count; i += 1) {
+      const seed = i + 7701.7;
+      const edgeX = seeded(seed) > .5
+        ? (HALF_W - 12)
+        : -(HALF_W - 12);
+      const x = THREE.MathUtils.clamp(
+        edgeX + (seeded(seed + 1.5) * 2 - 1) * 18,
+        -HALF_W + 6,
+        HALF_W - 6,
+      );
+      const z = (seeded(seed + 2.5) * 2 - 1) * (HALF_D - 9);
+      const y = getSimpleTerrainHeight(x, z);
+      const s = 1.15 + seeded(seed + 4.5) * 1.45;
+
+      rockDummy.position.set(x, y + s * .32, z);
+      rockDummy.rotation.set(
+        seeded(seed + 5.1) * .32,
+        seeded(seed + 6.1) * Math.PI * 2,
+        seeded(seed + 7.1) * .28,
+      );
+      rockDummy.scale.set(
+        s * (1.10 + seeded(seed + 8.1) * .60),
+        s * (.65 + seeded(seed + 9.1) * .48),
+        s * (.95 + seeded(seed + 10.1) * .50),
+      );
+      rockDummy.updateMatrix();
+      largeRocks.setMatrixAt(i, rockDummy.matrix);
+      rockColor.setHSL(
+        .16 + seeded(seed + 11.1) * .045,
+        .06 + seeded(seed + 12.1) * .06,
+        .24 + seeded(seed + 13.1) * .14,
+      );
+      largeRocks.setColorAt(i, rockColor);
+    }
+
+    largeRocks.instanceMatrix.needsUpdate = true;
+    largeRocks.instanceColor.needsUpdate = true;
+    largeRocks.computeBoundingSphere();
+    fallbackArenaRoot.add(largeRocks);
+
+    // A few hero boulders become physical cover; the pebbles and small rocks
+    // stay decorative so they never clutter movement.
+    for (let i = 0; i < 7; i += 1) {
+      const seed = i + 7701.7;
+      const edgeX = seeded(seed) > .5 ? (HALF_W - 12) : -(HALF_W - 12);
+      const x = THREE.MathUtils.clamp(edgeX + (seeded(seed + 1.5) * 2 - 1) * 18, -HALF_W + 6, HALF_W - 6);
+      const z = (seeded(seed + 2.5) * 2 - 1) * (HALF_D - 9);
+      const y = getSimpleTerrainHeight(x, z);
+      const s = 1.15 + seeded(seed + 4.5) * 1.45;
+      addCollision(
+        [s * 2.4, s * 1.4, s * 1.9],
+        [x, y + s * .45, z],
+        'RockCoverCollision',
+      );
+    }
 
     // Armored cover with layered skirts, bolts and hazard bands.
     const addFortifiedCover = (x, z, w, d, h, rotation = 0) => {
