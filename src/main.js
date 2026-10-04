@@ -855,6 +855,25 @@ function addArena() {
     material = concrete,
     rotation = 0,
   ) => {
+    const isMaterial =
+      material?.isMaterial === true ||
+      material?.color?.isColor === true;
+
+    const sourceColor =
+      isMaterial
+        ? material.color.getHex()
+        : material;
+
+    const roughness =
+      isMaterial
+        ? material.roughness
+        : .82;
+
+    const metalness =
+      isMaterial
+        ? material.metalness
+        : .16;
+
     const mesh =
       makeBox(
         new THREE.Vector3(
@@ -867,13 +886,16 @@ function addArena() {
           position[1],
           position[2],
         ),
-        material.color.getHex(),
+        sourceColor,
         true,
-        material.roughness,
-        material.metalness,
+        roughness,
+        metalness,
       );
 
-    mesh.material = material;
+    if (isMaterial) {
+      mesh.material = material;
+    }
+
     mesh.rotation.y = rotation;
     obstacles.push(mesh);
     return mesh;
