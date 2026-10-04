@@ -576,202 +576,507 @@ function createWeapon() {
   const weapon = new THREE.Group();
   weapon.name = 'MK-01_3D_RIFLE';
 
-  const dark = createMaterial(0x11151a, .82, .28);
-  const bodyMat = createMaterial(0x293139, .82, .25);
-  const bodyDark = createMaterial(0x171d23, .84, .24);
-  const metal = createMaterial(0x9da8b2, .72, .25);
-  const accent = createMaterial(0xd6dde4, .52, .24);
-  const rubber = createMaterial(0x0c1014, .05, .88);
-  const polymer = createMaterial(0x1d252c, .22, .48);
+  // True custom hard-surface mesh helpers. These are actual polygonal weapon
+  // parts rather than stretched boxes, giving the rifle a real side silhouette.
+  const dark = createMaterial(0x0a0d10, .90, .20);
+  const receiverMat = createMaterial(0x252d35, .82, .24);
+  const upperMat = createMaterial(0x313a43, .78, .25);
+  const polymer = createMaterial(0x161c21, .18, .46);
+  const polymerSoft = createMaterial(0x10151a, .08, .66);
+  const metal = createMaterial(0x68747f, .88, .18);
+  const metalDark = createMaterial(0x343d46, .84, .21);
+  const accent = createMaterial(0xb8c0c8, .62, .18);
+  const rubber = createMaterial(0x05070a, .02, .94);
+
   const glass = new THREE.MeshStandardMaterial({
-    color: 0x071116,
-    emissive: 0x2f9abf,
+    color: 0x061015,
+    emissive: 0x1b7693,
     emissiveIntensity: 2.2,
-    metalness: .85,
-    roughness: .1,
+    metalness: .88,
+    roughness: .07,
   });
 
-  const addBox = (
+  const addMesh = (
+    geometry,
+    position = [0, 0, 0],
+    rotation = [0, 0, 0],
+    material = receiverMat,
+    name = '',
+  ) => {
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    if (name) mesh.name = name;
+    weapon.add(mesh);
+    return mesh;
+  };
+
+  // Extruded 2D side-profile -> true custom polygon mesh.
+  // points are [z, y] in rifle side view; width is the physical x thickness.
+  const makeProfile = (
+    points,
+    width,
+    material,
+    name,
+    bevelOffset = 0,
+  ) => {
+    const n = points.length;
+    const vertices = [];
+    const half = width * .5;
+
+    for (let i = 0; i < n; i += 1) {
+      vertices.push(-half, points[i][1], points[i][0]);
+    }
+
+    for (let i = 0; i < n; i += 1) {
+      vertices.push(half, points[i][1], points[i][0]);
+    }
+
+    const indices = [];
+
+    // Front/back caps. The profiles used here are convex or nearly convex;
+    // triangulating as fans keeps the geometry compact.
+    for (let i = 1; i < n - 1; i += 1) {
+      indices.push(0, i + 1, i);
+      indices.push(n, n + i, n + i + 1);
+    }
+
+    for (let i = 0; i < n; i += 1) {
+      const j = (i + 1) % n;
+      indices.push(
+        i,
+        j,
+        n + j,
+        i,
+        n + j,
+        n + i,
+      );
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(vertices, 3),
+    );
+    geometry.setIndex(indices);
+
+    return addMesh(
+      geometry,
+      [0, 0, 0],
+      [0, 0, 0],
+      material,
+      name,
+    );
+  };
+
+  const addCylinder = (
+    radius,
+    height,
+    position,
+    material,
+    rotation = [0, 0, 0],
+    segments = 24,
+    name = '',
+  ) => {
+    const geometry = new THREE.CylinderGeometry(
+      radius,
+      radius * .94,
+      height,
+      segments,
+      1,
+    );
+    return addMesh(
+      geometry,
+      position,
+      rotation,
+      material,
+      name,
+    );
+  };
+
+  const addBoxDetail = (
     size,
     position,
     material,
-    rotation = [0,0,0],
+    rotation = [0, 0, 0],
     name = '',
-    bevel = .035,
   ) => {
-    // Beveled edges turn the old blocky primitives into proper hard-surface
-    // weapon pieces with real specular edge highlights.
-    const minSize = Math.min(...size);
-    const radius = Math.min(
-      bevel,
-      Math.max(.006, minSize * .22),
-    );
-
-    const geometry = new RoundedBoxGeometry(
-      size[0],
-      size[1],
-      size[2],
-      3,
-      radius,
-    );
-
-    const mesh = new THREE.Mesh(
+    const geometry = new THREE.BoxGeometry(...size);
+    return addMesh(
       geometry,
+      position,
+      rotation,
       material,
+      name,
     );
-
-    mesh.position.set(...position);
-    mesh.rotation.set(...rotation);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-
-    if (name) mesh.name = name;
-
-    weapon.add(mesh);
-    return mesh;
   };
 
-  const addCyl = (rt, rb, height, position, material, rotation = [0,0,0], radial = 12, name = '') => {
-    const mesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(
-        rt,
-        rb,
-        height,
-        Math.max(20, radial),
-        2,
-      ),
-      material,
+  // Narrow receiver profile — this is the main silhouette of the rifle.
+  makeProfile(
+    [
+      [-1.18, .16],
+      [-1.00, .22],
+      [-.68, .22],
+      [-.54, .16],
+      [-.08, .15],
+      [.10, .10],
+      [.18, -.08],
+      [.06, -.22],
+      [-.28, -.28],
+      [-.62, -.20],
+      [-.96, -.05],
+      [-1.18, .06],
+    ],
+    .34,
+    receiverMat,
+    'RifleReceiverMesh',
+  );
+
+  // Raised upper receiver and rear housing.
+  makeProfile(
+    [
+      [-.70, .24],
+      [-.44, .31],
+      [-.05, .27],
+      [.10, .18],
+      [.02, .10],
+      [-.48, .12],
+    ],
+    .30,
+    upperMat,
+    'UpperReceiverMesh',
+  );
+
+  // Tapered handguard — noticeably slimmer than the previous version.
+  makeProfile(
+    [
+      [-2.03, .16],
+      [-1.18, .17],
+      [-1.10, .10],
+      [-1.10, -.05],
+      [-2.02, -.02],
+      [-2.12, .05],
+    ],
+    .19,
+    polymer,
+    'HandguardMesh',
+  );
+
+  // Top rail follows the receiver instead of sitting on a giant rectangular
+  // block.
+  for (let i = 0; i < 9; i += 1) {
+    const z = -.92 - i * .125;
+    addBoxDetail(
+      [.20, .032, .065],
+      [0, .30 - Math.max(0, i - 4) * .006, z],
+      dark,
+      [0, 0, 0],
+      'RailTooth',
     );
-    mesh.position.set(...position);
-    mesh.rotation.set(...rotation);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    if (name) mesh.name = name;
-    weapon.add(mesh);
-    return mesh;
-  };
-
-  // Receiver / action.
-  addBox([.46, .28, 1.64], [0, 0, -.72], bodyMat, [0,0,0], 'RifleBody');
-  addBox([.52, .18, .58], [0, .14, -.02], dark);
-  addBox([.38, .11, .48], [0, .24, -.18], bodyDark);
-  addBox([.21, .08, .32], [.14, .13, -.12], metal, [0,0,0], 'EjectionPort');
-  addBox([.10, .045, .28], [.17, .22, -.12], dark);
-  addBox([.07, .035, .24], [-.17, .22, -.16], metal);
-  addBox([.055, .055, .22], [.20, -.01, -.16], metal, [0,0,0], 'ChargingHandle');
-
-  // Muzzle, gas system, and handguard.
-  addCyl(.056, .062, 1.46, [0, .035, -1.62], metal, [Math.PI/2,0,0], 14, 'Barrel');
-  addCyl(.11, .10, .17, [0, .035, -2.35], dark, [Math.PI/2,0,0], 14, 'MuzzleDevice');
-  addCyl(.087, .09, .26, [0, .035, -2.18], bodyDark, [Math.PI/2,0,0], 14);
-  addBox([.28, .25, .86], [0, .025, -1.05], polymer, [0,0,0], 'Handguard');
-
-  for (let i = -2; i <= 2; i += 1) {
-    const z = -1.03 + i * .15;
-    addBox([.34, .055, .06], [0, .17, z], dark);
-    addBox([.05, .12, .06], [.19, .02, z], dark);
-    addBox([.05, .12, .06], [-.19, .02, z], dark);
   }
 
-  // Rail / optic stack.
-  addBox([.22, .07, .92], [0, .20, -.42], dark, [0,0,0], 'TopRail');
-  addBox([.19, .11, .26], [0, .31, -.30], bodyDark, [0,0,0], 'OpticBase');
-  addBox([.14, .10, .20], [0, .40, -.28], glass, [0,0,0], 'OpticGlass');
-  addBox([.07, .13, .12], [0, .42, -.48], dark);
-  addBox([.06, .11, .10], [0, .42, -.08], dark);
-  addCyl(.018, .018, .15, [.12, .34, -.28], accent, [0,0,Math.PI/2], 8);
-  addCyl(.018, .018, .15, [-.12, .34, -.28], accent, [0,0,Math.PI/2], 8);
+  // Low optic with a genuine beveled-ish custom prism body.
+  makeProfile(
+    [
+      [-.67, .35],
+      [-.56, .42],
+      [-.28, .42],
+      [-.19, .36],
+      [-.22, .29],
+      [-.63, .29],
+    ],
+    .13,
+    polymerSoft,
+    'OpticBodyMesh',
+  );
 
-  // Front sight and side hardware.
-  addBox([.07, .13, .07], [0, .29, -1.30], dark);
-  addBox([.035, .10, .04], [0, .37, -1.30], accent);
-  addBox([.05, .08, .42], [.17, .07, -1.23], dark);
-  addBox([.05, .08, .42], [-.17, .07, -1.23], dark);
+  addMesh(
+    new THREE.OctahedronGeometry(.075, 1),
+    [0, .355, -.42],
+    [0, 0, 0],
+    glass,
+    'OpticLens',
+  );
 
-  // Magazine, release, trigger and guard.
-  const magazine = addBox([.19, .46, .31], [0, -.28, -.40], bodyDark, [-.18,0,0], 'Magazine');
-  addBox([.215, .05, .25], [0, -.52, -.40], rubber, [-.18,0,0]);
-  addBox([.07, .30, .05], [.11, -.35, -.40], metal, [-.18,0,0]);
-  addBox([.045, .08, .18], [.22, -.17, -.18], metal);
-  addCyl(.025, .025, .16, [0, -.16, .02], metal, [0,0,Math.PI/2], 10);
-  addBox([.17, .07, .23], [0, -.30, .16], dark, [-.18,0,0], 'TriggerGuard');
-  addBox([.10, .24, .16], [0, -.29, .20], rubber, [-.18,0,0], 'Grip');
+  // Barrel is thin and centered inside the handguard.
+  addCylinder(
+    .045,
+    1.48,
+    [0, .06, -2.35],
+    metal,
+    [Math.PI / 2, 0, 0],
+    24,
+    'Barrel',
+  );
 
-  // Stock with cheek rest, buttpad and sling points.
-  addBox([.36, .23, .64], [0, -.015, .50], rubber, [-.08,0,0], 'Stock');
-  addBox([.39, .12, .22], [0, .085, .56], bodyDark, [-.08,0,0]);
-  addBox([.40, .19, .08], [0, -.035, .83], dark, [-.08,0,0]);
-  addBox([.37, .17, .07], [0, -.13, .83], rubber, [-.08,0,0]);
-  addCyl(.028, .028, .11, [.21, .02, .56], metal, [0,Math.PI/2,0], 8);
-  addCyl(.028, .028, .11, [-.21, .02, .56], metal, [0,Math.PI/2,0], 8);
+  // Compact muzzle brake.
+  makeProfile(
+    [
+      [-2.97, .08],
+      [-2.92, .11],
+      [-2.66, .10],
+      [-2.60, .06],
+      [-2.62, -.06],
+      [-2.95, -.07],
+    ],
+    .12,
+    metalDark,
+    'MuzzleDeviceMesh',
+  );
 
-  // Angled foregrip / support.
-  addBox([.14, .31, .18], [0, -.19, -1.04], rubber, [-.18,0,0], 'Foregrip');
-  addBox([.18, .08, .18], [0, -.07, -1.05], dark);
+  addBoxDetail(
+    [.15, .045, .025],
+    [0, .12, -2.78],
+    accent,
+    [0, 0, 0],
+    'MuzzleTopCut',
+  );
 
-  // Detailed hands wrapped around the weapon.
-  const handMat = createMaterial(0x80634f, .03, .9);
-  const gloveMat = createMaterial(0x171c21, .04, .84);
-  const leftHand = new THREE.Mesh(new THREE.SphereGeometry(.125, 14, 10), gloveMat);
-  leftHand.scale.set(1.05, .72, 1.35);
-  leftHand.position.set(-.27, -.14, -.87);
+  // Magazine well and a visibly angled magazine.
+  makeProfile(
+    [
+      [-.55, -.12],
+      [-.25, -.10],
+      [-.12, -.22],
+      [-.18, -.35],
+      [-.52, -.31],
+      [-.61, -.20],
+    ],
+    .20,
+    metalDark,
+    'MagazineWellMesh',
+  );
+
+  makeProfile(
+    [
+      [-.44, -.29],
+      [-.12, -.36],
+      [.02, -.80],
+      [-.22, -.86],
+      [-.50, -.70],
+    ],
+    .17,
+    polymer,
+    'MagazineMesh',
+  );
+
+  // Trigger guard and pistol grip have an actual sloped silhouette.
+  makeProfile(
+    [
+      [-.04, -.23],
+      [.28, -.25],
+      [.34, -.38],
+      [.25, -.48],
+      [.05, -.45],
+      [-.02, -.36],
+    ],
+    .18,
+    dark,
+    'TriggerGuardMesh',
+  );
+
+  makeProfile(
+    [
+      [.12, -.27],
+      [.30, -.30],
+      [.42, -.68],
+      [.24, -.75],
+      [.03, -.60],
+    ],
+    .16,
+    rubber,
+    'PistolGripMesh',
+  );
+
+  // Buttstock is no longer a block: tapered and kicked downward.
+  makeProfile(
+    [
+      [.08, .08],
+      [.44, .08],
+      [.98, -.05],
+      [1.10, -.18],
+      [.98, -.28],
+      [.54, -.21],
+      [.13, -.08],
+    ],
+    .22,
+    polymer,
+    'StockMesh',
+  );
+
+  makeProfile(
+    [
+      [.94, -.10],
+      [1.16, -.16],
+      [1.20, -.27],
+      [1.00, -.32],
+      [.90, -.25],
+    ],
+    .24,
+    rubber,
+    'ButtpadMesh',
+  );
+
+  // Cheek rest.
+  makeProfile(
+    [
+      [.38, .05],
+      [.76, .07],
+      [.84, -.02],
+      [.44, -.06],
+    ],
+    .20,
+    upperMat,
+    'CheekRestMesh',
+  );
+
+  // Angled front grip.
+  makeProfile(
+    [
+      [-1.24, -.06],
+      [-1.08, -.08],
+      [-1.02, -.44],
+      [-1.19, -.49],
+      [-1.34, -.15],
+    ],
+    .12,
+    rubber,
+    'ForegripMesh',
+  );
+
+  // Small controls make the mesh read as a functional firearm.
+  addBoxDetail(
+    [.035, .06, .16],
+    [.18, .08, -.40],
+    metal,
+    [0, 0, 0],
+    'ChargingHandle',
+  );
+
+  addBoxDetail(
+    [.05, .06, .13],
+    [.18, .02, -.10],
+    metalDark,
+    [0, 0, 0],
+    'BoltRelease',
+  );
+
+  addCylinder(
+    .018,
+    .12,
+    [0, -.17, .02],
+    accent,
+    [0, 0, Math.PI / 2],
+    16,
+    'TriggerPin',
+  );
+
+  // Hands and sleeves stay the same overall idea, but are kept close to the
+  // narrower weapon silhouette.
+  const handMat = createMaterial(0x795b49, .02, .88);
+  const gloveMat = createMaterial(0x10151a, .08, .80);
+
+  const leftHand = new THREE.Mesh(
+    new THREE.SphereGeometry(.115, 20, 14),
+    gloveMat,
+  );
+  leftHand.scale.set(1.0, .66, 1.30);
+  leftHand.position.set(-.16, -.18, -1.02);
   leftHand.castShadow = true;
   weapon.add(leftHand);
-  const rightHand = new THREE.Mesh(new THREE.SphereGeometry(.12, 14, 10), gloveMat);
-  rightHand.scale.set(1.0, .75, 1.3);
-  rightHand.position.set(.27, -.13, .17);
+
+  const rightHand = new THREE.Mesh(
+    new THREE.SphereGeometry(.11, 20, 14),
+    gloveMat,
+  );
+  rightHand.scale.set(.98, .68, 1.24);
+  rightHand.position.set(.16, -.16, .17);
   rightHand.castShadow = true;
   weapon.add(rightHand);
-  addCyl(.055, .055, .16, [-.27, -.15, -.78], handMat, [0,0,Math.PI/2], 10);
-  addCyl(.055, .055, .16, [.27, -.15, .10], handMat, [0,0,Math.PI/2], 10);
 
-  // Weapon support arms.
+  addCylinder(
+    .045,
+    .15,
+    [-.17, -.18, -.93],
+    handMat,
+    [0, 0, Math.PI / 2],
+    18,
+  );
+
+  addCylinder(
+    .045,
+    .15,
+    [.16, -.16, .09],
+    handMat,
+    [0, 0, Math.PI / 2],
+    18,
+  );
+
   const leftArm = new THREE.Group();
   const rightArm = new THREE.Group();
   leftArm.name = 'WeaponLeftArm';
   rightArm.name = 'WeaponRightArm';
 
-  const armMat = createMaterial(0xb6bec7, .18, .58);
-  const sleeveL = new THREE.Mesh(new THREE.CylinderGeometry(.115, .145, .72, 12), armMat);
+  const armMat = createMaterial(0xa5afb9, .18, .56);
+
+  const sleeveL = new THREE.Mesh(
+    new THREE.CapsuleGeometry(.10, .44, 6, 12),
+    armMat,
+  );
   sleeveL.rotation.z = -.35;
-  sleeveL.position.set(-.34, -.04, -.50);
+  sleeveL.position.set(-.25, -.03, -.56);
   sleeveL.castShadow = true;
   leftArm.add(sleeveL);
-  const sleeveR = new THREE.Mesh(new THREE.CylinderGeometry(.115, .145, .72, 12), armMat);
+
+  const sleeveR = new THREE.Mesh(
+    new THREE.CapsuleGeometry(.10, .44, 6, 12),
+    armMat,
+  );
   sleeveR.rotation.z = .35;
-  sleeveR.position.set(.34, -.04, -.50);
+  sleeveR.position.set(.25, -.03, -.56);
   sleeveR.castShadow = true;
   rightArm.add(sleeveR);
+
   weapon.add(leftArm, rightArm);
 
   // Muzzle flash.
-  const flash = new THREE.PointLight(0xffcf6a, 0, 7, 2);
-  flash.position.set(0, .04, -2.42);
+  const flash = new THREE.PointLight(
+    0xffcf6a,
+    0,
+    7,
+    2,
+  );
+  flash.position.set(0, .04, -2.96);
   weapon.add(flash);
+
   const flashMesh = new THREE.Mesh(
-    new THREE.ConeGeometry(.12, .44, 10),
+    new THREE.ConeGeometry(.11, .40, 12),
     new THREE.MeshBasicMaterial({
       color: 0xffdc85,
       transparent: true,
       opacity: 0,
-      blending: THREE.AdditiveBlending
-    })
+      blending: THREE.AdditiveBlending,
+    }),
   );
   flashMesh.rotation.x = -Math.PI / 2;
-  flashMesh.position.set(0, .04, -2.52);
+  flashMesh.position.set(0, .04, -3.06);
   weapon.add(flashMesh);
 
   weapon.userData.flash = flash;
   weapon.userData.flashMesh = flashMesh;
-  weapon.userData.muzzle = weapon.getObjectByName('MuzzleDevice');
-  weapon.position.set(.43, -.48, -1.03);
-  weapon.rotation.set(-.03, -.04, -.015);
+  weapon.userData.muzzle = weapon.getObjectByName('MuzzleDeviceMesh');
+
+  weapon.position.set(.39, -.48, -1.01);
+  weapon.rotation.set(-.025, -.045, -.012);
+
   gunViewportScene.add(weapon);
   scene.add(camera);
 
   return weapon;
 }
-
 const weapon = createWeapon();
 weapon.visible = false;
 
