@@ -3484,7 +3484,7 @@ function createWeapon() {
       size[0],
       size[1],
       size[2],
-      2,
+      4,
       Math.min(
         bevel,
         Math.min(...size) * .18,
@@ -3830,77 +3830,9 @@ function createWeapon() {
     'TriggerPin',
   );
 
-  // Hands and sleeves stay the same overall idea, but are kept close to the
-  // narrower weapon silhouette.
-  const handMat = createMaterial(0x795b49, .02, .88);
-  const gloveMat = createMaterial(0x10151a, .08, .80);
-
-  const leftHand = new THREE.Mesh(
-    new THREE.SphereGeometry(.115, 20, 14),
-    gloveMat,
-  );
-  leftHand.name = 'WeaponLeftHand';
-  leftHand.scale.set(1.0, .66, 1.30);
-  leftHand.position.set(-.16, -.18, -1.02);
-  leftHand.castShadow = true;
-  weapon.add(leftHand);
-
-  const rightHand = new THREE.Mesh(
-    new THREE.SphereGeometry(.11, 20, 14),
-    gloveMat,
-  );
-  rightHand.name = 'WeaponRightHand';
-  rightHand.scale.set(.98, .68, 1.24);
-  rightHand.position.set(.16, -.16, .17);
-  rightHand.castShadow = true;
-  weapon.add(rightHand);
-
-  addCylinder(
-    .045,
-    .15,
-    [-.17, -.18, -.93],
-    handMat,
-    [0, 0, Math.PI / 2],
-    18,
-    'WeaponLeftHandGrip',
-  );
-
-  addCylinder(
-    .045,
-    .15,
-    [.16, -.16, .09],
-    handMat,
-    [0, 0, Math.PI / 2],
-    18,
-    'WeaponRightHandGrip',
-  );
-
-  const leftArm = new THREE.Group();
-  const rightArm = new THREE.Group();
-  leftArm.name = 'WeaponLeftArm';
-  rightArm.name = 'WeaponRightArm';
-
-  const armMat = createMaterial(0xa5afb9, .18, .56);
-
-  const sleeveL = new THREE.Mesh(
-    new THREE.CapsuleGeometry(.10, .44, 6, 12),
-    armMat,
-  );
-  sleeveL.rotation.z = -.35;
-  sleeveL.position.set(-.25, -.03, -.56);
-  sleeveL.castShadow = true;
-  leftArm.add(sleeveL);
-
-  const sleeveR = new THREE.Mesh(
-    new THREE.CapsuleGeometry(.10, .44, 6, 12),
-    armMat,
-  );
-  sleeveR.rotation.z = .35;
-  sleeveR.position.set(.25, -.03, -.56);
-  sleeveR.castShadow = true;
-  rightArm.add(sleeveR);
-
-  weapon.add(leftArm, rightArm);
+  // Use the same high-density procedural arms/hands as the other
+  // weapons so the rifle does not fall back to the old low-poly spheres.
+  addStandaloneHands(weapon, 'standard');
 
   // Muzzle flash.
   const flash = new THREE.PointLight(
