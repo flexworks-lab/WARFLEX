@@ -51,7 +51,8 @@ canvas { display: block; }
   inset: 0;
   display: grid;
   place-items: center;
-  z-index: 50;
+  z-index: 1000;
+  pointer-events: auto;
   background: radial-gradient(circle at center, rgba(20,25,32,.45), rgba(4,6,8,.95));
 }
 .panel {
@@ -437,6 +438,9 @@ body {
 }
 
 .gothic-panel {
+  position: relative;
+  z-index: 1001;
+  pointer-events: auto;
   width: 100%;
   max-width: none;
   min-height: calc(100dvh - 48px);
