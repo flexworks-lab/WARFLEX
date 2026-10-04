@@ -3594,6 +3594,8 @@ const menuStaticOverlay =
 menuStaticOverlay.className = 'menu-static-overlay';
 document.body.appendChild(menuStaticOverlay);
 
+void loadImportedAK4Weapon();
+
 const menuGunLights = {
   key: null,
   fill: null,
