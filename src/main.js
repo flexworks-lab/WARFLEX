@@ -241,7 +241,7 @@ gunViewportRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 gunViewportRenderer.setSize(innerWidth, innerHeight);
 gunViewportRenderer.outputColorSpace = THREE.SRGBColorSpace;
 gunViewportRenderer.toneMapping = THREE.AgXToneMapping;
-gunViewportRenderer.toneMappingExposure = 1.1;
+gunViewportRenderer.toneMappingExposure = 1.35;
 gunViewportRenderer.setClearColor(0x000000, 0);
 gunViewportRenderer.domElement.className = 'gun-viewport-canvas';
 Object.assign(gunViewportRenderer.domElement.style, {
@@ -256,9 +256,9 @@ Object.assign(gunViewportRenderer.domElement.style, {
 document.body.appendChild(gunViewportRenderer.domElement);
 
 gunViewportScene.add(
-  new THREE.HemisphereLight(0xdbe9ff, 0x11151a, 1.8),
+  new THREE.HemisphereLight(0xeaf4ff, 0x202832, 2.35),
 );
-const gunKeyLight = new THREE.DirectionalLight(0xffffff, 2.4);
+const gunKeyLight = new THREE.DirectionalLight(0xffffff, 3.5);
 gunKeyLight.position.set(2.8, 4.8, 2.2);
 gunViewportScene.add(gunKeyLight);
 
@@ -3526,25 +3526,25 @@ const menuGunLights = {
 const menuGunPalettes = [
   {
     name: 'RIFLE',
-    dark: 0x0b1115,
-    metal: 0x4e5c66,
-    polymer: 0x1c242a,
+    dark: 0x182127,
+    metal: 0x667983,
+    polymer: 0x303b43,
     accent: 0x657e8b,
     light: 0x9fc9db,
   },
   {
     name: 'FIELD',
-    dark: 0x11150f,
-    metal: 0x4f5a4c,
-    polymer: 0x2d3828,
+    dark: 0x20291d,
+    metal: 0x65735f,
+    polymer: 0x414f39,
     accent: 0x788e57,
     light: 0xa9c176,
   },
   {
     name: 'DESERT',
-    dark: 0x17130f,
-    metal: 0x6e6255,
-    polymer: 0x3f3427,
+    dark: 0x282019,
+    metal: 0x88786a,
+    polymer: 0x55483a,
     accent: 0xb08b5d,
     light: 0xd4aa70,
   },
