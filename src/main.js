@@ -8,7 +8,7 @@ import { AssetManager } from './assets/AssetManager.js?v=modulefix-20261004';
 import { MapLoader } from './world/MapLoader.js?v=modulefix-20261004';
 import { PropInstancer } from './world/PropInstancer.js?v=modulefix-20261004';
 import { applyBakedLightmap } from './world/BakedLighting.js?v=modulefix-20261004';
-import { configureAtmosphere } from './world/Atmosphere.js?v=mapvisuals-20261003';
+import { configureAtmosphere } from './world/Atmosphere.js?v=lighting-20261003';
 import { NavMeshService } from './ai/NavMeshService.js?v=modulefix-20261004';
 import { NavMeshAgent } from './ai/NavMeshAgent.js?v=modulefix-20261004';
 
