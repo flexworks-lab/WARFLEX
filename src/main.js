@@ -3,14 +3,14 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { PhysicsWorld } from './physics/PhysicsWorld.js?v=modulefix-20261004';
 import { RagdollController } from './physics/RagdollController.js?v=modulefix-20261004';
 import { WaveDirector } from './systems/WaveDirector.js?v=modulefix-20261004';
-import { SteeringAgent } from './systems/SteeringAgent.js?v=modulefix-20261004';
+import { SteeringAgent } from './systems/SteeringAgent.js?v=wallavoid-20261003';
 import { AssetManager } from './assets/AssetManager.js?v=modulefix-20261004';
 import { MapLoader } from './world/MapLoader.js?v=modulefix-20261004';
 import { PropInstancer } from './world/PropInstancer.js?v=modulefix-20261004';
 import { applyBakedLightmap } from './world/BakedLighting.js?v=modulefix-20261004';
-import { configureAtmosphere } from './world/Atmosphere.js?v=noshader-20261003';
-import { NavMeshService } from './ai/NavMeshService.js?v=modulefix-20261004';
-import { NavMeshAgent } from './ai/NavMeshAgent.js?v=modulefix-20261004';
+import { configureAtmosphere } from './world/Atmosphere.js?v=brightai-20261003';
+import { NavMeshService } from './ai/NavMeshService.js?v=astar-20261003';
+import { NavMeshAgent } from './ai/NavMeshAgent.js?v=astar-20261003';
 
 const CONFIG = {
   maxHealth: 100,
@@ -87,7 +87,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.AgXToneMapping;
-renderer.toneMappingExposure = 1.35;
+renderer.toneMappingExposure = 1.55;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
@@ -159,13 +159,13 @@ const assetManager = new AssetManager(renderer);
 const worldHemiLight = new THREE.HemisphereLight(
   0xe7f2ff,
   0x26313a,
-  2.15,
+  2.6,
 );
 scene.add(worldHemiLight);
 
 const sun = new THREE.DirectionalLight(
   0xfff7e8,
-  4.6,
+  5.8,
 );
 sun.position.set(-28, 48, 18);
 sun.castShadow = true;
@@ -182,14 +182,14 @@ scene.add(sun);
 
 const daylightFill = new THREE.DirectionalLight(
   0x9fc4ff,
-  0.95,
+  1.3,
 );
 daylightFill.position.set(34, 22, -30);
 scene.add(daylightFill);
 
 const ambientLight = new THREE.AmbientLight(
   0xc8d9e8,
-  0.28,
+  0.42,
 );
 scene.add(ambientLight);
 
@@ -1010,6 +1010,9 @@ const mapLoader = new MapLoader({
 const propInstancer = new PropInstancer(scene);
 const navMeshService = new NavMeshService({
   assetManager,
+  obstacles,
+  fallbackBounds: 54,
+  fallbackCellSize: 1.5,
 });
 
 let environmentTexture = null;
@@ -1105,8 +1108,10 @@ async function loadNavMeshAsset() {
     );
     return true;
   } catch (error) {
+    navMeshService.buildFallbackGrid();
+
     console.info(
-      '[WARFLEX] NavMesh not present yet; using steering fallback.',
+      '[WARFLEX] NavMesh GLB not present; using built-in A* obstacle grid.',
       error,
     );
     return false;
@@ -2792,7 +2797,7 @@ function spawnEnemy(index = 0, spawnPosition = null) {
   group.userData.usedFallback = usedFallback;
   scene.add(group);
 
-  const navAgent = navMeshService.ready
+  const navAgent = navMeshService.canPathfind
     ? new NavMeshAgent({
         object: group,
         navMesh: navMeshService,
@@ -2802,6 +2807,8 @@ function spawnEnemy(index = 0, spawnPosition = null) {
             Math.min(state.wave * .08, 1.2)) *
           roleStats.speed,
         repathInterval: .35,
+        obstacles,
+        radius,
         desiredDistance:
           role === 'rusher'
             ? 2.25
@@ -3785,13 +3792,18 @@ function updateEnemies(dt) {
           ? 24
           : 26;
 
-    if (!enemy.navAgent && navMeshService.ready) {
+    if (!enemy.navAgent && navMeshService.canPathfind) {
       enemy.navAgent = new NavMeshAgent({
         object: enemy.group,
         navMesh: navMeshService,
         getTarget: () => player.position,
         speed: enemy.speed,
         repathInterval: .35,
+        obstacles,
+        radius:
+          enemy.role === 'heavy'
+            ? .68
+            : .58,
         desiredDistance:
           enemy.role === 'rusher'
             ? 2.25
@@ -3850,6 +3862,13 @@ function updateEnemies(dt) {
       }
     }
 
+    // Keep local combat strafing and bullet knockback outside world cover.
+    if (enemy.navAgent) {
+      enemy.navAgent.resolveCurrentPosition();
+    } else {
+      enemy.steering?.resolveCurrentPosition();
+    }
+
     // Apply bullet knockback after AI steering/strafe so the hit
     // visibly moves the enemy instead of being overwritten by the pathing
     // controller on the same frame.
@@ -3858,6 +3877,12 @@ function updateEnemies(dt) {
         enemy.shotVelocity,
         dt,
       );
+
+      if (enemy.navAgent) {
+        enemy.navAgent.resolveCurrentPosition();
+      } else {
+        enemy.steering?.resolveCurrentPosition();
+      }
 
       // Strong initial resistance gives each shot a clear shove without
       // leaving enemies sliding around forever.
@@ -3924,8 +3949,12 @@ function updateEnemies(dt) {
         enemy.shootRecoil - dt * 7,
       );
 
+    const movementVelocity =
+      enemy.navAgent?.velocity ||
+      enemy.steering?.velocity;
+
     const moving =
-      enemy.steering?.velocity.lengthSq() >
+      movementVelocity?.lengthSq() >
       .05;
 
     const moveAmount =
