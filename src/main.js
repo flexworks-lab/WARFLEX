@@ -3572,6 +3572,168 @@ weapon.visible = false;
 
 const menuGunPairs = [];
 
+function installImportedWeaponModel(target, sourceScene, {
+  keepHands = true,
+  scaleTarget = 3.05,
+} = {}) {
+  const keepNames = new Set([
+    'WeaponLeftHand',
+    'WeaponRightHand',
+    'WeaponLeftHandGrip',
+    'WeaponRightHandGrip',
+    'WeaponLeftArm',
+    'WeaponRightArm',
+    'WeaponMuzzleLight',
+    'WeaponMuzzleFlash',
+  ]);
+
+  for (const child of [...target.children]) {
+    if (keepNames.has(child.name)) {
+      if (!keepHands && child.name.startsWith('Weapon')) {
+        target.remove(child);
+      }
+      continue;
+    }
+    target.remove(child);
+  }
+
+  const model = sourceScene.clone(true);
+  model.name = 'ImportedAK4Model';
+
+  const bounds = new THREE.Box3().setFromObject(model);
+  const size = bounds.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z, .001);
+  model.scale.setScalar(scaleTarget / maxDim);
+
+  model.updateMatrixWorld(true);
+  const fittedBounds = new THREE.Box3().setFromObject(model);
+  const center = fittedBounds.getCenter(new THREE.Vector3());
+  model.position.sub(center);
+  model.position.y -= .06;
+  model.position.z -= .06;
+
+  let magazine = null;
+  let muzzle = null;
+
+  model.traverse((child) => {
+    const n = String(child.name || '').toLowerCase();
+
+    if (
+      n.includes('hand') ||
+      n.includes('forearm') ||
+      n.endsWith('arm')
+    ) {
+      child.visible = false;
+    }
+
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+      child.frustumCulled = false;
+
+      const materials = Array.isArray(child.material)
+        ? child.material
+        : [child.material];
+
+      const cloned = materials.map((material) => {
+        if (!material) return material;
+        const clone = material.clone();
+        clone.envMapIntensity =
+          Math.max(clone.envMapIntensity ?? 1, 1.15);
+        return clone;
+      });
+
+      child.material = Array.isArray(child.material)
+        ? cloned
+        : cloned[0];
+    }
+
+    if (!magazine && (
+      n.includes('magazine') ||
+      n.includes('mag') ||
+      n.includes('clip')
+    )) {
+      magazine = child;
+    }
+
+    if (!muzzle && (
+      n.includes('muzzle') ||
+      n.includes('flashhider') ||
+      n.includes('flash_hider') ||
+      n.includes('muzzlebrake') ||
+      n.includes('muzzle_brake')
+    )) {
+      muzzle = child;
+    }
+  });
+
+  if (magazine) magazine.name = 'MagazineMesh';
+
+  const muzzleAnchor = new THREE.Object3D();
+  muzzleAnchor.name = 'ImportedMuzzleAnchor';
+
+  if (muzzle) {
+    muzzle.updateWorldMatrix(true, false);
+    const world = new THREE.Vector3();
+    muzzle.getWorldPosition(world);
+    model.worldToLocal(world);
+    muzzleAnchor.position.copy(world);
+  } else {
+    const localBounds =
+      new THREE.Box3().setFromObject(model);
+    muzzleAnchor.position.set(
+      (localBounds.min.x + localBounds.max.x) * .5,
+      (localBounds.min.y + localBounds.max.y) * .5,
+      localBounds.min.z - .055,
+    );
+  }
+
+  model.add(muzzleAnchor);
+  target.add(model);
+  target.userData.importedWeaponModel = model;
+  target.userData.muzzle = muzzleAnchor;
+
+  return model;
+}
+
+async function loadImportedAK4Weapon() {
+  try {
+    const url = new URL(
+      './assets/guns/ak4/source/AK4.glb',
+      import.meta.url,
+    ).href;
+
+    const asset = await assetManager.loadGLTF(url);
+
+    installImportedWeaponModel(
+      weapon,
+      asset.scene,
+      { keepHands: true, scaleTarget: 3.05 },
+    );
+
+    for (const pair of menuGunPairs) {
+      installImportedWeaponModel(
+        pair.hero,
+        asset.scene,
+        { keepHands: false, scaleTarget: 3.05 },
+      );
+      installImportedWeaponModel(
+        pair.secondary,
+        asset.scene,
+        { keepHands: false, scaleTarget: 3.05 },
+      );
+    }
+
+    syncWorldWeaponAnchor();
+    weapon.visible = state.active && !state.over;
+  } catch (error) {
+    console.error(
+      '[WARFLEX] Failed to load AK4.glb; using fallback weapon.',
+      error,
+    );
+  }
+}
+
 const menuToonGradient =
   new THREE.DataTexture(
     new Uint8Array([
@@ -3593,8 +3755,6 @@ const menuStaticOverlay =
   document.createElement('div');
 menuStaticOverlay.className = 'menu-static-overlay';
 document.body.appendChild(menuStaticOverlay);
-
-void loadImportedAK4Weapon();
 
 const menuGunLights = {
   key: null,
@@ -4105,6 +4265,8 @@ const syncWorldWeaponAnchor = () => {
 };
 
 syncWorldWeaponAnchor();
+
+void loadImportedAK4Weapon();
 
 function createDroppedWeaponMesh() {
   const mesh = weapon.clone(true);
