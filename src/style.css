@@ -1171,3 +1171,139 @@ body {
   .touch-actions button{min-height:48px}
   .touch-actions .touch-fire{width:76px;height:76px}
 }
+
+
+/* Adaptive in-world contrast: white UI uses difference blending so it
+   automatically inverts against the color underneath it. */
+.hud .crosshair,
+.hud .hitmarker,
+.hud .top-left,
+.hud .bottom-left,
+.hud .bottom-right,
+.hud .scoreboard,
+.hud .combat-callout,
+.hud .weapon-pickup-prompt,
+.hud .weapon-selector {
+  mix-blend-mode: difference;
+}
+
+#crosshair i,
+#crosshair b {
+  background: #fff;
+}
+#hitmarker { color: #fff; }
+#health-fill {
+  background: #fff;
+  mix-blend-mode: difference;
+}
+
+.weapon-selector {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  pointer-events: auto;
+}
+.weapon-selector button {
+  min-width: 72px;
+  padding: 7px 8px 6px;
+  border: 1px solid rgba(255,255,255,.32);
+  background: rgba(0,0,0,.12);
+  color: #fff;
+  box-shadow: none;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  font-size: 8px;
+  letter-spacing: .14em;
+  mix-blend-mode: normal;
+}
+.weapon-selector button b {
+  font-size: 10px;
+}
+.weapon-selector button span {
+  font-size: 7px;
+  font-weight: 900;
+}
+.weapon-selector button.active {
+  border-color: #fff;
+  background: rgba(255,255,255,.16);
+}
+
+#wave-menu .wave-list {
+  max-height: 42vh;
+  overflow-y: auto;
+  padding-right: 8px;
+  scrollbar-width: thin;
+}
+#wave-menu .wave-list::-webkit-scrollbar,
+#wave-menu .menu-view::-webkit-scrollbar {
+  width: 7px;
+}
+#wave-menu .wave-list::-webkit-scrollbar-thumb,
+#wave-menu .menu-view::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.22);
+}
+#wave-menu .map-list {
+  max-height: 32vh;
+}
+
+.player-name-gate {
+  z-index: 5000;
+}
+.player-name-panel {
+  width: min(520px, calc(100vw - 32px));
+}
+.player-name-panel h2 {
+  margin-bottom: 16px;
+}
+.player-name-copy {
+  margin: 0 0 22px;
+  max-width: 470px;
+  line-height: 1.55;
+  font-size: 14px;
+}
+.player-name-panel label {
+  display: block;
+  margin-bottom: 7px;
+  color: #7f8992;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+#player-name-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.055);
+  color: #fff;
+  padding: 13px 14px;
+  outline: none;
+  font: 700 18px/1.1 Inter, ui-sans-serif, system-ui, sans-serif;
+}
+#player-name-input:focus {
+  border-color: rgba(255,255,255,.45);
+}
+.player-name-error {
+  min-height: 18px;
+  margin: 8px 0 14px;
+  color: #ff8c98;
+  font-size: 11px;
+}
+#player-name-confirm {
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .weapon-selector {
+    bottom: 84px;
+    max-width: calc(100vw - 20px);
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+  .weapon-selector button {
+    min-width: 63px;
+  }
+}
