@@ -3597,7 +3597,9 @@ function createWeapon() {
   weapon.position.set(.39, -.48, -1.01);
   weapon.rotation.set(-.025, -.045, -.012);
 
-  gunViewportScene.add(weapon);
+  // Render the live first-person weapon through the main world camera so it
+  // is guaranteed to appear in gameplay with the same camera transform.
+  camera.add(weapon);
   scene.add(camera);
 
   return weapon;
@@ -6903,7 +6905,7 @@ function updateWeapon(dt) {
     return;
   }
 
-  weapon.visible = true;
+  weapon.visible = state.active && !state.over;
 
   updateAK47Animation(dt);
 
@@ -7459,18 +7461,14 @@ function frame() {
 
   updateMenuGuns(dt);
 
-  const showGameplayWeapon =
-    state.active &&
-    !state.over;
-
   const showMenuWeapon =
     !state.active &&
     !state.over;
 
+  // The gameplay rifle is now a child of the main camera. The overlay canvas
+  // is reserved for the cinematic main-menu weapon presentation.
   gunViewportRenderer.domElement.style.display =
-    mapEditor.enabled
-      ? 'none'
-      : (showGameplayWeapon || showMenuWeapon ? 'block' : 'none');
+    mapEditor.enabled || !showMenuWeapon ? 'none' : 'block';
 
   gunViewportRenderer.render(
     gunViewportScene,
