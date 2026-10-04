@@ -87,7 +87,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.AgXToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.35;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
@@ -154,12 +154,44 @@ const atmosphere = configureAtmosphere(
 
 const assetManager = new AssetManager(renderer);
 
-scene.add(new THREE.HemisphereLight(0xaec4d8, 0x11151c, 1.5));
-const sun = new THREE.DirectionalLight(0xffffff, 2.4);
-sun.position.set(24, 35, 10);
+// Bright outdoor daylight rig: a strong sun plus soft sky/ground fill
+// keeps the arena readable while preserving directional shadows.
+const worldHemiLight = new THREE.HemisphereLight(
+  0xe7f2ff,
+  0x26313a,
+  2.15,
+);
+scene.add(worldHemiLight);
+
+const sun = new THREE.DirectionalLight(
+  0xfff7e8,
+  4.6,
+);
+sun.position.set(-28, 48, 18);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.025;
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 180;
+sun.shadow.camera.left = -75;
+sun.shadow.camera.right = 75;
+sun.shadow.camera.top = 75;
+sun.shadow.camera.bottom = -75;
 scene.add(sun);
+
+const daylightFill = new THREE.DirectionalLight(
+  0x9fc4ff,
+  0.95,
+);
+daylightFill.position.set(34, 22, -30);
+scene.add(daylightFill);
+
+const ambientLight = new THREE.AmbientLight(
+  0xc8d9e8,
+  0.28,
+);
+scene.add(ambientLight);
 
 const clock = new THREE.Clock();
 const raycaster = new THREE.Raycaster();
