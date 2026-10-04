@@ -22,6 +22,10 @@ export class SteeringAgent {
     this.wallNormal = new THREE.Vector3();
     this.wallTangent = new THREE.Vector3();
     this.beforeMove = new THREE.Vector3();
+    this.obstacleCache = {
+      signature: '',
+      bounds: [],
+    };
 
     this.raycaster =
       new THREE.Raycaster();
@@ -32,6 +36,7 @@ export class SteeringAgent {
       this.object,
       this.obstacles,
       this.radius,
+      this.obstacleCache,
     );
   }
 
