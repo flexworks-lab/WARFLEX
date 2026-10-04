@@ -3627,7 +3627,7 @@ function installImportedWeaponModel(target, sourceScene, {
   }
 
   const model = sourceScene.clone(true);
-  model.name = 'ImportedAK4Model';
+  model.name = 'ImportedAK47Model';
 
   const bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());
@@ -3725,14 +3725,14 @@ function installImportedWeaponModel(target, sourceScene, {
   return model;
 }
 
-window.__WARFLEX_LOAD_AK4__ = async function loadImportedAK4Weapon() {
+window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
   try {
     const url = new URL(
-      './assets/guns/ak4/source/AK4.glb',
+      './assets/guns/ak4/source/AK47.glb',
       import.meta.url,
     ).href;
 
-    const asset = await assetManager.loadGLTF(url);
+    const asset = await assetManager.loadUSDZ(url);
 
     installImportedWeaponModel(
       weapon,
@@ -3757,7 +3757,7 @@ window.__WARFLEX_LOAD_AK4__ = async function loadImportedAK4Weapon() {
     weapon.visible = state.active && !state.over;
   } catch (error) {
     console.error(
-      '[WARFLEX] Failed to load AK4.glb; using fallback weapon.',
+      '[WARFLEX] Failed to load Ak47.usdz; using fallback weapon.',
       error,
     );
   }
@@ -4296,7 +4296,7 @@ const syncWorldWeaponAnchor = () => {
 syncWorldWeaponAnchor();
 
 void Promise.resolve()
-  .then(() => window.__WARFLEX_LOAD_AK4__?.());
+  .then(() => window.__WARFLEX_LOAD_AK47__?.());
 
 function createDroppedWeaponMesh() {
   const mesh = weapon.clone(true);
