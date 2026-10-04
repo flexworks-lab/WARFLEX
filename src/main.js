@@ -106,6 +106,104 @@ skySun.setFromSphericalCoords(
 );
 skyUniforms.sunPosition.value.copy(skySun);
 
+// Live moving cloud layer.
+// Clouds are generated locally so WARFLEX does not depend on a cloud image/URL.
+const cloudRoot = new THREE.Group();
+cloudRoot.name = 'WARFLEX_LIVE_CLOUDS';
+scene.add(cloudRoot);
+
+function makeCloudTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(128, 64, 8, 128, 64, 116);
+  gradient.addColorStop(0, 'rgba(255,255,255,.92)');
+  gradient.addColorStop(.48, 'rgba(255,255,255,.64)');
+  gradient.addColorStop(.78, 'rgba(255,255,255,.20)');
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 256, 128);
+
+  // Layered soft lobes give the cloud a more natural silhouette.
+  ctx.globalCompositeOperation = 'source-in';
+  const puffs = [
+    [54, 70, 38], [88, 52, 47], [126, 61, 54],
+    [166, 48, 43], [202, 69, 34], [128, 78, 78],
+  ];
+  ctx.globalCompositeOperation = 'source-over';
+  for (const [x, y, radius] of puffs) {
+    const g = ctx.createRadialGradient(x, y, 2, x, y, radius);
+    g.addColorStop(0, 'rgba(255,255,255,.82)');
+    g.addColorStop(.62, 'rgba(255,255,255,.48)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+const cloudTexture = makeCloudTexture();
+const cloudMaterial = new THREE.SpriteMaterial({
+  map: cloudTexture,
+  color: 0xffffff,
+  transparent: true,
+  opacity: .48,
+  depthWrite: false,
+  depthTest: true,
+  fog: true,
+});
+
+const liveClouds = [];
+const cloudRng = (seed) => {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+for (let i = 0; i < 34; i += 1) {
+  const cloud = new THREE.Sprite(cloudMaterial.clone());
+  const angle = cloudRng(i + 2) * Math.PI * 2;
+  const radius = 45 + cloudRng(i + 18) * 205;
+  const size = 22 + cloudRng(i + 31) * 46;
+
+  cloud.position.set(
+    Math.cos(angle) * radius,
+    72 + cloudRng(i + 43) * 38,
+    Math.sin(angle) * radius,
+  );
+  cloud.scale.set(
+    size * (1.5 + cloudRng(i + 57) * .8),
+    size * (.48 + cloudRng(i + 61) * .28),
+    1,
+  );
+  cloud.material.opacity = .28 + cloudRng(i + 71) * .30;
+  cloud.userData.cloudSpeed = .9 + cloudRng(i + 79) * .75;
+  cloud.userData.cloudSeed = i;
+  cloudRoot.add(cloud);
+  liveClouds.push(cloud);
+}
+
+const CLOUD_DRIFT = new THREE.Vector3(0.85, 0, -0.32);
+
+function updateLiveClouds(dt) {
+  for (const cloud of liveClouds) {
+    cloud.position.x += CLOUD_DRIFT.x * cloud.userData.cloudSpeed * dt;
+    cloud.position.z += CLOUD_DRIFT.z * cloud.userData.cloudSpeed * dt;
+
+    // Wrap clouds around the arena so the sky is always populated.
+    if (cloud.position.x > 280) cloud.position.x = -280;
+    if (cloud.position.x < -280) cloud.position.x = 280;
+    if (cloud.position.z > 280) cloud.position.z = -280;
+    if (cloud.position.z < -280) cloud.position.z = 280;
+  }
+}
+
 const camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.05, 320);
 camera.rotation.order = 'YXZ';
 
@@ -6541,6 +6639,7 @@ function frame() {
 
   updateBoundaryGrid();
   mapEditor.update(dt);
+  updateLiveClouds(dt);
 
 
   const hasPointerLock =
