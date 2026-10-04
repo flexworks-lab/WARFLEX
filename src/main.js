@@ -837,17 +837,45 @@ function getGroundHeightAt(x, z) {
 function createSimpleSlopeTerrain() {
   const width = MAP_WIDTH - 8;
   const depth = MAP_DEPTH - 8;
-  const nx = 72;
-  const nz = 42;
+  const nx = 96;
+  const nz = 56;
   const positions = [];
+  const colors = [];
   const indices = [];
   const row = nx + 1;
+  const terrainColor = new THREE.Color();
+
+  const terrainNoise = (x, z) => {
+    const n =
+      Math.sin(x * .055 + z * .071) * .45 +
+      Math.sin(x * .14 - z * .11) * .22 +
+      Math.sin(x * .34 + z * .19) * .10 +
+      Math.sin(x * .73 - z * .41) * .05;
+    return THREE.MathUtils.clamp(.5 + n, 0, 1);
+  };
 
   for (let iz = 0; iz <= nz; iz += 1) {
     const z = THREE.MathUtils.lerp(-depth * .5, depth * .5, iz / nz);
+
     for (let ix = 0; ix <= nx; ix += 1) {
       const x = THREE.MathUtils.lerp(-width * .5, width * .5, ix / nx);
-      positions.push(x, getSimpleTerrainHeight(x, z), z);
+      const y = getSimpleTerrainHeight(x, z);
+
+      positions.push(x, y, z);
+
+      const n = terrainNoise(x, z);
+      const heightT = THREE.MathUtils.clamp((y + .4) / 6.6, 0, 1);
+      terrainColor.setHSL(
+        .255 + n * .075 + heightT * .012,
+        .46 + n * .12,
+        .18 + n * .065 + heightT * .028,
+      );
+
+      colors.push(
+        terrainColor.r,
+        terrainColor.g,
+        terrainColor.b,
+      );
     }
   }
 
@@ -862,22 +890,29 @@ function createSimpleSlopeTerrain() {
   }
 
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geometry.setAttribute(
+    'color',
+    new THREE.Float32BufferAttribute(colors, 3),
+  );
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
 
   const material = new THREE.MeshStandardMaterial({
-    color: 0x2b3438,
+    color: 0xffffff,
+    vertexColors: true,
     roughness: .98,
     metalness: .02,
   });
 
   simpleTerrainMesh = new THREE.Mesh(geometry, material);
-  simpleTerrainMesh.name = 'WARFLEX_SIMPLE_SLOPE_TERRAIN';
+  simpleTerrainMesh.name = 'WARFLEX_PROCEDURAL_GREEN_TERRAIN';
   simpleTerrainMesh.receiveShadow = true;
   fallbackArenaRoot.add(simpleTerrainMesh);
 }
-
 function makeBox(
   size,
   position,
@@ -1360,25 +1395,457 @@ function addArena() {
     addCollision([1.5, 10, MAP_DEPTH], [-HALF_W, 5, 0], 'SlopeWestBoundary');
     addCollision([1.5, 10, MAP_DEPTH], [HALF_W, 5, 0], 'SlopeEastBoundary');
 
-    const cover = [
-      [-44, 12, 8.0, 1.8, 1.6],
-      [38, 8, 9.5, 2.0, 1.8],
-      [-12, -19, 7.0, 1.7, 1.5],
-      [52, -31, 6.5, 2.0, 1.8],
-      [-64, -34, 8.5, 1.6, 1.4],
-      [6, 31, 10.0, 1.7, 1.5],
-    ];
+    const seeded = (seed) => {
+      const n = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+      return n - Math.floor(n);
+    };
 
-    for (const [x, z, w, d, h] of cover) {
-      const y = getSimpleTerrainHeight(x, z);
-      box(fallbackArenaRoot, [w, h, d], [x, y + h * .5, z], mat(0x4b5458, .92, .06), Math.random() * Math.PI, .05);
-      addCollision([w, h, d], [x, y + h * .5, z], 'SlopeCover');
+    const grassMat = new THREE.MeshStandardMaterial({
+      color: 0x5f963f,
+      roughness: .98,
+      metalness: 0,
+    });
+    const grassDarkMat = new THREE.MeshStandardMaterial({
+      color: 0x355f31,
+      roughness: 1,
+      metalness: 0,
+    });
+    const dirtMat = mat(0x5c4935, .98, .01);
+    const stoneMat = mat(0x56615d, .92, .04);
+    const steelMat = mat(0x4a575d, .58, .70);
+    const steelDarkMat = mat(0x20282c, .72, .72);
+    const rubberMat = mat(0x0d1214, .97, .01);
+    const woodMat = mat(0x6f5238, .92, .03);
+    const hazardMat = mat(0xcda13a, .70, .24);
+    const oliveMat = mat(0x435745, .72, .32);
+    const binMat = mat(0x28353b, .70, .50);
+
+    // Ground breakup: mud, worn paths and tire arcs follow the real terrain height.
+    const addPatch = (x, z, rx, rz, material, rotation = 0) => {
+      const patch = new THREE.Mesh(
+        new THREE.CircleGeometry(1, 28),
+        material,
+      );
+      patch.position.set(x, getSimpleTerrainHeight(x, z) + .018, z);
+      patch.rotation.x = -Math.PI / 2;
+      patch.rotation.z = rotation;
+      patch.scale.set(rx, rz, 1);
+      patch.receiveShadow = true;
+      fallbackArenaRoot.add(patch);
+    };
+
+    for (const patch of [
+      [-20, 56, 28, 4.2, 0.10],
+      [0, 27, 15, 2.6, -0.12],
+      [38, 6, 12, 2.4, 0.34],
+      [-46, -10, 15, 2.8, -0.28],
+      [58, -28, 18, 3.0, 0.08],
+      [-78, 28, 11, 2.6, 0.20],
+      [82, 31, 10, 2.2, -0.48],
+      [70, -48, 16, 2.9, 0.12],
+    ]) {
+      addPatch(
+        patch[0],
+        patch[1],
+        patch[2],
+        patch[3],
+        dirtMat,
+        patch[4],
+      );
     }
 
-    console.info('[WARFLEX] Simple procedural slope map enabled.');
+    // Instanced grass: thousands of blades with varied scale/rotation,
+    // but no per-blade shadows, keeping the GPU load controlled.
+    const grassGeometry = new THREE.ConeGeometry(.045, .52, 5, 1);
+    grassGeometry.translate(0, .26, 0);
+
+    const grass = new THREE.InstancedMesh(
+      grassGeometry,
+      grassMat,
+      3200,
+    );
+    grass.name = 'WARFLEX_ProceduralGrass';
+    grass.castShadow = false;
+    grass.receiveShadow = true;
+    grass.frustumCulled = true;
+
+    const grassDummy = new THREE.Object3D();
+
+    for (let i = 0; i < grass.count; i += 1) {
+      const seed = i + 41.7;
+      const x =
+        (seeded(seed) * 2 - 1) *
+        (HALF_W - 5);
+      const z =
+        (seeded(seed + 8.2) * 2 - 1) *
+        (HALF_D - 5);
+
+      if (Math.hypot(x - 18, z - 54) < 8) {
+        i -= 1;
+        continue;
+      }
+
+      const y = getSimpleTerrainHeight(x, z);
+      const scale = .55 + seeded(seed + 17.8) * 1.15;
+
+      grassDummy.position.set(x, y, z);
+      grassDummy.rotation.y =
+        seeded(seed + 27.4) * Math.PI * 2;
+      grassDummy.scale.set(
+        .55 + seeded(seed + 31.1) * .65,
+        scale,
+        .55 + seeded(seed + 39.2) * .65,
+      );
+      grassDummy.updateMatrix();
+      grass.setMatrixAt(i, grassDummy.matrix);
+    }
+
+    grass.instanceMatrix.needsUpdate = true;
+    grass.computeBoundingSphere();
+    fallbackArenaRoot.add(grass);
+
+    // Taller accent tufts around edges and worn areas.
+    const tuftGeometry = new THREE.ConeGeometry(.07, .86, 5, 1);
+    tuftGeometry.translate(0, .43, 0);
+
+    const tufts = new THREE.InstancedMesh(
+      tuftGeometry,
+      grassDarkMat,
+      650,
+    );
+    tufts.name = 'WARFLEX_TallGrassTufts';
+    tufts.castShadow = false;
+    tufts.receiveShadow = true;
+    tufts.frustumCulled = true;
+
+    for (let i = 0; i < tufts.count; i += 1) {
+      const seed = i + 801.3;
+      const angle = seeded(seed) * Math.PI * 2;
+      const radius = 24 + seeded(seed + 3.6) * 96;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius * .56;
+      const y = getSimpleTerrainHeight(x, z);
+
+      grassDummy.position.set(x, y, z);
+      grassDummy.rotation.y =
+        seeded(seed + 7.4) * Math.PI * 2;
+      grassDummy.scale.set(
+        .75 + seeded(seed + 9.4) * .6,
+        .75 + seeded(seed + 12.4) * .95,
+        .75 + seeded(seed + 15.4) * .6,
+      );
+      grassDummy.updateMatrix();
+      tufts.setMatrixAt(i, grassDummy.matrix);
+    }
+
+    tufts.instanceMatrix.needsUpdate = true;
+    tufts.computeBoundingSphere();
+    fallbackArenaRoot.add(tufts);
+
+    // Real rock silhouettes break the terrain at long distance.
+    const rockGeometry = new THREE.DodecahedronGeometry(.72, 1);
+    const rocks = new THREE.InstancedMesh(
+      rockGeometry,
+      stoneMat,
+      150,
+    );
+    rocks.name = 'WARFLEX_RockScatter';
+    rocks.castShadow = true;
+    rocks.receiveShadow = true;
+
+    for (let i = 0; i < rocks.count; i += 1) {
+      const seed = i + 1601.1;
+      const x =
+        (seeded(seed) * 2 - 1) *
+        (HALF_W - 8);
+      const z =
+        (seeded(seed + 5.2) * 2 - 1) *
+        (HALF_D - 8);
+      const y = getSimpleTerrainHeight(x, z);
+      const s = .32 + seeded(seed + 12.7) * 1.45;
+
+      grassDummy.position.set(x, y + s * .28, z);
+      grassDummy.rotation.set(
+        seeded(seed + 18.2) * .45,
+        seeded(seed + 21.4) * Math.PI * 2,
+        seeded(seed + 24.7) * .35,
+      );
+      grassDummy.scale.set(
+        s * 1.25,
+        s * (.55 + seeded(seed + 29.7) * .75),
+        s,
+      );
+      grassDummy.updateMatrix();
+      rocks.setMatrixAt(i, grassDummy.matrix);
+    }
+
+    rocks.instanceMatrix.needsUpdate = true;
+    rocks.computeBoundingSphere();
+    fallbackArenaRoot.add(rocks);
+
+    // Armored cover with layered skirts, bolts and hazard bands.
+    const addFortifiedCover = (x, z, w, d, h, rotation = 0) => {
+      const root = new THREE.Group();
+      root.position.set(x, getSimpleTerrainHeight(x, z), z);
+      root.rotation.y = rotation;
+      fallbackArenaRoot.add(root);
+
+      box(root, [w, h, d], [0, h * .5, 0], stoneMat, 0, .08);
+      box(root, [w * .86, .11, d * 1.04], [0, h - .05, 0], steelDarkMat, 0, .025);
+      box(root, [w * .82, .07, .07], [0, h * .54, -d * .51], hazardMat, 0, .012);
+      box(root, [.05, h * .62, .05], [-w * .26, h * .54, -d * .52], steelMat, 0, .008);
+      box(root, [.05, h * .62, .05], [w * .26, h * .54, -d * .52], steelMat, 0, .008);
+
+      for (const sx of [-1, 1]) {
+        for (const sy of [.34, .72]) {
+          addBolt(
+            root,
+            [sx * w * .36, h * sy, -d * .53],
+            .85,
+            steelMat,
+          );
+        }
+      }
+
+      addCollision(
+        [w, h, d],
+        [x, getSimpleTerrainHeight(x, z) + h * .5, z],
+        'FortifiedCover',
+      );
+    };
+
+    for (const item of [
+      [-46, 13, 8.5, 1.9, 1.6, .04],
+      [35, 9, 10.5, 2.0, 1.8, -.08],
+      [-11, -18, 7.6, 1.7, 1.45, .10],
+      [54, -31, 6.9, 2.1, 1.85, -.14],
+      [-63, -35, 8.8, 1.7, 1.5, .06],
+      [6, 30, 10.5, 1.8, 1.55, -.05],
+    ]) {
+      addFortifiedCover(...item);
+    }
+
+    const addBin = (x, z, scale = 1, rotation = 0) => {
+      const root = new THREE.Group();
+      root.position.set(x, getSimpleTerrainHeight(x, z), z);
+      root.rotation.y = rotation;
+      root.scale.setScalar(scale);
+      fallbackArenaRoot.add(root);
+
+      box(root, [1.12, 1.18, .76], [0, .62, 0], binMat, 0, .045);
+      box(root, [1.00, .10, .67], [0, 1.24, 0], steelDarkMat, 0, .025);
+      box(root, [.76, .34, .035], [0, .66, -.40], oliveMat, 0, .012);
+      box(root, [.58, .05, .038], [0, .86, -.43], hazardMat, 0, .008);
+
+      for (const sx of [-.38, .38]) {
+        cyl(root, .045, .80, [sx, 1.31, .02], steelMat, [0, Math.PI / 2, 0], 12);
+      }
+
+      for (const sx of [-.42, .42]) {
+        for (const sz of [-.24, .24]) {
+          cyl(root, .11, .09, [sx, .14, sz], rubberMat, [0, Math.PI / 2, 0], 16);
+          addBolt(root, [sx, .42, -.35], .65, steelMat);
+        }
+      }
+
+      addCollision(
+        [1.20 * scale, 1.32 * scale, .82 * scale],
+        [x, getSimpleTerrainHeight(x, z) + .66 * scale, z],
+        'DetailBinCollision',
+      );
+    };
+
+    for (const p of [
+      [-103, 37, .9, .1],
+      [-77, 3, 1.0, 1.2],
+      [-38, 41, .88, -.4],
+      [24, 44, .94, .25],
+      [82, 34, 1.0, 2.2],
+      [104, -7, .92, -.2],
+      [70, -38, .98, .6],
+      [-98, -39, .9, -1.0],
+    ]) {
+      addBin(...p);
+    }
+
+    // HESCO-style defensive cells.
+    const addHesco = (x, z, width, rotation = 0) => {
+      const root = new THREE.Group();
+      root.position.set(x, getSimpleTerrainHeight(x, z), z);
+      root.rotation.y = rotation;
+      fallbackArenaRoot.add(root);
+
+      const fill = mat(0x746c50, .98, .01);
+      const cage = mat(0x465153, .70, .56);
+      const count = Math.max(2, Math.floor(width / 1.25));
+
+      for (let i = 0; i < count; i += 1) {
+        const px = (i - (count - 1) * .5) * 1.15;
+        box(root, [1.04, 1.04, .92], [px, .54, 0], fill, 0, .10);
+        for (const zz of [-.49, .49]) {
+          box(root, [.045, .94, .045], [px, .54, zz], cage);
+        }
+      }
+
+      box(root, [width, .05, 1.02], [0, 1.10, 0], cage);
+      addCollision(
+        [width + .1, 1.1, 1.0],
+        [x, getSimpleTerrainHeight(x, z) + .55, z],
+        'DetailHescoCollision',
+      );
+    };
+
+    addHesco(-24, 48, 11, .04);
+    addHesco(31, 42, 9, -.12);
+    addHesco(-86, -5, 10, Math.PI / 2);
+    addHesco(87, -28, 12, Math.PI / 2);
+
+    // Logistics: pallets, military crates and fuel drums.
+    const addPalletStack = (x, z, scale = 1, rotation = 0) => {
+      const root = new THREE.Group();
+      root.position.set(x, getSimpleTerrainHeight(x, z), z);
+      root.rotation.y = rotation;
+      root.scale.setScalar(scale);
+      fallbackArenaRoot.add(root);
+
+      for (let level = 0; level < 2; level += 1) {
+        box(root, [2.55, .15, 1.34], [0, .08 + level * .25, 0], woodMat, 0, .018);
+        for (let px = -.92; px <= .92; px += .46) {
+          box(root, [.24, .12, 1.18], [px, .22 + level * .25, 0], woodMat);
+        }
+        box(root, [.20, .38, 1.16], [-.96, -.12 + level * .25, 0], woodMat);
+        box(root, [.20, .38, 1.16], [.96, -.12 + level * .25, 0], woodMat);
+      }
+    };
+
+    addPalletStack(-98, 24, .94, .12);
+    addPalletStack(50, 39, .84, -.10);
+    addPalletStack(97, 16, .90, .20);
+
+    const addFuelDrum = (x, z, color = 0x3d5a42) => {
+      const root = new THREE.Group();
+      root.position.set(x, getSimpleTerrainHeight(x, z), z);
+      fallbackArenaRoot.add(root);
+
+      const body = mat(color, .67, .44);
+      cyl(root, .34, .92, [0, .46, 0], body, [0, 0, 0], 28);
+      for (const yBand of [.20, .69]) {
+        torus(root, .346, .03, [0, yBand, 0], steelMat, [Math.PI / 2, 0, 0], 9, 26);
+      }
+      cyl(root, .11, .045, [0, .95, 0], steelDarkMat, [0, 0, 0], 18);
+      box(root, [.28, .14, .03], [0, .48, -.35], hazardMat, 0, .008);
+    };
+
+    for (const drum of [
+      [-101, 34, 0x3c5942],
+      [-97, 35, 0x4d6246],
+      [46, 41, 0x485a43],
+      [89, 27, 0x5a4f3b],
+      [77, -42, 0x3f513f],
+      [-67, -42, 0x4b5c44],
+    ]) {
+      addFuelDrum(...drum);
+    }
+
+    // Utility towers create vertical scale and deeper silhouettes.
+    const addLightTower = (x, z, height = 6.8) => {
+      const y = getSimpleTerrainHeight(x, z);
+      const root = new THREE.Group();
+      root.position.set(x, y, z);
+      fallbackArenaRoot.add(root);
+
+      cyl(root, .075, height, [0, height * .5, 0], steelDarkMat, [0, 0, 0], 16);
+      for (const angle of [0, Math.PI / 2]) {
+        box(root, [.08, height * .84, .08], [0, height * .45, .06], steelMat, angle);
+      }
+      box(root, [.58, .12, .22], [0, height - .22, 0], steelDarkMat, 0, .02);
+      addMesh(
+        root,
+        new THREE.SphereGeometry(.11, 16, 10),
+        new THREE.MeshStandardMaterial({
+          color: 0x5a6b6e,
+          emissive: 0xffb85f,
+          emissiveIntensity: 1.7,
+          roughness: .25,
+          metalness: .25,
+        }),
+        [0, height - .30, 0],
+      );
+      box(root, [.62, .035, .035], [0, height - .70, 0], steelMat);
+    };
+
+    for (const pole of [
+      [-116, -4],
+      [116, -4],
+      [-33, 54],
+      [33, 54],
+      [-116, 45],
+      [116, 38],
+    ]) {
+      addLightTower(...pole);
+    }
+
+    // Two focal armored positions.
+    const addBunker = (x, z, rotation = 0, scale = 1) => {
+      const root = new THREE.Group();
+      root.position.set(x, getSimpleTerrainHeight(x, z), z);
+      root.rotation.y = rotation;
+      root.scale.setScalar(scale);
+      fallbackArenaRoot.add(root);
+
+      const wall = mat(0x56615d, .90, .07);
+      const dark = mat(0x1b2327, .74, .62);
+
+      box(root, [12.5, .42, 8.2], [0, .22, 0], darkStoneMat, 0, .07);
+      box(root, [12.5, 3.5, .42], [0, 1.75, -4.0], wall, 0, .05);
+      box(root, [12.5, 3.5, .42], [0, 1.75, 4.0], wall, 0, .05);
+      box(root, [.42, 3.5, 7.7], [-6.0, 1.75, 0], wall, 0, .05);
+      box(root, [.42, 3.5, 7.7], [6.0, 1.75, 0], wall, 0, .05);
+      box(root, [12.8, .26, 8.5], [0, 3.68, 0], dark, 0, .05);
+
+      for (const sx of [-1, 1]) {
+        for (let px = -3.8; px <= 3.8; px += 2.2) {
+          box(root, [1.02, .28, .06], [px, 2.10, sx * 4.22], steelDarkMat);
+          box(root, [1.18, .06, .08], [px, 1.67, sx * 4.25], steelMat);
+        }
+      }
+
+      box(root, [2.2, 2.3, .20], [0, 1.15, -4.25], dark, 0, .02);
+      for (let yy = .38; yy <= 1.96; yy += .38) {
+        box(root, [1.72, .05, .035], [0, yy, -4.39], steelMat);
+      }
+
+      cyl(root, .032, 2.1, [3.2, 4.6, 0], steelMat, [0, 0, 0], 14);
+      torus(root, .22, .025, [3.2, 5.25, 0], steelMat, [Math.PI / 2, 0, 0], 8, 20);
+
+      addCollision(
+        [12.5 * scale, 3.5 * scale, .48 * scale],
+        [x, getSimpleTerrainHeight(x, z) + 1.75 * scale, z - 4.0 * scale],
+        'BunkerFront',
+      );
+      addCollision(
+        [12.5 * scale, 3.5 * scale, .48 * scale],
+        [x, getSimpleTerrainHeight(x, z) + 1.75 * scale, z + 4.0 * scale],
+        'BunkerBack',
+      );
+      addCollision(
+        [.48 * scale, 3.5 * scale, 8.0 * scale],
+        [x - 6.0 * scale, getSimpleTerrainHeight(x, z) + 1.75 * scale, z],
+        'BunkerLeft',
+      );
+      addCollision(
+        [.48 * scale, 3.5 * scale, 8.0 * scale],
+        [x + 6.0 * scale, getSimpleTerrainHeight(x, z) + 1.75 * scale, z],
+        'BunkerRight',
+      );
+    };
+
+    addBunker(-72, 27, .08, 1.0);
+    addBunker(74, 23, -.10, 1.04);
+
+    console.info('[WARFLEX] Crazy green procedural battlefield visuals enabled.');
     return;
   }
-
   const sectors = [
     [-93, 39, 52, 38, 0x454b4c],
     [0, 39, 52, 38, 0x363d3f],
