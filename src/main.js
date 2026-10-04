@@ -11,7 +11,7 @@ import { applyBakedLightmap } from './world/BakedLighting.js?v=modulefix-2026100
 import { configureAtmosphere } from './world/Atmosphere.js?v=readability-20261003';
 import { NavMeshService } from './ai/NavMeshService.js?v=wide-map-20261003';
 import { NavMeshAgent } from './ai/NavMeshAgent.js?v=wide-map-20261003';
-import { MapEditor } from './dev/MapEditor.js?v=25ca825c34bbaa566827e7977542ea4f3948b2ec';
+import { MapEditor } from './dev/MapEditor.js?v=88daa5da65639c54065c2129254c5168e1bee5fb';
 
 const CONFIG = {
   maxHealth: 100,
@@ -71,6 +71,9 @@ const els = {
   backFromWaves: document.querySelector('#back-from-waves'),
   backFromOptions: document.querySelector('#back-from-options'),
   waveChoices: [...document.querySelectorAll('[data-wave-choice]')],
+  mapList: document.querySelector('#map-list'),
+  startMapButton: document.querySelector('#start-map-button'),
+  editorButton: document.querySelector('#editor-button'),
   damageOverlay: document.querySelector('#damage-overlay'),
   combatCallout: document.querySelector('#combat-callout'),
   comboCount: document.querySelector('#combo-count'),
@@ -208,6 +211,7 @@ const shellCasings = [];
 const arenaLights = [];
 
 const state = {
+  selectedMapId: null,
   active: false,
   over: false,
   yaw: 0,
@@ -6521,6 +6525,26 @@ function frame() {
   );
 }
 
+function getMapLibrary(){try{const raw=localStorage.getItem('WARFLEX_MAP_LIBRARY');const data=raw?JSON.parse(raw):[];return Array.isArray(data)?data.filter(m=>m&&m.playable!==false&&!m.hidden):[];}catch{return [];}}
+function getCurrentMapId(){return localStorage.getItem('WARFLEX_CURRENT_MAP')||null;}
+function refreshMapList(){
+  if(!els.mapList)return; els.mapList.innerHTML='';
+  const current=getCurrentMapId(); const maps=getMapLibrary();
+  const built=document.createElement('button'); built.type='button'; built.className='map-choice active'; built.dataset.mapId='builtin';
+  built.innerHTML='<strong>WARFLEX BASE</strong><span>BUILT-IN MAP'+(current==='builtin'?' · CURRENT':'')+'</span>'; els.mapList.appendChild(built);
+  for(const m of maps){const b=document.createElement('button');b.type='button';b.className='map-choice';b.dataset.mapId=m.id;b.innerHTML='<strong></strong><span></span>';b.querySelector('strong').textContent=m.name;b.querySelector('span').textContent=(current===m.id?'CURRENT · ':'')+'CUSTOM MAP';b.addEventListener('click',()=>{state.selectedMapId=m.id;els.mapList.querySelectorAll('.map-choice').forEach(x=>x.classList.toggle('active',x.dataset.mapId===m.id));});els.mapList.appendChild(b);}
+  if(!state.selectedMapId)state.selectedMapId=current&&current!=='builtin'?current:'builtin'; els.mapList.querySelectorAll('.map-choice').forEach(x=>x.classList.toggle('active',x.dataset.mapId===state.selectedMapId));
+}
+function activateSelectedMap(){
+  const id=state.selectedMapId||getCurrentMapId()||'builtin';
+  if(id==='builtin'){editorMapRoot.visible=false;fallbackArenaRoot.visible=true;return;}
+  const record=mapEditor.getMapById(id); if(!record?.data){state.selectedMapId='builtin';editorMapRoot.visible=false;fallbackArenaRoot.visible=true;return;}
+  mapEditor.loadMapRecord(id); editorMapRoot.visible=true; fallbackArenaRoot.visible=false;
+  for(let i=0;i<fallbackObstacleCount;i++) obstacles.shift();
+  try{physicsWorld.removeBodies(fallbackPhysicsBodies);}catch{}
+  mapEditor.refreshColliders();
+}
+
 function setWaveChoice(value) {
   state.selectedWave = value === 'endless' ? -1 : Number(value);
   if (els.selectedWaveLabel) {
@@ -6659,16 +6683,21 @@ for (const button of els.waveChoices) {
   button.addEventListener('click', () => setWaveChoice(button.dataset.waveChoice));
 }
 
-els.wavesButton.addEventListener('click', () => showMenuView('waves'));
+els.wavesButton.addEventListener('click', () => { refreshMapList(); showMenuView('waves'); });
 els.optionsButton.addEventListener('click', () => showMenuView('options'));
 els.backFromWaves.addEventListener('click', () => showMenuView('main'));
 els.backFromOptions.addEventListener('click', () => showMenuView('main'));
+els.mapList?.addEventListener('click', (event) => { const b=event.target.closest('.map-choice'); if(b) state.selectedMapId=b.dataset.mapId; });
+els.startMapButton?.addEventListener('click', () => { refreshMapList(); enterGame(); });
+els.editorButton?.addEventListener('click', () => { location.href=location.pathname+'?editor=WARFLEX_DEV'; });
 
 setWaveChoice('1');
 showMenuView('main');
+refreshMapList();
 updateMenuSelection(0, false);
 
 function enterGame() {
+  activateSelectedMap();
   // Put the UI into gameplay state first. Optional systems must not be able
   // to prevent the player from entering the arena.
   renderer.domElement.style.display = 'block';
