@@ -9,6 +9,7 @@ export class AssetManager {
   constructor(renderer) {
     this.renderer = renderer;
     this.cache = new Map();
+    this.loading = new Map();
 
     this.gltfLoader = new GLTFLoader();
 
@@ -100,7 +101,9 @@ export class AssetManager {
 
       object.castShadow = true;
       object.receiveShadow = true;
-      object.frustumCulled = true;
+      // Keep imported first-person asset meshes renderable while their caller
+      // handles final placement and centering.
+      object.frustumCulled = false;
 
       this.prepareMaterial(object.material);
     });
@@ -167,6 +170,7 @@ export class AssetManager {
     }
 
     this.cache.clear();
+    this.loading.clear();
     this.dracoLoader.dispose();
     this.ktx2Loader?.dispose?.();
   }
