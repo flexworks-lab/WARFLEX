@@ -3665,15 +3665,23 @@ function installAK47Model(target, sourceScene, {
     }
   });
 
-  const bounds = new THREE.Box3().setFromObject(model);
+  // First normalize the imported asset from its real world-space bounds.
+  // Some GLB exporters leave rotation/scale on the root/armature, so centering
+  // before attaching it to the weapon can produce the wrong local position.
+  let bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z, 0.001);
   model.scale.setScalar(scaleTarget / maxDim);
-  model.updateMatrixWorld(true);
 
-  const fitted = new THREE.Box3().setFromObject(model);
-  const center = fitted.getCenter(new THREE.Vector3());
-  model.position.sub(center);
+  // Attach first, then center in the weapon/menu container's coordinate space.
+  target.add(model);
+  target.updateWorldMatrix(true, true);
+  model.updateWorldMatrix(true, true);
+
+  bounds = new THREE.Box3().setFromObject(model);
+  const centerWorld = bounds.getCenter(new THREE.Vector3());
+  const centerTarget = target.worldToLocal(centerWorld.clone());
+  model.position.sub(centerTarget);
   model.position.y -= 0.06;
   model.position.z -= 0.06;
   model.renderOrder = 1000;
