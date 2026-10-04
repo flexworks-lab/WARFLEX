@@ -4199,9 +4199,12 @@ function finishStandaloneWeapon(model, id) {
       if (!material) continue;
       material.transparent = false;
       material.opacity = 1;
-      material.depthTest = false;
-      material.depthWrite = false;
-      material.side = THREE.DoubleSide;
+      // Keep first-person weapon geometry physically occluding itself.
+      // Depth testing was disabled here, which caused the back/inside faces
+      // of the weapon to visibly show through the front shell.
+      material.depthTest = true;
+      material.depthWrite = true;
+      material.side = THREE.FrontSide;
     }
   });
   return normalized;
@@ -4282,7 +4285,9 @@ function finishStandaloneWeapon(model, id) {
   addStandaloneBox(model, 'PistolRearSight', [.08, .11, .13], [0, .30, -.60], frame, [0, 0, 0], .01);
   addStandaloneHands(model, 'pistol');
   addStandaloneMuzzle(model, -2.25);
-  model.scale.setScalar(.92);
+  // The previous pistol was stretched too far forward. Keep its height and
+  // width but compress its length substantially for a compact sidearm.
+  model.scale.set(.96, 1.0, .72);
   model.position.z = .38;
   weaponModels.push(finishStandaloneWeapon(model, 'pistol'));
 }
@@ -4376,8 +4381,8 @@ const stripPreviewModel = (source, index) => {
       next.transparent = false;
       next.opacity = 1;
       next.depthWrite = true;
-      next.depthTest = false;
-      next.side = THREE.DoubleSide;
+      next.depthTest = true;
+      next.side = THREE.FrontSide;
 
       if (next.color) {
         const hsl = {};
@@ -4606,10 +4611,14 @@ function setActiveWeapon(indexOrId, { resetAmmo = false } = {}) {
       : [child.material];
     for (const material of materials) {
       if (!material) continue;
-      material.depthTest = false;
-      material.depthWrite = false;
+      // The weapon is close to the camera, so depth testing keeps its own
+      // front surfaces solid while still allowing it to render in the
+      // foreground over the world.
+      material.depthTest = true;
+      material.depthWrite = true;
       material.transparent = false;
       material.opacity = 1;
+      material.side = THREE.FrontSide;
     }
   });
 
