@@ -30,3 +30,5 @@ A fast, browser-based first-person shooter built with Three.js.
 ## GitHub Pages
 
 Push to `main`; the included workflow deploys the repository root to GitHub Pages.
+
+<!-- Pages deployment heartbeat -->
