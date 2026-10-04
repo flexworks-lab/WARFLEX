@@ -39,10 +39,29 @@
       <div class="weapon">MK-01 // RIFLE</div>
       <div id="reload" class="reload hidden">RELOADING...</div>
     </div>
+    <div id="weapon-selector" class="weapon-selector" aria-label="Weapon selection">
+      <button type="button" data-weapon-slot="0"><b>1</b><span>RIFLE</span></button>
+      <button type="button" data-weapon-slot="1"><b>2</b><span>SHOTGUN</span></button>
+      <button type="button" data-weapon-slot="2"><b>3</b><span>SNIPER</span></button>
+      <button type="button" data-weapon-slot="3"><b>4</b><span>PISTOL</span></button>
+      <button type="button" data-weapon-slot="4"><b>5</b><span>SMG</span></button>
+    </div>
     <div id="weapon-pickup-prompt" class="weapon-pickup-prompt hidden" aria-live="polite"></div>
     <div class="scoreboard">
       <div><span>KILLS</span><strong id="kills">0</strong></div>
       <div><span>SCORE</span><strong id="score">0</strong></div>
+    </div>
+  </div>
+
+  <div id="player-name-gate" class="screen player-name-gate">
+    <div class="panel player-name-panel">
+      <p class="eyebrow">WARFLEX // PLAYER SETUP</p>
+      <h2>SET PLAYER NAME</h2>
+      <p class="player-name-copy">Choose your permanent in-game name. This name is locked to this browser after you confirm it.</p>
+      <label for="player-name-input">PLAYER NAME</label>
+      <input id="player-name-input" type="text" maxlength="16" minlength="3" autocomplete="nickname" spellcheck="false" placeholder="PLAYER" />
+      <p id="player-name-error" class="player-name-error" aria-live="polite"></p>
+      <button id="player-name-confirm" type="button">LOCK PLAYER NAME</button>
     </div>
   </div>
 
