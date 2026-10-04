@@ -3982,8 +3982,6 @@ const weaponAmmoState = new Map(
   ]),
 );
 
-setActiveWeapon(0);
-
 const menuGunPairs = [];
 
 function installAK47Model(target, sourceScene, {
@@ -4674,6 +4672,7 @@ const syncWorldWeaponAnchor = () => {
 };
 
 syncWorldWeaponAnchor();
+setActiveWeapon(0);
 
 function createDroppedWeaponMesh() {
   const mesh = weapon.clone(true);
