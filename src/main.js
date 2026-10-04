@@ -1538,6 +1538,10 @@ function spawnEnemy(index = 0, spawnPosition = null) {
       .5 + Math.random(),
     hurtFlash: 0,
     deathTimer: 0,
+    // Short-lived velocity used for bullet knockback. AI steering still
+    // controls normal movement, while this impulse physically pushes the
+    // enemy after every successful hit.
+    shotVelocity: new THREE.Vector3(),
     dying: false,
     steering,
     navAgent,
@@ -1996,6 +2000,39 @@ function shoot() {
       enemy.health -=
         headshot ? 70 : 34;
 
+      // Bullets physically shove living enemies backward from the impact.
+      // Keep this horizontal so shots do not make soldiers randomly fly
+      // upward, and stack repeated hits for a stronger push.
+      const knockbackDirection =
+        direction.clone();
+
+      knockbackDirection.y = 0;
+
+      if (knockbackDirection.lengthSq() > .0001) {
+        knockbackDirection.normalize();
+
+        enemy.shotVelocity.addScaledVector(
+          knockbackDirection,
+          headshot ? 4.8 : 3.2,
+        );
+
+        // Prevent rapid-fire from building an absurd amount of momentum.
+        const maxKnockbackSpeed =
+          headshot ? 7.5 : 5.5;
+
+        const maxKnockbackSpeedSq =
+          maxKnockbackSpeed *
+          maxKnockbackSpeed;
+
+        if (
+          enemy.shotVelocity.lengthSq() >
+          maxKnockbackSpeedSq
+        ) {
+          enemy.shotVelocity
+            .setLength(maxKnockbackSpeed);
+        }
+      }
+
       enemy.hurtFlash = .08;
 
       hitPoint =
@@ -2319,6 +2356,24 @@ function updateEnemies(dt) {
             dt,
         );
       }
+    }
+
+    // Apply bullet knockback after AI steering/strafe so the hit
+    // visibly moves the enemy instead of being overwritten by the pathing
+    // controller on the same frame.
+    if (enemy.shotVelocity.lengthSq() > .0001) {
+      enemy.group.position.addScaledVector(
+        enemy.shotVelocity,
+        dt,
+      );
+
+      // Strong initial resistance gives each shot a clear shove without
+      // leaving enemies sliding around forever.
+      enemy.shotVelocity.multiplyScalar(
+        Math.exp(-9.5 * dt),
+      );
+    } else {
+      enemy.shotVelocity.set(0, 0, 0);
     }
 
     if (
