@@ -209,7 +209,6 @@ NaN
     if(this.keys.has('ControlLeft')||this.keys.has('ControlRight'))v*=.25;
     const d=new T.Vector3(); if(this.keys.has('KeyW'))d.add(f);if(this.keys.has('KeyS'))d.sub(f);if(this.keys.has('KeyD'))d.add(right);if(this.keys.has('KeyA'))d.sub(right);if(this.keys.has('KeyE'))d.y+=1;if(this.keys.has('KeyQ'))d.y-=1;
     if(d.lengthSq()>.001){d.normalize().multiplyScalar(v*dt);this.camera.position.add(d);}
-    this.refreshColliders();
   }
 
   setTool(mode){this.transform=mode;if(this.selected.size===1){this.transformControls.setMode(mode);this.attachGizmo();}this.refreshStatus();}
