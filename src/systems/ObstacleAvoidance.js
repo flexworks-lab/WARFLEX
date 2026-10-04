@@ -1,16 +1,39 @@
 import * as THREE from 'three';
 
-export function resolveObstacleOverlap(object, obstacles, radius) {
+export function resolveObstacleOverlap(
+  object,
+  obstacles,
+  radius,
+  cache = null,
+) {
   let corrected = false;
 
-  for (let pass = 0; pass < 3; pass += 1) {
-    for (const obstacle of obstacles) {
-      if (!obstacle) continue;
+  let bounds = obstacles
+    .filter(Boolean)
+    .map((obstacle) =>
+      new THREE.Box3().setFromObject(
+        obstacle,
+      ),
+    );
 
-      const box =
-        new THREE.Box3().setFromObject(
-          obstacle,
-        );
+  if (cache) {
+    const signature =
+      obstacles
+        .map((item) => item?.uuid || '')
+        .join('|');
+
+    if (
+      cache.signature !== signature
+    ) {
+      cache.signature = signature;
+      cache.bounds = bounds;
+    } else {
+      bounds = cache.bounds;
+    }
+  }
+
+  for (let pass = 0; pass < 3; pass += 1) {
+    for (const box of bounds) {
 
       const closestX =
         THREE.MathUtils.clamp(
