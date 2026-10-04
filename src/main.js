@@ -805,7 +805,7 @@ function addArena() {
   const borderMaterial = 0x11171b;
 
   for (const [size, position] of border) {
-    obstacles.push(
+    const invisibleBoundary =
       makeBox(
         size,
         position,
@@ -813,8 +813,10 @@ function addArena() {
         true,
         .72,
         .25,
-      ),
-    );
+      );
+
+    invisibleBoundary.visible = false;
+    obstacles.push(invisibleBoundary);
   }
 
   const coverColor = 0x303a40;
@@ -1621,62 +1623,406 @@ function addArena() {
       metalness: .30,
     });
 
-  // West command compound.
-  addBuilding({
-    x: -82,
+  // Districts have distinct material accents so the site reads like a real
+  // military installation assembled over time, not one procedural palette.
+  const commandBuilding = addBuilding({
+    x: -84,
     z: 18,
-    width: 22,
-    depth: 18,
-    height: 6.2,
-    doorWidth: 4.2,
+    width: 28,
+    depth: 21,
+    height: 8.0,
+    doorWidth: 5.2,
     rotation: 0,
     label: 'COMMAND',
   });
 
-  addBuilding({
-    x: -57,
+  const barracksBuilding = addBuilding({
+    x: -56,
     z: 39,
-    width: 16,
-    depth: 13,
-    height: 5.1,
-    doorWidth: 3.5,
+    width: 22,
+    depth: 15,
+    height: 6.2,
+    doorWidth: 4.2,
     rotation: 0,
     label: 'BARRACKS',
   });
 
-  addBuilding({
-    x: 74,
-    z: 18,
-    width: 30,
-    depth: 20,
-    height: 7.0,
-    doorWidth: 6.5,
+  const logisticsBuilding = addBuilding({
+    x: 80,
+    z: 19,
+    width: 34,
+    depth: 23,
+    height: 8.2,
+    doorWidth: 7.0,
     rotation: 0,
     label: 'LOGISTICS',
   });
 
-  addBuilding({
+  const workshopBuilding = addBuilding({
     x: 49,
     z: 40,
-    width: 17,
-    depth: 13,
-    height: 5.4,
-    doorWidth: 3.5,
+    width: 24,
+    depth: 16,
+    height: 6.8,
+    doorWidth: 4.8,
     rotation: 0,
     label: 'WORKSHOP',
   });
 
-  // Small southern guard building keeps the deployment area purposeful.
-  addBuilding({
+  const adminBuilding = addBuilding({
+    x: -92,
+    z: 43,
+    width: 28,
+    depth: 17,
+    height: 7.2,
+    doorWidth: 5.0,
+    rotation: 0,
+    label: 'ADMIN',
+  });
+
+  const motorPoolBuilding = addBuilding({
+    x: 94,
+    z: -21,
+    width: 30,
+    depth: 22,
+    height: 7.4,
+    doorWidth: 6.8,
+    rotation: 0,
+    label: 'MOTOR POOL',
+  });
+
+  const guardBuilding = addBuilding({
     x: -50,
     z: 56,
-    width: 13,
-    depth: 8,
-    height: 4.4,
-    doorWidth: 2.8,
+    width: 14,
+    depth: 10,
+    height: 4.6,
+    doorWidth: 3.0,
     rotation: 0,
     label: 'GUARD',
   });
+
+  // Utility cables are roof-to-roof only. They never terminate on containers,
+  // crates, fences, or random props.
+  const utilityCableMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x11171a,
+      roughness: .46,
+      metalness: .72,
+    });
+
+  const addBuildingCable = (
+    a,
+    b,
+    liftA = 0,
+    liftB = 0,
+  ) => {
+    if (!a || !b) return;
+
+    const start =
+      new THREE.Vector3(
+        a.position.x,
+        7.2 + liftA,
+        a.position.z,
+      );
+
+    const end =
+      new THREE.Vector3(
+        b.position.x,
+        7.2 + liftB,
+        b.position.z,
+      );
+
+    const direction =
+      end.clone().sub(start);
+
+    const length =
+      direction.length();
+
+    if (length < 1) return;
+
+    const midpoint =
+      start.clone().add(end).multiplyScalar(.5);
+
+    const cable =
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          .025,
+          .025,
+          length,
+          10,
+        ),
+        utilityCableMat,
+      );
+
+    cable.position.copy(midpoint);
+    cable.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      direction.normalize(),
+    );
+    cable.castShadow = true;
+    fallbackArenaRoot.add(cable);
+
+    for (const point of [start, end]) {
+      const insulator =
+        new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            .08,
+            .08,
+            .16,
+            10,
+          ),
+          paintedMetal,
+        );
+
+      insulator.position.copy(point);
+      insulator.castShadow = true;
+      fallbackArenaRoot.add(insulator);
+    }
+  };
+
+  addBuildingCable(adminBuilding, commandBuilding, .3, .6);
+  addBuildingCable(commandBuilding, barracksBuilding, .4, .1);
+  addBuildingCable(logisticsBuilding, workshopBuilding, .6, .1);
+  addBuildingCable(logisticsBuilding, motorPoolBuilding, .5, .3);
+  addBuildingCable(adminBuilding, guardBuilding, .2, 0);
+
+  // =========================================================================
+  // SOUTH: DEPLOYMENT COURT / PARKING
+  // =========================================================================
+
+  const parkingMaterial =
+    new THREE.MeshStandardMaterial({
+      color: 0x252d31,
+      roughness: .93,
+      metalness: .04,
+    });
+
+  const curbMaterial =
+    new THREE.MeshStandardMaterial({
+      color: 0x555b5d,
+      roughness: .88,
+      metalness: .03,
+    });
+
+  makeVisualSlab(
+    new THREE.Vector3(72, .065, 27),
+    new THREE.Vector3(20, .035, 53),
+    parkingMaterial,
+  );
+
+  makeVisualSlab(
+    new THREE.Vector3(72.5, .12, 1.0),
+    new THREE.Vector3(20, .10, 39.8),
+    curbMaterial,
+  );
+
+  makeVisualSlab(
+    new THREE.Vector3(72.5, .12, 1.0),
+    new THREE.Vector3(20, .10, 66.2),
+    curbMaterial,
+  );
+
+  const parkingLineMat =
+    new THREE.MeshStandardMaterial({
+      color: 0xc9b75a,
+      emissive: 0x2c2710,
+      emissiveIntensity: .18,
+      roughness: .86,
+      metalness: .01,
+    });
+
+  for (const x of [-7, 5, 17, 29, 41]) {
+    makeVisualSlab(
+      new THREE.Vector3(.10, .024, 9.4),
+      new THREE.Vector3(x, .095, 53),
+      parkingLineMat,
+    );
+
+    makeVisualSlab(
+      new THREE.Vector3(.10, .024, 9.4),
+      new THREE.Vector3(x + 7, .095, 53),
+      parkingLineMat,
+    );
+  }
+
+  const addParkedVehicle = (
+    x,
+    z,
+    rotation,
+    color,
+    scale = 1,
+  ) => {
+    const root = new THREE.Group();
+    root.position.set(x, .18, z);
+    root.rotation.y = rotation;
+    root.scale.setScalar(scale);
+    fallbackArenaRoot.add(root);
+
+    const bodyMat =
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness: .62,
+        metalness: .34,
+      });
+
+    const glassMat =
+      new THREE.MeshStandardMaterial({
+        color: 0x18262d,
+        roughness: .20,
+        metalness: .58,
+        emissive: 0x102a35,
+        emissiveIntensity: .55,
+      });
+
+    const rubberMat =
+      new THREE.MeshStandardMaterial({
+        color: 0x0b0e10,
+        roughness: .84,
+        metalness: .02,
+      });
+
+    const body =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          3.9,
+          1.0,
+          1.75,
+          3,
+          .11,
+        ),
+        bodyMat,
+      );
+    body.position.y = .62;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    root.add(body);
+
+    const cabin =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          2.25,
+          .82,
+          1.50,
+          3,
+          .12,
+        ),
+        bodyMat,
+      );
+    cabin.position.set(.18, 1.37, 0);
+    cabin.castShadow = true;
+    root.add(cabin);
+
+    const windshield =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          1.20,
+          .45,
+          .035,
+        ),
+        glassMat,
+      );
+    windshield.position.set(
+      .55,
+      1.43,
+      -.765,
+    );
+    windshield.rotation.y = 0;
+    root.add(windshield);
+
+    const rearGlass =
+      windshield.clone();
+    rearGlass.position.z = .765;
+    root.add(rearGlass);
+
+    for (const side of [-1, 1]) {
+      for (const wheelX of [-1.20, 1.16]) {
+        const wheel =
+          new THREE.Mesh(
+            new THREE.CylinderGeometry(
+              .37,
+              .37,
+              .22,
+              18,
+            ),
+            rubberMat,
+          );
+
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(
+          wheelX,
+          .34,
+          side * .92,
+        );
+        wheel.castShadow = true;
+        root.add(wheel);
+      }
+    }
+
+    const bumper =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          .32,
+          .22,
+          1.92,
+          2,
+          .03,
+        ),
+        rubberMat,
+      );
+    bumper.position.set(
+      -1.92,
+      .48,
+      0,
+    );
+    root.add(bumper);
+  };
+
+  addParkedVehicle(-4, 48, 0, 0x6d3540, .95);
+  addParkedVehicle(8, 58, Math.PI, 0x40647a, .95);
+  addParkedVehicle(28, 48, 0, 0x6f7650, 1.05);
+  addParkedVehicle(40, 58, Math.PI, 0xb07b36, .90);
+
+  // Three service islands make the parking/deployment court feel lived-in.
+  const serviceYellow =
+    new THREE.MeshStandardMaterial({
+      color: 0xd0a13f,
+      roughness: .52,
+      metalness: .40,
+    });
+
+  for (const [x, z, width] of [
+    [54, 47, 3.4],
+    [54, 59, 4.8],
+    [-17, 48, 2.7],
+  ]) {
+    const cabinet =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          width,
+          1.25,
+          1.20,
+          2,
+          .045,
+        ),
+        serviceYellow,
+      );
+    cabinet.position.set(x, .72, z);
+    cabinet.castShadow = true;
+    fallbackArenaRoot.add(cabinet);
+
+    const stripe =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          width * .62,
+          .08,
+          .04,
+        ),
+        hazardYellow,
+      );
+    stripe.position.set(x, 1.02, z - .62);
+    fallbackArenaRoot.add(stripe);
+  }
 
   // =========================================================================
   // WEST: FORTIFIED COMMAND DISTRICT
@@ -1749,106 +2095,272 @@ function addArena() {
     z,
     rotation,
     material,
+    variant = 'standard',
   ) => {
-    const root =
-      new THREE.Group();
-
-    root.position.set(x, 2.0, z);
+    const root = new THREE.Group();
+    root.position.set(x, 1.30, z);
     root.rotation.y = rotation;
     fallbackArenaRoot.add(root);
 
-    addTrimBox(
-      root,
-      [8.0, 3.7, .18],
-      [0, 0, -1.72],
-      material,
+    const floorMat =
+      material.clone();
+
+    const roofMat =
+      material.clone();
+
+    const darkMetal =
+      new THREE.MeshStandardMaterial({
+        color: 0x1b2326,
+        roughness: .58,
+        metalness: .54,
+      });
+
+    const highlightMat =
+      new THREE.MeshStandardMaterial({
+        color: variant === 'reefer'
+          ? 0x7cc3d9
+          : 0xb5b0a3,
+        roughness: .43,
+        metalness: .38,
+      });
+
+    const sharpBox = (
+      size,
+      position,
+      mat = material,
+    ) => {
+      const mesh =
+        new THREE.Mesh(
+          new THREE.BoxGeometry(
+            size[0],
+            size[1],
+            size[2],
+          ),
+          mat,
+        );
+
+      mesh.position.set(...position);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      root.add(mesh);
+      return mesh;
+    };
+
+    // Real-world proportions: long body, low profile, sharp 90-degree panels.
+    sharpBox(
+      [12.15, 2.58, .075],
+      [0, 0, -1.22],
+    );
+    sharpBox(
+      [12.15, 2.58, .075],
+      [0, 0, 1.22],
+    );
+    sharpBox(
+      [.075, 2.58, 2.35],
+      [-6.04, 0, 0],
+    );
+    sharpBox(
+      [.075, 2.58, 2.35],
+      [6.04, 0, 0],
+    );
+    sharpBox(
+      [12.0, .07, 2.35],
+      [0, 1.255, 0],
+      roofMat,
     );
 
-    addTrimBox(
-      root,
-      [8.0, 3.7, .18],
-      [0, 0, 1.72],
-      material,
+    // Corrugated long-side ribs.
+    for (let xPos = -5.45; xPos <= 5.45; xPos += .72) {
+      for (const zSide of [-1.265, 1.265]) {
+        sharpBox(
+          [.055, 2.36, .05],
+          [xPos, 0, zSide],
+          darkMetal,
+        );
+      }
+    }
+
+    // Heavy corner castings / posts.
+    for (const xPos of [-5.99, 5.99]) {
+      for (const zPos of [-1.17, 1.17]) {
+        sharpBox(
+          [.14, 2.72, .14],
+          [xPos, 0, zPos],
+          darkMetal,
+        );
+
+        for (const yPos of [-1.31, 1.31]) {
+          sharpBox(
+            [.30, .11, .30],
+            [xPos, yPos, zPos],
+            darkMetal,
+          );
+        }
+      }
+    }
+
+    // One end is a proper double-door assembly with inset panels and hinges.
+    const doorMat =
+      material.clone();
+    doorMat.color.offsetHSL(0, 0, -.055);
+
+    for (const side of [-1, 1]) {
+      const doorX = 6.005;
+      const leaf =
+        sharpBox(
+          [.035, 2.28, 1.08],
+          [doorX, 0, side * .59],
+          doorMat,
+        );
+      leaf.position.x = 6.06;
+
+      for (const yPos of [-.88, 0, .88]) {
+        sharpBox(
+          [.045, .06, .98],
+          [6.09, yPos, side * .59],
+          darkMetal,
+        );
+      }
+
+      const hinge =
+        new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            .045,
+            .045,
+            1.85,
+            12,
+          ),
+          darkMetal,
+        );
+      hinge.position.set(
+        5.96,
+        0,
+        side * 1.05,
+      );
+      root.add(hinge);
+    }
+
+    // Lock bars and warning plate.
+    sharpBox(
+      [.055, 1.72, .055],
+      [6.125, 0, 0],
+      highlightMat,
     );
 
-    addTrimBox(
-      root,
-      [.18, 3.7, 3.5],
-      [-3.9, 0, 0],
-      material,
+    sharpBox(
+      [.065, .42, .82],
+      [6.15, .06, 0],
+      variant === 'reefer'
+        ? highlightMat
+        : hazardYellow,
     );
 
-    addTrimBox(
-      root,
-      [.18, 3.7, 3.5],
-      [3.9, 0, 0],
-      material,
-    );
-
-    addTrimBox(
-      root,
-      [7.7, .18, 3.4],
-      [0, 1.77, 0],
-      material,
-    );
-
-    for (const xPos of [
-      -2.9,
-      -1.95,
-      -1.0,
-      -.05,
-      .90,
-      1.85,
-      2.8,
-    ]) {
-      addTrimBox(
-        root,
-        [.045, 3.2, .06],
-        [xPos, 0, -1.83],
-        buildingDark,
+    // Lower rail / fork pockets.
+    for (const zPos of [-.78, .78]) {
+      sharpBox(
+        [10.9, .13, .12],
+        [0, -1.25, zPos],
+        darkMetal,
       );
     }
 
-    addTrimBox(
-      root,
-      [1.7, 3.1, .08],
-      [2.7, 0, -1.84],
-      paintedMetal,
-    );
-
-    addTrimBox(
-      root,
-      [1.25, .12, .08],
-      [2.7, -.95, -1.9],
-      hazardYellow,
-    );
-
-    // Collision volume stays separate and clean.
-    addSolid(
-      [7.9, 3.5, 3.5],
-      [x, 1.78, z],
-      buildingDark,
-      rotation,
-    ).visible = false;
+    // Collision volume remains invisible.
+    const collision =
+      addSolid(
+        [12.05, 2.45, 2.40],
+        [x, 1.23, z],
+        darkCover,
+        rotation,
+      );
+    collision.visible = false;
   };
 
   // Containers are aligned into two logistics rows.
-  for (const [x, z, rot, mat] of [
-    [52, 7, 0, containerMatA],
-    [61, 7, 0, containerMatA],
-    [70, 7, 0, containerMatB],
-    [79, 7, 0, containerMatB],
-    [52, -5, 0, containerMatB],
-    [61, -5, 0, containerMatB],
-    [70, -5, 0, containerMatA],
-    [79, -5, 0, containerMatA],
+  const containerMatC =
+    new THREE.MeshStandardMaterial({
+      color: 0x4e684e,
+      roughness: .55,
+      metalness: .36,
+    });
+
+  const containerMatD =
+    new THREE.MeshStandardMaterial({
+      color: 0x7b3f3b,
+      roughness: .57,
+      metalness: .34,
+    });
+
+  const containerMatE =
+    new THREE.MeshStandardMaterial({
+      color: 0xb0a59a,
+      roughness: .49,
+      metalness: .30,
+    });
+
+  for (const [x, z, rot, mat, variant] of [
+    [50, 6, 0, containerMatA, 'standard'],
+    [63, 6, 0, containerMatC, 'standard'],
+    [76, 6, 0, containerMatB, 'standard'],
+    [50, -8, 0, containerMatD, 'standard'],
+    [63, -8, 0, containerMatE, 'reefer'],
+    [76, -8, Math.PI / 2, containerMatA, 'standard'],
   ]) {
     addContainer(
       x,
       z,
       rot,
       mat,
+      variant,
     );
+  }
+
+  // Logistics loading lane: one coherent work area instead of scattered props.
+  const loadingPadMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x384348,
+      roughness: .88,
+      metalness: .12,
+    });
+
+  makeVisualSlab(
+    new THREE.Vector3(42, .06, 15),
+    new THREE.Vector3(88, .035, 1),
+    loadingPadMat,
+  );
+
+  for (const [x, z] of [
+    [90, -1],
+    [97, -1],
+    [90, 4],
+    [97, 4],
+  ]) {
+    const pallet =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          1.35,
+          .13,
+          1.05,
+        ),
+        crateMat,
+      );
+    pallet.position.set(x, .12, z);
+    pallet.castShadow = true;
+    fallbackArenaRoot.add(pallet);
+
+    for (const y of [.23, .35]) {
+      const load =
+        new THREE.Mesh(
+          new THREE.BoxGeometry(
+            1.12,
+            .14,
+            .82,
+          ),
+          y > .2 ? containerMatC : crateMat,
+        );
+      load.position.set(x, y, z);
+      load.castShadow = true;
+      fallbackArenaRoot.add(load);
+    }
   }
 
   // =========================================================================
@@ -2449,6 +2961,149 @@ function addArena() {
   }
 }
 addArena();
+
+const boundaryGridRoot = new THREE.Group();
+boundaryGridRoot.name = 'InvisibleBoundaryGrid';
+boundaryGridRoot.visible = false;
+scene.add(boundaryGridRoot);
+
+const boundaryGridMaterial =
+  new THREE.LineBasicMaterial({
+    color: 0x79b5c9,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    toneMapped: false,
+  });
+
+const makeBoundaryGrid = (
+  side,
+  fixed,
+  span,
+  height = 10,
+) => {
+  const positions = [];
+  const divisions = 26;
+
+  for (let i = 0; i <= divisions; i += 1) {
+    const t = i / divisions;
+    const along = -span * .5 + span * t;
+
+    if (side === 'x') {
+      positions.push(
+        fixed, 0, along,
+        fixed, height, along,
+      );
+    } else {
+      positions.push(
+        along, 0, fixed,
+        along, height, fixed,
+      );
+    }
+  }
+
+  const rows = 10;
+  for (let i = 0; i <= rows; i += 1) {
+    const y = height * (i / rows);
+
+    if (side === 'x') {
+      positions.push(
+        fixed, y, -span * .5,
+        fixed, y, span * .5,
+      );
+    } else {
+      positions.push(
+        -span * .5, y, fixed,
+        span * .5, y, fixed,
+      );
+    }
+  }
+
+  const geometry =
+    new THREE.BufferGeometry();
+  geometry.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute(
+      positions,
+      3,
+    ),
+  );
+
+  const lines =
+    new THREE.LineSegments(
+      geometry,
+      boundaryGridMaterial,
+    );
+  boundaryGridRoot.add(lines);
+  return lines;
+};
+
+const boundaryGridSides = [
+  {
+    side: 'x',
+    fixed: -129.2,
+    span: 150,
+    axis: 'x',
+  },
+  {
+    side: 'x',
+    fixed: 129.2,
+    span: 150,
+    axis: 'x',
+  },
+  {
+    side: 'z',
+    fixed: -74.2,
+    span: 260,
+    axis: 'z',
+  },
+  {
+    side: 'z',
+    fixed: 74.2,
+    span: 260,
+    axis: 'z',
+  },
+];
+
+for (const side of boundaryGridSides) {
+  makeBoundaryGrid(
+    side.side,
+    side.fixed,
+    side.span,
+  );
+}
+
+function updateBoundaryGrid() {
+  if (
+    !state.active ||
+    state.over
+  ) {
+    boundaryGridRoot.visible = false;
+    boundaryGridMaterial.opacity = 0;
+    return;
+  }
+
+  const distances = [
+    129.2 - Math.abs(player.position.x),
+    74.2 - Math.abs(player.position.z),
+  ];
+
+  const distance =
+    Math.min(...distances);
+
+  const intensity =
+    THREE.MathUtils.clamp(
+      (26 - distance) / 26,
+      0,
+      1,
+    );
+
+  boundaryGridRoot.visible =
+    intensity > 0;
+
+  boundaryGridMaterial.opacity =
+    .08 + intensity * .44;
+}
 
 const fallbackObstacleCount = obstacles.length;
 
@@ -3435,6 +4090,335 @@ function createWeapon() {
 const weapon = createWeapon();
 weapon.visible = false;
 
+const menuGunPairs = [];
+const menuGunLights = {
+  key: null,
+  fill: null,
+  rim: null,
+};
+
+const menuGunPalettes = [
+  {
+    name: 'RIFLE',
+    dark: 0x0b1115,
+    metal: 0x4e5c66,
+    polymer: 0x1c242a,
+    accent: 0x657e8b,
+    light: 0x9fc9db,
+  },
+  {
+    name: 'FIELD',
+    dark: 0x11150f,
+    metal: 0x4f5a4c,
+    polymer: 0x2d3828,
+    accent: 0x788e57,
+    light: 0xa9c176,
+  },
+  {
+    name: 'DESERT',
+    dark: 0x17130f,
+    metal: 0x6e6255,
+    polymer: 0x3f3427,
+    accent: 0xb08b5d,
+    light: 0xd4aa70,
+  },
+];
+
+function prepareMenuGun(source, palette, scale = 1) {
+  const gun = source.clone(true);
+  gun.visible = false;
+  gun.scale.setScalar(scale);
+
+  gun.traverse((child) => {
+    if (
+      child.name === 'WeaponLeftArm' ||
+      child.name === 'WeaponRightArm' ||
+      child.name === 'WeaponLeftHand' ||
+      child.name === 'WeaponRightHand' ||
+      child.name === 'WeaponLeftHandGrip' ||
+      child.name === 'WeaponRightHandGrip' ||
+      child.name === 'WeaponMuzzleLight' ||
+      child.name === 'WeaponMuzzleFlash'
+    ) {
+      child.visible = false;
+      return;
+    }
+
+    if (!child.isMesh || !child.material) return;
+
+    const materials = Array.isArray(child.material)
+      ? child.material
+      : [child.material];
+
+    const cloned =
+      materials.map((material) => {
+        const next = material.clone();
+        next.transparent = true;
+        next.opacity = 0;
+        next.depthWrite = true;
+
+        if (next.color) {
+          if (child.name.includes('Optic')) {
+            next.color.setHex(palette.light);
+            if (next.emissive) {
+              next.emissive.setHex(palette.light);
+              next.emissiveIntensity = 1.25;
+            }
+          } else if (
+            child.name.includes('Receiver') ||
+            child.name.includes('Upper')
+          ) {
+            next.color.setHex(palette.metal);
+          } else if (
+            child.name.includes('Stock') ||
+            child.name.includes('Handguard') ||
+            child.name.includes('Grip') ||
+            child.name.includes('Foregrip') ||
+            child.name.includes('Magazine')
+          ) {
+            next.color.setHex(palette.polymer);
+          } else {
+            next.color.setHex(palette.dark);
+          }
+        }
+
+        return next;
+      });
+
+    child.material =
+      Array.isArray(child.material)
+        ? cloned
+        : cloned[0];
+
+    child.castShadow = true;
+    child.receiveShadow = true;
+    child.frustumCulled = false;
+  });
+
+  gun.position.set(1.9, -.10, -3.6);
+  gun.rotation.set(
+    -.08,
+    -.22,
+    .035,
+  );
+
+  gunViewportScene.add(gun);
+  return gun;
+}
+
+for (let i = 0; i < menuGunPalettes.length; i += 1) {
+  const palette = menuGunPalettes[i];
+
+  const hero =
+    prepareMenuGun(
+      weapon,
+      palette,
+      1.04 - i * .04,
+    );
+
+  const secondary =
+    prepareMenuGun(
+      weapon,
+      palette,
+      .72 - i * .025,
+    );
+
+  hero.position.set(
+    1.95,
+    -.10,
+    -3.85,
+  );
+  hero.rotation.y += i * .16;
+
+  secondary.position.set(
+    3.25,
+    -.86,
+    -5.05,
+  );
+  secondary.rotation.y -= .42 - i * .08;
+  secondary.rotation.z = .06;
+
+  menuGunPairs.push({
+    hero,
+    secondary,
+    palette,
+  });
+}
+
+menuGunLights.key =
+  new THREE.PointLight(
+    0xffffff,
+    2.9,
+    12,
+    2,
+  );
+menuGunLights.key.position.set(
+  3.1,
+  2.4,
+  1.8,
+);
+gunViewportScene.add(menuGunLights.key);
+
+menuGunLights.fill =
+  new THREE.PointLight(
+    0x7ca8d7,
+    1.5,
+    11,
+    2,
+  );
+menuGunLights.fill.position.set(
+  -1.2,
+  1.1,
+  2.2,
+);
+gunViewportScene.add(menuGunLights.fill);
+
+menuGunLights.rim =
+  new THREE.PointLight(
+    0xe2c17e,
+    1.8,
+    12,
+    2,
+  );
+menuGunLights.rim.position.set(
+  4.4,
+  3.4,
+  -2.6,
+);
+gunViewportScene.add(menuGunLights.rim);
+
+let menuGunCycle = 0;
+let menuGunCurrent = 0;
+let menuGunPrevious = -1;
+
+function setMenuGunOpacity(gun, opacity) {
+  gun.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+
+    const materials = Array.isArray(child.material)
+      ? child.material
+      : [child.material];
+
+    for (const material of materials) {
+      if ('opacity' in material) {
+        material.opacity = opacity;
+      }
+    }
+  });
+
+  gun.visible = opacity > .001;
+}
+
+function updateMenuGuns(dt) {
+  const show =
+    !state.active &&
+    !state.over;
+
+  if (!show) {
+    for (const pair of menuGunPairs) {
+      pair.hero.visible = false;
+      pair.secondary.visible = false;
+    }
+    return;
+  }
+
+  menuGunCycle += dt;
+
+  const next =
+    Math.floor(menuGunCycle / 7.5) %
+    menuGunPairs.length;
+
+  if (next !== menuGunCurrent) {
+    menuGunPrevious = menuGunCurrent;
+    menuGunCurrent = next;
+    menuGunCycle =
+      next * 7.5 + .001;
+  }
+
+  const localT =
+    THREE.MathUtils.clamp(
+      (menuGunCycle % 7.5) / 1.4,
+      0,
+      1,
+    );
+
+  const fade =
+    THREE.MathUtils.smoothstep(
+      localT,
+      0,
+      1,
+    );
+
+  for (let i = 0; i < menuGunPairs.length; i += 1) {
+    const pair = menuGunPairs[i];
+    const isCurrent = i === menuGunCurrent;
+    const isPrevious = i === menuGunPrevious;
+
+    const opacity =
+      isCurrent
+        ? (i === menuGunPrevious ? 1 : fade)
+        : isPrevious
+          ? 1 - fade
+          : 0;
+
+    setMenuGunOpacity(pair.hero, opacity);
+    setMenuGunOpacity(pair.secondary, opacity * .78);
+
+    const t =
+      performance.now() * .001 +
+      i * 1.7;
+
+    if (pair.hero.visible) {
+      pair.hero.rotation.x =
+        -.08 + Math.sin(t * .42) * .035;
+      pair.hero.rotation.y =
+        -.22 + Math.sin(t * .55) * .13;
+      pair.hero.rotation.z =
+        .035 + Math.sin(t * .31) * .022;
+      pair.hero.position.y =
+        -.10 + Math.sin(t * .70) * .055;
+    }
+
+    if (pair.secondary.visible) {
+      pair.secondary.rotation.x =
+        -.10 + Math.sin(t * .37) * .028;
+      pair.secondary.rotation.y =
+        -.34 + Math.sin(t * .49) * .10;
+      pair.secondary.position.y =
+        -.86 + Math.cos(t * .62) * .04;
+    }
+  }
+
+  const palette =
+    menuGunPairs[menuGunCurrent]?.palette ||
+    menuGunPalettes[0];
+
+  menuGunLights.key.color.lerp(
+    new THREE.Color(palette.light),
+    THREE.MathUtils.clamp(dt * 3.5, 0, 1),
+  );
+  menuGunLights.fill.color.lerp(
+    new THREE.Color(palette.accent),
+    THREE.MathUtils.clamp(dt * 3.0, 0, 1),
+  );
+  menuGunLights.rim.color.lerp(
+    new THREE.Color(0xffd8a0),
+    THREE.MathUtils.clamp(dt * 2.5, 0, 1),
+  );
+
+  const pulse =
+    .85 + Math.sin(performance.now() * .0014) * .12;
+
+  menuGunLights.key.intensity =
+    THREE.MathUtils.damp(
+      menuGunLights.key.intensity,
+      2.8 * pulse,
+      5,
+      dt,
+    );
+}
+
+
 const worldWeaponAnchor = new THREE.Group();
 const worldMuzzleAnchor = new THREE.Object3D();
 worldWeaponAnchor.add(worldMuzzleAnchor);
@@ -4282,7 +5266,7 @@ function resetGame(spawnImmediately = true) {
     comboTimer: 0,
   });
 
-  player.position.set(0, 1.65, 56);
+  player.position.set(18, 1.65, 58);
   camera.position.set(0, 0, 0);
   camera.rotation.set(0, 0, 0);
   camera.fov = CONFIG.defaultFov;
@@ -5930,7 +6914,7 @@ function updateWeapon(dt) {
   // Keep the rifle narrow and bring its optic onto the camera centerline.
   const adsPosition = new THREE.Vector3(
     -.005,
-    -.405 - state.weaponKick * .015,
+    -.475 - state.weaponKick * .015,
     -.78 + state.weaponKick * .035,
   );
 
@@ -5979,7 +6963,6 @@ function updateWeapon(dt) {
 
   const visible = state.active && !state.over;
   weapon.visible = visible;
-  gunViewportRenderer.domElement.style.display = visible ? 'block' : 'none';
   syncWorldWeaponAnchor();
 
   const flashPower = state.muzzleFlash > 0 ? 18 : 0;
@@ -6169,6 +7152,8 @@ function frame() {
       .05,
     );
 
+  updateBoundaryGrid();
+
   const hasPointerLock =
     document.pointerLockElement ===
     renderer.domElement;
@@ -6218,12 +7203,25 @@ function frame() {
 
   atmosphere.composer.render(dt);
 
-  if (state.active && !state.over) {
-    gunViewportRenderer.render(
-      gunViewportScene,
-      gunViewportCamera,
-    );
-  }
+  updateMenuGuns(dt);
+
+  const showGameplayWeapon =
+    state.active &&
+    !state.over;
+
+  const showMenuWeapon =
+    !state.active &&
+    !state.over;
+
+  gunViewportRenderer.domElement.style.display =
+    showGameplayWeapon || showMenuWeapon
+      ? 'block'
+      : 'none';
+
+  gunViewportRenderer.render(
+    gunViewportScene,
+    gunViewportCamera,
+  );
 }
 
 function setWaveChoice(value) {
@@ -6241,6 +7239,48 @@ function showMenuView(view) {
   els.waveMenu.classList.toggle('hidden', view !== 'waves');
   els.optionsMenu.classList.toggle('hidden', view !== 'options');
 }
+
+const menuNavButtons = [
+  ...document.querySelectorAll(
+    '#menu-main .menu-nav button',
+  ),
+];
+
+let menuSelectionIndex = 0;
+
+function updateMenuSelection(nextIndex, focus = true) {
+  if (!menuNavButtons.length) return;
+
+  menuSelectionIndex =
+    (nextIndex + menuNavButtons.length) %
+    menuNavButtons.length;
+
+  menuNavButtons.forEach(
+    (button, index) => {
+      button.classList.toggle(
+        'menu-selected',
+        index === menuSelectionIndex,
+      );
+    },
+  );
+
+  if (
+    focus &&
+    els.mainMenu &&
+    !els.mainMenu.classList.contains('hidden')
+  ) {
+    menuNavButtons[menuSelectionIndex]?.focus({
+      preventScroll: true,
+    });
+  }
+}
+
+for (const [index, button] of menuNavButtons.entries()) {
+  button.addEventListener('mouseenter', () => {
+    updateMenuSelection(index, false);
+  });
+}
+
 
 let directorWaveInitialized = false;
 
@@ -6329,6 +7369,7 @@ els.backFromOptions.addEventListener('click', () => showMenuView('main'));
 
 setWaveChoice('1');
 showMenuView('main');
+updateMenuSelection(0, false);
 
 function enterGame() {
   // Put the UI into gameplay state first. Optional systems must not be able
@@ -6370,7 +7411,7 @@ function enterGame() {
       combo: 0,
       comboTimer: 0,
     });
-    player.position.set(0, 1.65, 56);
+    player.position.set(18, 1.65, 58);
     camera.position.set(0, 0, 0);
     camera.rotation.set(0, 0, 0);
     camera.fov = CONFIG.defaultFov;
@@ -6412,6 +7453,34 @@ els.updateDismiss.addEventListener('click', () => {
 });
 
 window.addEventListener('keydown', (event) => {
+  const mainMenuVisible =
+    !state.active &&
+    !state.over &&
+    els.mainMenu &&
+    !els.mainMenu.classList.contains('hidden');
+
+  if (
+    mainMenuVisible &&
+    (event.code === 'ArrowDown' ||
+      event.code === 'ArrowUp')
+  ) {
+    event.preventDefault();
+    updateMenuSelection(
+      menuSelectionIndex +
+        (event.code === 'ArrowDown' ? 1 : -1),
+    );
+    return;
+  }
+
+  if (
+    mainMenuVisible &&
+    event.code === 'Enter'
+  ) {
+    event.preventDefault();
+    menuNavButtons[menuSelectionIndex]?.click();
+    return;
+  }
+
   if (event.code === 'KeyE') {
     if (pickupNearestDroppedWeapon()) {
       event.preventDefault();
@@ -6462,6 +7531,20 @@ window.addEventListener('mouseup', (event) => {
 renderer.domElement.addEventListener('contextmenu', (event) => {
   event.preventDefault();
 });
+
+els.mainMenu?.addEventListener('wheel', (event) => {
+  if (
+    state.active ||
+    state.over ||
+    els.mainMenu.classList.contains('hidden')
+  ) return;
+
+  event.preventDefault();
+  updateMenuSelection(
+    menuSelectionIndex +
+      (event.deltaY > 0 ? 1 : -1),
+  );
+}, { passive: false });
 
 renderer.domElement.addEventListener('click', () => {
   if (state.active && !state.over && document.pointerLockElement !== renderer.domElement) {
