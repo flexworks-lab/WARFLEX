@@ -162,7 +162,7 @@ let pendingUpdate = null;
 
 const DEBUG_MODE = new URLSearchParams(location.search).has('debug');
 
-let startRequestedBeforeBoot = false;
+let startRequestedBeforeBoot = Boolean(window.__WARFLEX_START_REQUESTED);
 window.addEventListener('warfex-start-request', () => {
   startRequestedBeforeBoot = true;
   if (typeof window.WARFLEX_START_GAME === 'function') {
