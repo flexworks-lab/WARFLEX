@@ -99,12 +99,29 @@
     </div>
   </div>
 
-  <div id="pause-screen" class="screen hidden">
-    <div class="panel compact">
-      <p class="eyebrow">SYSTEM PAUSED</p>
-      <h2>WEAPONS HOT</h2>
-      <p>Click below to re-enter the arena.</p>
-      <button id="resume-button">RESUME</button>
+  <div id="pause-screen" class="screen pause-screen hidden">
+    <div class="pause-shell">
+      <div class="pause-main">
+        <p class="eyebrow">WARFLEX // COMBAT PAUSED</p>
+        <h2>PAUSED</h2>
+        <p class="pause-status"><span class="pause-dot"></span> ARENA STATE SAVED IN MEMORY</p>
+        <div class="pause-actions">
+          <button id="resume-button" class="pause-primary" type="button">RESUME</button>
+          <button id="pause-restart-button" type="button">RESTART RUN</button>
+          <button id="pause-quit-button" type="button">QUIT TO MENU</button>
+        </div>
+      </div>
+      <aside class="pause-side">
+        <div class="pause-side-title">FIELD CONTROLS</div>
+        <div class="pause-control"><b>W A S D</b><span>MOVE</span></div>
+        <div class="pause-control"><b>SHIFT</b><span>SPRINT</span></div>
+        <div class="pause-control"><b>SPACE</b><span>JUMP</span></div>
+        <div class="pause-control"><b>CTRL / C</b><span>SLIDE</span></div>
+        <div class="pause-control"><b>LMB</b><span>FIRE</span></div>
+        <div class="pause-control"><b>R</b><span>RELOAD</span></div>
+        <div class="pause-control"><b>ESC</b><span>PAUSE</span></div>
+      </aside>
+      <div class="pause-footer">PROJECT STRIKE <span>//</span> WARFLEX</div>
     </div>
   </div>
 
