@@ -6531,7 +6531,7 @@ function refreshMapList(){
   if(!els.mapList)return; els.mapList.innerHTML='';
   const current=getCurrentMapId(); const maps=getMapLibrary();
   const built=document.createElement('button'); built.type='button'; built.className='map-choice active'; built.dataset.mapId='builtin';
-  built.innerHTML='<strong>WARFLEX BASE</strong><span>BUILT-IN MAP'+(current==='builtin'?' · CURRENT':'')+'</span>'; els.mapList.appendChild(built);
+  built.innerHTML='<strong>WARFLEX BASE</strong><span>BUILT-IN MAP'+(current==='builtin'?' · CURRENT':'')+'</span>'; built.addEventListener('click',()=>{state.selectedMapId='builtin';els.mapList.querySelectorAll('.map-choice').forEach(x=>x.classList.toggle('active',x.dataset.mapId==='builtin'));}); els.mapList.appendChild(built);
   for(const m of maps){const b=document.createElement('button');b.type='button';b.className='map-choice';b.dataset.mapId=m.id;b.innerHTML='<strong></strong><span></span>';b.querySelector('strong').textContent=m.name;b.querySelector('span').textContent=(current===m.id?'CURRENT · ':'')+'CUSTOM MAP';b.addEventListener('click',()=>{state.selectedMapId=m.id;els.mapList.querySelectorAll('.map-choice').forEach(x=>x.classList.toggle('active',x.dataset.mapId===m.id));});els.mapList.appendChild(b);}
   if(!state.selectedMapId)state.selectedMapId=current&&current!=='builtin'?current:'builtin'; els.mapList.querySelectorAll('.map-choice').forEach(x=>x.classList.toggle('active',x.dataset.mapId===state.selectedMapId));
 }
@@ -6690,6 +6690,7 @@ els.backFromOptions.addEventListener('click', () => showMenuView('main'));
 els.mapList?.addEventListener('click', (event) => { const b=event.target.closest('.map-choice'); if(b) state.selectedMapId=b.dataset.mapId; });
 els.startMapButton?.addEventListener('click', () => { refreshMapList(); enterGame(); });
 els.editorButton?.addEventListener('click', () => { location.href=location.pathname+'?editor=WARFLEX_DEV'; });
+if(new URLSearchParams(location.search).get('editor')==='WARFLEX_DEV' && els.editorButton) els.editorButton.style.display='block';
 
 setWaveChoice('1');
 showMenuView('main');
