@@ -1250,60 +1250,176 @@ function spawnEnemyModel() {
     roughness: .12,
   });
 
-  const box = (size, position, material, parent, name = '', rotation = [0,0,0]) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+  const box = (
+    size,
+    position,
+    material,
+    parent,
+    name = '',
+    rotation = [0,0,0],
+  ) => {
+    // Keep the same dimensions/names for the ragdoll, but use real beveled
+    // hard-surface geometry so armor no longer looks like raw cubes.
+    const minSize = Math.min(...size);
+    const geometry = new RoundedBoxGeometry(
+      size[0],
+      size[1],
+      size[2],
+      3,
+      Math.min(
+        .035,
+        Math.max(.008, minSize * .12),
+      ),
+    );
+
+    const mesh = new THREE.Mesh(
+      geometry,
+      material,
+    );
+
     mesh.position.set(...position);
     mesh.rotation.set(...rotation);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+
     if (name) mesh.name = name;
+
     parent.add(mesh);
     return mesh;
   };
 
-  const cyl = (rt, rb, height, position, material, parent, rotation = [0,0,0], radial = 12, name = '') => {
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, height, radial, 1), material);
+  const cyl = (
+    rt,
+    rb,
+    height,
+    position,
+    material,
+    parent,
+    rotation = [0,0,0],
+    radial = 12,
+    name = '',
+  ) => {
+    const geometry = new THREE.CylinderGeometry(
+      rt,
+      rb,
+      height,
+      Math.max(24, radial),
+      2,
+      false,
+    );
+    geometry.computeVertexNormals();
+
+    const mesh = new THREE.Mesh(
+      geometry,
+      material,
+    );
+
     mesh.position.set(...position);
     mesh.rotation.set(...rotation);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+
     if (name) mesh.name = name;
+
     parent.add(mesh);
     return mesh;
   };
 
-  const sphere = (radius, position, material, parent, scale = [1,1,1], name = '') => {
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 16, 12), material);
+  const sphere = (
+    radius,
+    position,
+    material,
+    parent,
+    scale = [1,1,1],
+    name = '',
+  ) => {
+    const geometry = new THREE.SphereGeometry(
+      radius,
+      28,
+      20,
+    );
+    geometry.computeVertexNormals();
+
+    const mesh = new THREE.Mesh(
+      geometry,
+      material,
+    );
+
     mesh.position.set(...position);
     mesh.scale.set(...scale);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+
     if (name) mesh.name = name;
+
     parent.add(mesh);
     return mesh;
   };
 
-  const capsule = (radius, length, position, material, parent, rotation = [0,0,0], name = '') => {
-    const mesh = new THREE.Mesh(
-      new THREE.CapsuleGeometry(radius, length, 6, 12),
-      material
+  const capsule = (
+    radius,
+    length,
+    position,
+    material,
+    parent,
+    rotation = [0,0,0],
+    name = '',
+  ) => {
+    const geometry = new THREE.CapsuleGeometry(
+      radius,
+      length,
+      8,
+      20,
     );
+    geometry.computeVertexNormals();
+
+    const mesh = new THREE.Mesh(
+      geometry,
+      material,
+    );
+
     mesh.position.set(...position);
     mesh.rotation.set(...rotation);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+
     if (name) mesh.name = name;
+
     parent.add(mesh);
     return mesh;
   };
 
-  const torus = (radius, tube, position, material, parent, rotation = [0,0,0], arc = Math.PI * 2, name = '') => {
-    const mesh = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 16, arc), material);
+  const torus = (
+    radius,
+    tube,
+    position,
+    material,
+    parent,
+    rotation = [0,0,0],
+    arc = Math.PI * 2,
+    name = '',
+  ) => {
+    const geometry = new THREE.TorusGeometry(
+      radius,
+      tube,
+      14,
+      28,
+      arc,
+    );
+    geometry.computeVertexNormals();
+
+    const mesh = new THREE.Mesh(
+      geometry,
+      material,
+    );
+
     mesh.position.set(...position);
     mesh.rotation.set(...rotation);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+
     if (name) mesh.name = name;
+
     parent.add(mesh);
     return mesh;
   };
