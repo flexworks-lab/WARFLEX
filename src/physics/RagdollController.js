@@ -84,9 +84,9 @@ function createSegmentBody({
   body.addShape(
     new CANNON.Box(
       new CANNON.Vec3(
-        halfExtents.x,
-        halfExtents.y,
-        halfExtents.z,
+        halfExtents.x * scale,
+        halfExtents.y * scale,
+        halfExtents.z * scale,
       )
     ),
     cannonVec(
@@ -288,6 +288,7 @@ export class RagdollController {
         mass: 5,
         world: this.world,
         collisionGroup,
+        scale: visualScale,
       }));
     }
 
@@ -302,6 +303,7 @@ export class RagdollController {
         mass: 1.4,
         world: this.world,
         collisionGroup,
+        scale: visualScale,
       }));
     }
 
@@ -313,6 +315,7 @@ export class RagdollController {
         mass: 1.4,
         world: this.world,
         collisionGroup,
+        scale: visualScale,
       }));
     }
 
@@ -327,6 +330,7 @@ export class RagdollController {
         mass: 1.0,
         world: this.world,
         collisionGroup,
+        scale: visualScale,
       }));
     }
 
@@ -338,6 +342,7 @@ export class RagdollController {
         mass: 1.0,
         world: this.world,
         collisionGroup,
+        scale: visualScale,
       }));
     }
 
@@ -354,6 +359,7 @@ export class RagdollController {
         mass: 4,
         world: this.world,
         collisionGroup,
+        scale: visualScale,
       }));
     }
 
@@ -365,6 +371,7 @@ export class RagdollController {
         mass: 4,
         world: this.world,
         collisionGroup,
+        scale: visualScale,
       }));
     }
 
@@ -376,6 +383,7 @@ export class RagdollController {
         mass: 2.7,
         world: this.world,
         collisionGroup,
+        scale: visualScale,
       }));
     }
 
@@ -387,6 +395,7 @@ export class RagdollController {
         mass: 2.7,
         world: this.world,
         collisionGroup,
+        scale: visualScale,
       }));
     }
 
@@ -398,6 +407,7 @@ export class RagdollController {
         mass: 2,
         world: this.world,
         collisionGroup,
+        scale: visualScale,
       }));
     }
 
