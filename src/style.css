@@ -1790,3 +1790,24 @@ body {
   user-select: text !important;
   -webkit-user-select: text !important;
 }
+
+/* Full-screen armory: let the dedicated 3D weapon viewport read through the UI. */
+.loadout-screen {
+  background:
+    radial-gradient(circle at 68% 43%, rgba(76,95,110,.22), transparent 31%),
+    linear-gradient(120deg, rgba(4,7,10,.64), rgba(9,13,17,.42) 55%, rgba(3,6,9,.64));
+}
+
+.loadout-screen::before {
+  opacity: .28;
+}
+
+.loadout-scanline {
+  opacity: .12;
+}
+
+/* Preview weapon should read as solid hardware, not a ghost image. */
+.loadout-screen + .pause-screen,
+.loadout-screen ~ .gun-viewport-canvas {
+  opacity: 1 !important;
+}
