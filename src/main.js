@@ -162,6 +162,14 @@ let pendingUpdate = null;
 
 const DEBUG_MODE = new URLSearchParams(location.search).has('debug');
 
+let startRequestedBeforeBoot = false;
+window.addEventListener('warfex-start-request', () => {
+  startRequestedBeforeBoot = true;
+  if (typeof window.WARFLEX_START_GAME === 'function') {
+    window.WARFLEX_START_GAME();
+  }
+});
+
 function showRuntimeError(error, context = 'Runtime error') {
   console.error('[WARFLEX]', context, error);
 
@@ -2703,7 +2711,11 @@ function enterGame() {
   renderer.domElement.requestPointerLock?.();
 }
 
-els.startButton.addEventListener('click', enterGame);
+window.WARFLEX_START_GAME = enterGame;
+if (startRequestedBeforeBoot) {
+  startRequestedBeforeBoot = false;
+  enterGame();
+}
 els.resumeButton.addEventListener('click', () => renderer.domElement.requestPointerLock());
 els.restartButton.addEventListener('click', enterGame);
 els.updateReload.addEventListener('click', () => {
