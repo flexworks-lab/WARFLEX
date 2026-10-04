@@ -246,6 +246,8 @@ const player = {
   radius: 0.45,
 };
 
+const ENEMY_GROUND_Y = 0.12;
+
 const UPDATE_STORAGE_KEY = 'warfex:lastSeenUpdate';
 let pendingUpdate = null;
 
@@ -4494,6 +4496,8 @@ function spawnEnemy(index = 0, spawnPosition = null) {
     getSpawnPoint(index);
 
   group.position.copy(spawn);
+  // Living enemies are kinematic; keep their feet planted on the flat arena.
+  group.position.y = ENEMY_GROUND_Y;
   group.scale.setScalar(
     group.userData.baseScale || .54,
   );
@@ -5547,6 +5551,9 @@ function enemyShoot(enemy) {
 function updateEnemies(dt) {
   for (let i = enemies.length - 1; i >= 0; i -= 1) {
     const enemy = enemies[i];
+
+    // Do not let navigation/animation accumulate vertical drift.
+    enemy.group.position.y = ENEMY_GROUND_Y;
 
     enemy.attackTimer -= dt;
     enemy.hurtFlash =
