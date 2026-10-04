@@ -181,13 +181,70 @@
       startButton?.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
+
         window.__WARFLEX_START_REQUESTED = true;
         window.dispatchEvent(new Event('warfex-start-request'));
+
+        if (typeof window.WARFLEX_START_GAME === 'function') {
+          try {
+            window.__WARFLEX_START_REQUESTED = false;
+            window.WARFLEX_START_GAME();
+          } catch (error) {
+            console.error('[WARFLEX START]', error);
+            const status = document.querySelector('#warfex-boot-status');
+            if (status) {
+              status.textContent =
+                'WARFLEX failed to start: ' +
+                (error?.message || String(error));
+              status.style.display = 'block';
+            }
+          }
+        }
       });
 
       show('main');
     })();
   </script>
-  <script type="module" src="./src/main.js?v=__WARFLEX_BUILD__"></script>
+  <script>
+    (() => {
+      const bootMessage = document.createElement('div');
+      bootMessage.id = 'warfex-boot-status';
+      Object.assign(bootMessage.style, {
+        position: 'fixed',
+        left: '50%',
+        bottom: '24px',
+        transform: 'translateX(-50%)',
+        zIndex: '2000',
+        maxWidth: 'min(760px, calc(100vw - 32px))',
+        padding: '10px 14px',
+        border: '1px solid rgba(255,255,255,.18)',
+        background: 'rgba(5,7,10,.92)',
+        color: '#f4f6f8',
+        font: '12px/1.45 monospace',
+        textAlign: 'center',
+        display: 'none',
+        pointerEvents: 'none',
+      });
+      document.body.appendChild(bootMessage);
+
+      const setBootError = (error) => {
+        console.error('[WARFLEX BOOT]', error);
+        bootMessage.textContent =
+          'WARFLEX failed to start. ' +
+          (error?.message || String(error));
+        bootMessage.style.display = 'block';
+      };
+
+      import('./src/main.js?v=__WARFLEX_BUILD__')
+        .then(() => {
+          if (window.__WARFLEX_START_REQUESTED &&
+              typeof window.WARFLEX_START_GAME === 'function') {
+            window.__WARFLEX_START_REQUESTED = false;
+            window.WARFLEX_START_GAME();
+          }
+        })
+        .catch(setBootError);
+    })();
+  </script>
 </body>
 </html>
