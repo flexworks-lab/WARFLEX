@@ -1050,7 +1050,7 @@ function addArena() {
     box(root, [3.56, Math.min(2.45, height * 0.58), 0.18], [0, Math.min(1.28, height * 0.34), doorZ + doorSign * 0.23], doorMat);
 
     for (let i = -2; i <= 2; i += 1) {
-      box(root, [0.05, height * 0.63, 0.22], [i * 0.68, Math.min(1.08, height * 0.34), doorZ + doorSign * 0.34], steelDark);
+      box(root, [0.05, height * 0.63, 0.22], [i * 0.68, Math.min(1.30, height * 0.34), doorZ + doorSign * 0.34], steelDark);
     }
 
     mark(root, [3.1, 0.12, 0.09], [0, Math.min(2.85, height * 0.86), doorZ + doorSign * 0.36], accent);
@@ -1112,7 +1112,7 @@ function addArena() {
     z: 24,
     width: 28,
     depth: 20,
-    height: 4.7,
+    height: 5.6,
     accent: 0x3e6572,
     roof: 0x1f292d,
     label: 'COMMAND',
@@ -1123,7 +1123,7 @@ function addArena() {
     z: 31,
     width: 20,
     depth: 14,
-    height: 5.6,
+    height: 4.7,
     accent: 0x62644b,
     roof: 0x28312e,
     label: 'BARRACKS',
