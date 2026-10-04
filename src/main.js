@@ -285,6 +285,31 @@ const atmosphere = configureAtmosphere(
 
 const assetManager = new AssetManager(renderer);
 
+// Explicitly bundle every external file referenced by the AK47 GLTF.
+// Vite only sees these URLs because they are declared as module assets.
+const AK47_GLTF_URL = new URL(
+  './assets/ak47/scene.gltf',
+  import.meta.url,
+).href;
+const AK47_RESOURCE_URLS = {
+  'scene.bin': new URL(
+    './assets/ak47/scene.bin',
+    import.meta.url,
+  ).href,
+  'textures/Material_baseColor.png': new URL(
+    './assets/ak47/textures/Material_baseColor.png',
+    import.meta.url,
+  ).href,
+  'textures/Material_metallicRoughness.png': new URL(
+    './assets/ak47/textures/Material_metallicRoughness.png',
+    import.meta.url,
+  ).href,
+  'textures/Material_normal.png': new URL(
+    './assets/ak47/textures/Material_normal.png',
+    import.meta.url,
+  ).href,
+};
+
 // Bright outdoor daylight rig: a strong sun plus soft sky/ground fill
 // keeps the arena readable while preserving directional shadows.
 const worldHemiLight = new THREE.HemisphereLight(
@@ -3775,12 +3800,10 @@ function installImportedWeaponModel(target, sourceScene, {
 
 window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
   try {
-    const url = new URL(
-      './assets/ak47/scene.gltf',
-      import.meta.url,
-    ).href;
-
-    const asset = await assetManager.loadGLTF(url);
+    const asset = await assetManager.loadGLTFDocument(
+      AK47_GLTF_URL,
+      AK47_RESOURCE_URLS,
+    );
 
     installImportedWeaponModel(
       weapon,
