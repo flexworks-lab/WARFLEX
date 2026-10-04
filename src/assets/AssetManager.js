@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
-import { USDZLoader } from 'three/addons/loaders/USDZLoader.js';
+import { USDLoader } from 'three/addons/loaders/USDLoader.js';
 
 export class AssetManager {
   constructor(renderer) {
@@ -59,7 +59,7 @@ export class AssetManager {
       return this.cache.get(url);
     }
 
-    const usdzLoader = new USDZLoader();
+    const usdzLoader = new USDLoader();
     const scene = await usdzLoader.loadAsync(url);
     this.prepare(scene);
 
