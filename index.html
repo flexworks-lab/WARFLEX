@@ -55,6 +55,7 @@
           <button id="start-button" type="button">START</button>
           <button id="waves-button" type="button">WAVES</button>
           <button id="options-button" type="button">OPTIONS</button>
+          <button id="editor-button" type="button" class="dev-only-menu">MAP EDITOR</button>
         </div>
         <p class="small menu-hint">WASD MOVE · SHIFT SPRINT · CTRL/C SLIDE · SPACE JUMP · CLICK FIRE · R RELOAD · ESC PAUSE</p>
       </div>
@@ -62,12 +63,20 @@
       <div class="menu-view hidden" id="wave-menu">
         <p class="eyebrow gothic-eyebrow">SELECT YOUR TRIAL</p>
         <h2 class="menu-view-title">WAVES</h2>
-        <div class="wave-list">
-          <button class="wave-choice active" type="button" data-wave-choice="1"><strong>WAVE 01</strong><span>RECRUIT</span></button>
-          <button class="wave-choice" type="button" data-wave-choice="5"><strong>WAVE 05</strong><span>ASSAULT</span></button>
-          <button class="wave-choice" type="button" data-wave-choice="10"><strong>WAVE 10</strong><span>VETERAN</span></button>
-          <button class="wave-choice" type="button" data-wave-choice="20"><strong>WAVE 20</strong><span>HELL</span></button>
-          <button class="wave-choice" type="button" data-wave-choice="endless"><strong>ENDLESS</strong><span>NO END</span></button>
+        <div class="wave-section">
+          <div class="menu-label">WAVE</div>
+          <div class="wave-list">
+            <button class="wave-choice active" type="button" data-wave-choice="1"><strong>WAVE 01</strong><span>RECRUIT</span></button>
+            <button class="wave-choice" type="button" data-wave-choice="5"><strong>WAVE 05</strong><span>ASSAULT</span></button>
+            <button class="wave-choice" type="button" data-wave-choice="10"><strong>WAVE 10</strong><span>VETERAN</span></button>
+            <button class="wave-choice" type="button" data-wave-choice="20"><strong>WAVE 20</strong><span>HELL</span></button>
+            <button class="wave-choice" type="button" data-wave-choice="endless"><strong>ENDLESS</strong><span>NO END</span></button>
+          </div>
+        </div>
+        <div class="map-section">
+          <div class="menu-label">MAPS</div>
+          <div id="map-list" class="map-list" aria-live="polite"></div>
+          <button id="start-map-button" class="deploy-button" type="button">START SELECTED MAP</button>
         </div>
         <button id="back-from-waves" class="back-button" type="button">BACK</button>
       </div>
