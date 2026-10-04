@@ -1691,6 +1691,7 @@ function addArena() {
 
       const wall = mat(0x56615d, .90, .07);
       const dark = mat(0x1b2327, .74, .62);
+      const darkStoneMat = mat(0x30383a, .88, .12);
 
       box(root, [12.5, .42, 8.2], [0, .22, 0], darkStoneMat, 0, .07);
       box(root, [12.5, 3.5, .42], [0, 1.75, -4.0], wall, 0, .05);
