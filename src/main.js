@@ -4320,6 +4320,14 @@ function finishStandaloneWeapon(model, id) {
   weaponModels.push(finishStandaloneWeapon(model, 'smg'));
 }
 
+// Attach every independent procedural weapon to the first-person weapon root.
+// setActiveWeapon() controls which one is visible.
+for (const model of weaponModels) {
+  if (model.parent !== weapon) {
+    weapon.add(model);
+  }
+}
+
 let loadoutOpen = false;
 let selectedLoadoutIndex = 0;
 let loadoutDestination = 'waves';
