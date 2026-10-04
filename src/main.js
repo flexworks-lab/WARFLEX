@@ -4135,7 +4135,12 @@ const menuGunPalettes = [
   },
 ];
 
-function prepareMenuGun(source, palette, scale = 1) {
+function prepareMenuGun(
+  source,
+  palette,
+  scale = 1,
+  variantIndex = 0,
+) {
   const gun = source.clone(true);
   gun.visible = false;
   gun.scale.setScalar(scale);
@@ -4206,6 +4211,95 @@ function prepareMenuGun(source, palette, scale = 1) {
     child.frustumCulled = false;
   });
 
+  if (variantIndex === 1) {
+    const barrel = gun.getObjectByName('Barrel');
+    const handguard = gun.getObjectByName('HandguardMesh');
+    const optic = gun.getObjectByName('OpticBodyMesh');
+    const lens = gun.getObjectByName('OpticLens');
+
+    if (barrel) {
+      barrel.scale.y *= .76;
+      barrel.position.z += .28;
+    }
+
+    if (handguard) {
+      handguard.scale.z *= .82;
+    }
+
+    if (optic) optic.visible = false;
+    if (lens) lens.visible = false;
+
+    const compactBrake =
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          .075,
+          .09,
+          .42,
+          20,
+        ),
+        new THREE.MeshStandardMaterial({
+          color: palette.metal,
+          roughness: .34,
+          metalness: .72,
+          transparent: true,
+          opacity: 0,
+        }),
+      );
+
+    compactBrake.rotation.x = Math.PI / 2;
+    compactBrake.position.set(
+      0,
+      .06,
+      -2.48,
+    );
+    gun.add(compactBrake);
+  }
+
+  if (variantIndex === 2) {
+    const barrel = gun.getObjectByName('Barrel');
+
+    if (barrel) {
+      barrel.scale.y *= 1.28;
+      barrel.position.z -= .30;
+    }
+
+    const optic = gun.getObjectByName('OpticBodyMesh');
+
+    if (optic) {
+      optic.scale.set(
+        1.12,
+        1.16,
+        1.18,
+      );
+      optic.position.y += .055;
+    }
+
+    const suppressor =
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          .075,
+          .085,
+          .66,
+          24,
+        ),
+        new THREE.MeshStandardMaterial({
+          color: palette.dark,
+          roughness: .48,
+          metalness: .68,
+          transparent: true,
+          opacity: 0,
+        }),
+      );
+
+    suppressor.rotation.x = Math.PI / 2;
+    suppressor.position.set(
+      0,
+      .06,
+      -2.92,
+    );
+    gun.add(suppressor);
+  }
+
   gun.position.set(1.9, -.10, -3.6);
   gun.rotation.set(
     -.08,
@@ -4225,6 +4319,7 @@ for (let i = 0; i < menuGunPalettes.length; i += 1) {
       weapon,
       palette,
       1.04 - i * .04,
+      i,
     );
 
   const secondary =
@@ -4232,6 +4327,7 @@ for (let i = 0; i < menuGunPalettes.length; i += 1) {
       weapon,
       palette,
       .72 - i * .025,
+      i,
     );
 
   hero.position.set(
