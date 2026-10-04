@@ -379,7 +379,15 @@ const player = {
 
 const ENEMY_GROUND_Y = 0.12;
 
+const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+let touchFireHeld = false;
+let touchLookPointerId = null;
+let touchLookX = 0;
+let touchLookY = 0;
 let multiplayerActive = false;
+let multiplayerDeathActive = false;
+let multiplayerDeathEndsAt = 0;
+let multiplayerDeathRagdoll = null;
 const savedMultiplayerUsername = localStorage.getItem('WARFLEX_USERNAME') || 'PLAYER';
 if (els.multiplayerUsername) els.multiplayerUsername.value = savedMultiplayerUsername;
 
@@ -6111,21 +6119,95 @@ multiplayer = new Multiplayer({
 });
 
 function damagePlayer(amount) {
-  if (state.damageCooldown > 0 || state.over) return;
+  if (state.damageCooldown > 0 || state.over || multiplayerDeathActive) return;
   state.damageCooldown = .22;
   state.health = Math.max(0, state.health - amount);
   state.hurtFlash = .18;
   state.shake = Math.max(state.shake, .13);
   updateHud();
   if (state.health <= 0) {
-    if (multiplayerActive) {
-      state.health = CONFIG.maxHealth;
-      player.position.set((Math.random() - .5) * 70, 1.65, 20 + Math.random() * 45);
-      state.damageCooldown = 1.0;
-    } else {
-      endGame();
-    }
+    if (multiplayerActive) beginMultiplayerDeath();
+    else endGame();
   }
+}
+
+function beginMultiplayerDeath() {
+  if (!multiplayerActive || multiplayerDeathActive) return;
+  multiplayerDeathActive = true;
+  multiplayerDeathEndsAt = performance.now() + 5000;
+  state.health = 0;
+  state.aiming = false;
+  state.slideTimer = 0;
+  state.slideQueued = false;
+  keys.clear();
+  document.exitPointerLock?.();
+  els.pause.classList.add('hidden');
+  els.hud.classList.remove('hidden');
+  document.querySelector('#pvp-death-screen')?.classList.remove('hidden');
+  if (els.wave) els.wave.textContent = 'DOWN';
+  weapon.visible = false;
+
+  const deathRig = spawnEnemyModel();
+  deathRig.position.copy(player.position);
+  deathRig.position.y = ENEMY_GROUND_Y;
+  deathRig.rotation.y = state.yaw;
+  deathRig.scale.setScalar(deathRig.userData.baseScale || .54);
+  scene.add(deathRig);
+
+  multiplayerDeathRagdoll = ragdollController.create(
+    { group: deathRig },
+    {
+      hitPoint: deathRig.position.clone().add(new THREE.Vector3(0, 1.2, 0)),
+      direction: new THREE.Vector3(Math.sin(state.yaw) * .35, -.15, Math.cos(state.yaw) * .35).normalize(),
+      hitPart: 'upperBody',
+    },
+  );
+  if (multiplayerDeathRagdoll) ragdolls.push(multiplayerDeathRagdoll);
+  multiplayer?.sendState(performance.now(), state.yaw, 0);
+}
+
+function respawnMultiplayer() {
+  if (!multiplayerActive || !multiplayerDeathActive) return;
+  if (multiplayerDeathRagdoll && ragdollController.active.has(multiplayerDeathRagdoll)) ragdollController.destroy(multiplayerDeathRagdoll);
+  const ragIndex = ragdolls.indexOf(multiplayerDeathRagdoll);
+  if (ragIndex !== -1) ragdolls.splice(ragIndex, 1);
+  multiplayerDeathRagdoll = null;
+  multiplayerDeathActive = false;
+  state.health = CONFIG.maxHealth;
+  state.damageCooldown = 1.0;
+  state.yaw = 0;
+  state.pitch = 0;
+  state.verticalVelocity = 0;
+  state.onGround = true;
+  player.position.set((Math.random() - .5) * 70, 1.65, 20 + Math.random() * 45);
+  camera.position.copy(player.position);
+  camera.rotation.set(0, 0, 0);
+  camera.fov = CONFIG.defaultFov;
+  camera.updateProjectionMatrix();
+  weapon.visible = true;
+  document.querySelector('#pvp-death-screen')?.classList.add('hidden');
+  if (els.wave) els.wave.textContent = 'PVP';
+  updateHud();
+  multiplayer?.sendRespawn();
+}
+
+function updateMultiplayerDeath() {
+  if (!multiplayerDeathActive) return;
+  const remaining = Math.max(0, multiplayerDeathEndsAt - performance.now());
+  const countdown = document.querySelector('#death-countdown');
+  if (countdown) countdown.textContent = String(Math.max(0, Math.ceil(remaining / 1000)));
+  const rag = multiplayerDeathRagdoll;
+  if (rag?.root) {
+    const target = rag.root.position.clone().add(new THREE.Vector3(0, 2.7, 5.8));
+    camera.position.lerp(target, .16);
+    camera.lookAt(rag.root.position.clone().add(new THREE.Vector3(0, .85, 0)));
+  } else {
+    camera.position.copy(player.position).add(new THREE.Vector3(0, 2.7, 5.8));
+    camera.lookAt(player.position);
+  }
+  camera.fov = THREE.MathUtils.lerp(camera.fov, 72, .12);
+  camera.updateProjectionMatrix();
+  if (remaining <= 0) respawnMultiplayer();
 }
 
 function enemyHasLineOfSight(enemy) {
@@ -6517,6 +6599,11 @@ function updateWave(dt) {
 }
 
 function updateWeapon(dt) {
+  if (multiplayerDeathActive) {
+    weapon.visible = false;
+    return;
+  }
+  weapon.visible = true;
   const moving = keys.has('KeyW') || keys.has('KeyA') || keys.has('KeyS') || keys.has('KeyD');
   const sprinting = keys.has('ShiftLeft') || keys.has('ShiftRight');
   const bobSpeed = sprinting ? 15 : 10;
@@ -6801,6 +6888,7 @@ function frame() {
   mapEditor.update(dt);
   updateLiveClouds(dt);
   multiplayer?.update(dt);
+  if (touchFireHeld && state.active && !state.over && !multiplayerDeathActive) shoot();
   if (multiplayerActive) multiplayer?.sendState(performance.now(), state.yaw, state.health);
 
   const hasPointerLock =
@@ -6812,9 +6900,12 @@ function frame() {
     updateWave(dt);
   }
 
+  updateMultiplayerDeath();
+
   if (
     state.active &&
-    hasPointerLock
+    hasPointerLock &&
+    !multiplayerDeathActive
   ) {
     movePlayer(dt);
     if (!multiplayerActive) updateEnemies(dt);
@@ -7085,6 +7176,9 @@ async function enterMultiplayer() {
   localStorage.setItem('WARFLEX_USERNAME', username);
   state.gameMode = 'multiplayer';
   multiplayerActive = true;
+  multiplayerDeathActive = false;
+  multiplayerDeathRagdoll = null;
+  document.querySelector('#pvp-death-screen')?.classList.add('hidden');
   state.selectedMapId = state.selectedMapId || getCurrentMapId() || 'builtin';
   activateSelectedMap();
   renderer.domElement.style.display = 'block';
@@ -7119,6 +7213,10 @@ function enterGame(fromEditorPlaytest = false) {
     activateSelectedMap();
   }
   multiplayerActive = false;
+  multiplayerDeathActive = false;
+  multiplayerDeathRagdoll = null;
+  document.querySelector('#pvp-death-screen')?.classList.add('hidden');
+  weapon.visible = true;
   state.gameMode = 'waves';
   // Put the UI into gameplay state first. Optional systems must not be able
   // to prevent the player from entering the arena.
@@ -7201,6 +7299,11 @@ els.pauseQuitButton?.addEventListener('click', () => {
   document.exitPointerLock?.();
   waveDirector?.stop?.();
   multiplayerActive = false;
+  multiplayerDeathActive = false;
+  if (multiplayerDeathRagdoll && ragdollController.active.has(multiplayerDeathRagdoll)) ragdollController.destroy(multiplayerDeathRagdoll);
+  multiplayerDeathRagdoll = null;
+  document.querySelector('#pvp-death-screen')?.classList.add('hidden');
+  weapon.visible = true;
   state.gameMode = 'waves';
   multiplayer?.disconnect();
   state.active = false;
@@ -7232,6 +7335,80 @@ els.updateDismiss.addEventListener('click', () => {
   pendingUpdate = null;
   els.updateNotice.classList.add('hidden');
 });
+
+
+function setTouchKey(code, pressed) {
+  if (pressed) keys.add(code);
+  else keys.delete(code);
+}
+
+function setupTouchControls() {
+  if (!isTouchDevice) return;
+  const controls = document.querySelector('#touch-controls');
+  const joystick = document.querySelector('#touch-joystick');
+  const knob = document.querySelector('#touch-stick-knob');
+  if (!controls || !joystick || !knob) return;
+  controls.classList.add('touch-enabled');
+
+  let stickPointer = null;
+  const radius = 48;
+  const updateStick = (event) => {
+    const rect = joystick.getBoundingClientRect();
+    let x = event.clientX - (rect.left + rect.width / 2);
+    let y = event.clientY - (rect.top + rect.height / 2);
+    const length = Math.hypot(x, y);
+    if (length > radius) { x *= radius / length; y *= radius / length; }
+    knob.style.transform = `translate(${x}px,${y}px)`;
+    setTouchKey('KeyA', x / radius < -.22);
+    setTouchKey('KeyD', x / radius > .22);
+    setTouchKey('KeyW', y / radius < -.22);
+    setTouchKey('KeyS', y / radius > .22);
+  };
+  const resetStick = () => {
+    stickPointer = null;
+    knob.style.transform = 'translate(0,0)';
+    for (const code of ['KeyW','KeyA','KeyS','KeyD']) setTouchKey(code, false);
+  };
+  joystick.addEventListener('pointerdown', (event) => {
+    event.preventDefault(); stickPointer = event.pointerId;
+    joystick.setPointerCapture?.(event.pointerId); updateStick(event);
+  });
+  joystick.addEventListener('pointermove', (event) => { if (event.pointerId === stickPointer) updateStick(event); });
+  joystick.addEventListener('pointerup', resetStick);
+  joystick.addEventListener('pointercancel', resetStick);
+
+  const bindHold = (selector, down, up = down) => {
+    const button = document.querySelector(selector);
+    if (!button) return;
+    button.addEventListener('pointerdown', (event) => { event.preventDefault(); down(); button.setPointerCapture?.(event.pointerId); });
+    button.addEventListener('pointerup', (event) => { event.preventDefault(); up(); });
+    button.addEventListener('pointercancel', up);
+  };
+  bindHold('#touch-fire', () => { touchFireHeld = true; }, () => { touchFireHeld = false; });
+  bindHold('#touch-sprint', () => setTouchKey('ShiftLeft', true), () => setTouchKey('ShiftLeft', false));
+  bindHold('#touch-jump', () => setTouchKey('Space', true), () => setTouchKey('Space', false));
+  bindHold('#touch-slide', () => { state.slideQueued = true; });
+  document.querySelector('#touch-reload')?.addEventListener('pointerdown', (event) => { event.preventDefault(); reload(); });
+
+  renderer.domElement.addEventListener('pointerdown', (event) => {
+    if (!state.active || state.over || multiplayerDeathActive || event.pointerType !== 'touch') return;
+    if (event.clientX < innerWidth * .48 || event.clientY > innerHeight * .72) return;
+    touchLookPointerId = event.pointerId; touchLookX = event.clientX; touchLookY = event.clientY;
+    renderer.domElement.setPointerCapture?.(event.pointerId);
+  });
+  renderer.domElement.addEventListener('pointermove', (event) => {
+    if (event.pointerId !== touchLookPointerId) return;
+    const dx = event.clientX - touchLookX;
+    const dy = event.clientY - touchLookY;
+    touchLookX = event.clientX; touchLookY = event.clientY;
+    state.yaw -= dx * .006;
+    state.pitch = THREE.MathUtils.clamp(state.pitch - dy * .004, -Math.PI / 2 + .02, Math.PI / 2 - .02);
+  });
+  const stopLook = (event) => { if (event.pointerId === touchLookPointerId) touchLookPointerId = null; };
+  renderer.domElement.addEventListener('pointerup', stopLook);
+  renderer.domElement.addEventListener('pointercancel', stopLook);
+}
+setupTouchControls();
 
 window.addEventListener('keydown', (event) => {
   const mainMenuVisible =
@@ -7328,6 +7505,7 @@ els.mainMenu?.addEventListener('wheel', (event) => {
 }, { passive: false });
 
 renderer.domElement.addEventListener('click', () => {
+  if (isTouchDevice) return;
   if (state.active && !state.over && document.pointerLockElement !== renderer.domElement) {
     renderer.domElement.requestPointerLock();
   }
