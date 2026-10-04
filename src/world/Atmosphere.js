@@ -50,12 +50,12 @@ function makeAtmosphereApi(
 
 export function configureAtmosphere(scene, renderer, camera) {
   scene.background =
-    new THREE.Color(0x182633);
+    new THREE.Color(0x111a22);
 
   scene.fog =
     new THREE.FogExp2(
-      0x182633,
-      0.0065,
+      0x111a22,
+      0.0042,
     );
 
   let composer;
