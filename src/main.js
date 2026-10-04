@@ -426,6 +426,7 @@ const particles = [];
 const ragdolls = [];
 const droppedGuns = [];
 const shellCasings = [];
+const bulletHoles = [];
 const arenaLights = [];
 
 const state = {
@@ -3965,6 +3966,65 @@ function hideWeaponParts(model, names) {
   });
 }
 
+const RIFLE_BODY_PARTS = [
+  'RifleReceiverMesh',
+  'UpperReceiverMesh',
+  'HandguardMesh',
+  'AKGasTube',
+  'RailTooth',
+  'OpticBodyMesh',
+  'OpticLens',
+  'Barrel',
+  'AKFrontSightBlock',
+  'AKFrontSightPost',
+  'AKGasBlock',
+  'MuzzleDeviceMesh',
+  'MuzzleTopCut',
+  'MagazineWellMesh',
+  'MagazineMesh',
+  'TriggerGuardMesh',
+  'PistolGripMesh',
+  'StockMesh',
+  'ButtpadMesh',
+  'CheekRestMesh',
+  'ForegripMesh',
+  'AKChargingHandle',
+  'AKSelector',
+  'ChargingHandle',
+  'BoltRelease',
+  'TriggerPin',
+  'ShotgunTube',
+  'SniperBarrel',
+  'SniperScope',
+  'PistolSlide',
+  'PistolBarrel',
+  'SMGBarrel',
+];
+
+function hideRifleBody(model) {
+  hideWeaponParts(model, RIFLE_BODY_PARTS);
+}
+
+function addVariantBox(model, name, size, position, material, rotation = [0, 0, 0], bevel = .02) {
+  const mesh = new THREE.Mesh(
+    new RoundedBoxGeometry(
+      size[0],
+      size[1],
+      size[2],
+      2,
+      Math.min(bevel, Math.min(...size) * .16),
+    ),
+    material,
+  );
+  mesh.name = name;
+  mesh.position.set(...position);
+  mesh.rotation.set(...rotation);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  model.add(mesh);
+  return mesh;
+}
+
 function addVariantCylinder(model, name, radius, length, position, material) {
   const mesh = new THREE.Mesh(
     new THREE.CylinderGeometry(radius, radius * .94, length, 20),
@@ -3983,99 +4043,306 @@ const rifleModel = normalizeWeaponModel(createWeapon(), 'rifle');
 weaponModels.push(rifleModel);
 
 const shotgunModel = normalizeWeaponModel(rifleModel.clone(true), 'shotgun');
-hideWeaponParts(shotgunModel, [
-  'OpticBodyMesh',
-  'OpticLens',
-  'MagazineMesh',
-  'MagazineWellMesh',
-  'ForegripMesh',
-  ...[...shotgunModel.children]
-    .filter(child => child.name === 'RailTooth')
-    .map(child => child.name),
-]);
-const shotgunTube = addVariantCylinder(
+hideRifleBody(shotgunModel);
+
+const shotgunMat = createMaterial(0x34393c, .82, .28);
+const shotgunPolymer = createMaterial(0x23282b, .16, .62);
+const shotgunAccent = createMaterial(0x6d7272, .88, .20);
+
+addVariantBox(
+  shotgunModel,
+  'ShotgunReceiver',
+  [.38, .34, 1.25],
+  [0, .08, -.70],
+  shotgunMat,
+  [0, 0, 0],
+  .045,
+);
+addVariantBox(
+  shotgunModel,
+  'ShotgunStock',
+  [.28, .40, .82],
+  [0, -.02, .55],
+  shotgunPolymer,
+  [0, 0, -.10],
+  .055,
+);
+addVariantBox(
+  shotgunModel,
+  'ShotgunGrip',
+  [.22, .48, .34],
+  [0, -.25, .12],
+  shotgunPolymer,
+  [0, 0, -.12],
+  .04,
+);
+addVariantCylinder(
+  shotgunModel,
+  'ShotgunBarrel',
+  .065,
+  2.65,
+  [0, .18, -2.08],
+  shotgunAccent,
+);
+addVariantCylinder(
   shotgunModel,
   'ShotgunTube',
-  .095,
-  2.25,
-  [0, .23, -2.0],
-  createMaterial(0x252a2c, .84, .24),
+  .082,
+  2.05,
+  [0, .04, -1.72],
+  shotgunMat,
 );
-shotgunModel.getObjectByName('Barrel')?.scale.set(.1, 1.45, .1);
-shotgunModel.scale.set(1.04, 1.04, .94);
+addVariantBox(
+  shotgunModel,
+  'ShotgunPump',
+  [.34, .20, .58],
+  [0, .08, -1.50],
+  shotgunPolymer,
+  [0, 0, 0],
+  .035,
+);
+addVariantBox(
+  shotgunModel,
+  'ShellCarrier',
+  [.08, .16, .72],
+  [.22, -.10, -.70],
+  shotgunAccent,
+  [0, 0, 0],
+  .018,
+);
+shotgunModel.position.z = .16;
 weaponModels.push(shotgunModel);
 
 const sniperModel = normalizeWeaponModel(rifleModel.clone(true), 'sniper');
-hideWeaponParts(sniperModel, ['ForegripMesh']);
-sniperModel.scale.set(1.0, 1.0, 1.42);
+hideRifleBody(sniperModel);
+
+const sniperChassis = createMaterial(0x1a1f23, .88, .22);
+const sniperPolymer = createMaterial(0x303840, .28, .54);
+const sniperMetal = createMaterial(0x78818a, .92, .17);
+const sniperGlass = new THREE.MeshStandardMaterial({
+  color: 0x0a1820,
+  emissive: 0x185f78,
+  emissiveIntensity: 1.8,
+  metalness: .72,
+  roughness: .10,
+});
+
+addVariantBox(
+  sniperModel,
+  'SniperChassis',
+  [.42, .40, 1.70],
+  [0, .08, -.35],
+  sniperChassis,
+  [0, 0, 0],
+  .055,
+);
+addVariantBox(
+  sniperModel,
+  'SniperButtstock',
+  [.32, .32, .95],
+  [0, .00, .92],
+  sniperPolymer,
+  [0, 0, -.04],
+  .05,
+);
+addVariantBox(
+  sniperModel,
+  'SniperGrip',
+  [.22, .54, .34],
+  [0, -.27, .14],
+  sniperPolymer,
+  [0, 0, -.09],
+  .04,
+);
 addVariantCylinder(
   sniperModel,
   'SniperBarrel',
-  .045,
-  2.55,
-  [0, .07, -2.75],
-  createMaterial(0x15191c, .9, .18),
+  .048,
+  3.75,
+  [0, .17, -2.80],
+  sniperMetal,
+);
+addVariantCylinder(
+  sniperModel,
+  'SniperMuzzleBrake',
+  .075,
+  .36,
+  [0, .17, -4.55],
+  sniperChassis,
 );
 const sniperScope = new THREE.Mesh(
-  new THREE.CylinderGeometry(.115, .11, .72, 20),
-  createMaterial(0x161b20, .78, .22),
+  new THREE.CylinderGeometry(.12, .105, 1.15, 20),
+  sniperChassis,
 );
 sniperScope.name = 'SniperScope';
-sniperScope.rotation.z = Math.PI / 2;
-sniperScope.position.set(0, .43, -.55);
+sniperScope.rotation.x = Math.PI / 2;
+sniperScope.position.set(0, .43, -.62);
 sniperScope.castShadow = true;
 sniperModel.add(sniperScope);
+addVariantBox(
+  sniperModel,
+  'SniperScopeGlass',
+  [.15, .16, .22],
+  [0, .43, -1.12],
+  sniperGlass,
+  [0, 0, 0],
+  .035,
+);
+addVariantBox(
+  sniperModel,
+  'SniperBipod',
+  [.10, .50, .10],
+  [-.13, -.34, -1.10],
+  sniperMetal,
+  [0.22, 0, 0],
+  .018,
+);
+addVariantBox(
+  sniperModel,
+  'SniperBipodRight',
+  [.10, .50, .10],
+  [.13, -.34, -1.10],
+  sniperMetal,
+  [-0.22, 0, 0],
+  .018,
+);
+sniperModel.position.z = .22;
 weaponModels.push(sniperModel);
 
 const pistolModel = normalizeWeaponModel(rifleModel.clone(true), 'pistol');
-hideWeaponParts(pistolModel, [
-  'StockMesh',
-  'ButtpadMesh',
-  'CheekRestMesh',
-  'HandguardMesh',
-  'AKGasTube',
-  'ForegripMesh',
-  'OpticBodyMesh',
-  'OpticLens',
-  'MuzzleDeviceMesh',
-]);
-pistolModel.scale.set(.72, .72, .72);
-pistolModel.position.z = .18;
-const pistolSlide = new THREE.Mesh(
-  new RoundedBoxGeometry(.24, .16, 1.02, 2, .025),
-  createMaterial(0x282c2f, .82, .3),
+hideRifleBody(pistolModel);
+
+const pistolFrame = createMaterial(0x20262b, .78, .34);
+const pistolPolymer = createMaterial(0x161b20, .12, .72);
+const pistolMetal = createMaterial(0x707875, .94, .16);
+
+addVariantBox(
+  pistolModel,
+  'PistolFrame',
+  [.30, .25, .82],
+  [0, -.02, -.25],
+  pistolFrame,
+  [0, 0, 0],
+  .045,
 );
-pistolSlide.name = 'PistolSlide';
-pistolSlide.position.set(0, .23, -.42);
-pistolSlide.castShadow = true;
-pistolModel.add(pistolSlide);
+addVariantBox(
+  pistolModel,
+  'PistolSlide',
+  [.28, .18, 1.10],
+  [0, .18, -1.00],
+  pistolMetal,
+  [0, 0, 0],
+  .028,
+);
+addVariantBox(
+  pistolModel,
+  'PistolGrip',
+  [.24, .52, .38],
+  [0, -.31, .26],
+  pistolPolymer,
+  [0, 0, -.12],
+  .04,
+);
+addVariantBox(
+  pistolModel,
+  'PistolTriggerGuard',
+  [.22, .16, .38],
+  [0, -.16, -.52],
+  pistolFrame,
+  [0, 0, 0],
+  .025,
+);
 addVariantCylinder(
   pistolModel,
   'PistolBarrel',
   .04,
   .82,
-  [0, .22, -1.05],
-  createMaterial(0x747a78, .9, .2),
+  [0, .19, -1.76],
+  pistolMetal,
 );
+addVariantBox(
+  pistolModel,
+  'PistolSight',
+  [.08, .10, .14],
+  [0, .30, -1.46],
+  pistolFrame,
+  [0, 0, 0],
+  .012,
+);
+pistolModel.scale.set(.92, .92, .92);
+pistolModel.position.z = .44;
 weaponModels.push(pistolModel);
 
 const smgModel = normalizeWeaponModel(rifleModel.clone(true), 'smg');
-hideWeaponParts(smgModel, [
-  'OpticLens',
-  'StockMesh',
-  'ButtpadMesh',
-  'CheekRestMesh',
-]);
-smgModel.scale.set(1.0, 1.0, .78);
-smgModel.position.z = .06;
+hideRifleBody(smgModel);
+
+const smgBody = createMaterial(0x22292e, .84, .26);
+const smgPolymer = createMaterial(0x30373d, .18, .60);
+const smgAccent = createMaterial(0x899196, .88, .19);
+
+addVariantBox(
+  smgModel,
+  'SMGReceiver',
+  [.34, .34, 1.05],
+  [0, .06, -.72],
+  smgBody,
+  [0, 0, 0],
+  .04,
+);
+addVariantBox(
+  smgModel,
+  'SMGTopHousing',
+  [.28, .14, .84],
+  [0, .26, -.60],
+  smgAccent,
+  [0, 0, 0],
+  .025,
+);
+addVariantBox(
+  smgModel,
+  'SMGGrip',
+  [.24, .44, .34],
+  [0, -.22, -.02],
+  smgPolymer,
+  [0, 0, -.16],
+  .035,
+);
+addVariantBox(
+  smgModel,
+  'SMGStock',
+  [.28, .30, .62],
+  [0, .00, .38],
+  smgPolymer,
+  [0, 0, .08],
+  .04,
+);
 addVariantCylinder(
   smgModel,
   'SMGBarrel',
-  .055,
-  1.35,
-  [0, .06, -2.05],
-  createMaterial(0x1b2023, .86, .22),
+  .052,
+  1.72,
+  [0, .10, -2.02],
+  smgAccent,
 );
+addVariantCylinder(
+  smgModel,
+  'SMGMuzzle',
+  .072,
+  .32,
+  [0, .10, -2.99],
+  smgBody,
+);
+addVariantBox(
+  smgModel,
+  'SMGMagazine',
+  [.16, .58, .34],
+  [0, -.43, -.58],
+  smgPolymer,
+  [0.06, 0, 0],
+  .03,
+);
+smgModel.scale.set(.98, .98, .92);
+smgModel.position.z = .20;
 weaponModels.push(smgModel);
 
 let loadoutOpen = false;
@@ -4349,6 +4616,21 @@ function setActiveWeapon(indexOrId, { resetAmmo = false } = {}) {
     model.visible = false;
   }
   nextModel.visible = true;
+  nextModel.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    child.frustumCulled = false;
+    child.renderOrder = 1000;
+    const materials = Array.isArray(child.material)
+      ? child.material
+      : [child.material];
+    for (const material of materials) {
+      if (!material) continue;
+      material.depthTest = false;
+      material.depthWrite = false;
+      material.transparent = false;
+      material.opacity = 1;
+    }
+  });
 
   weapon.userData.muzzle = nextModel.userData.muzzle;
   weapon.userData.flash = nextModel.userData.flash;
@@ -5716,6 +5998,20 @@ function resetGame(spawnImmediately = true) {
   for (const shell of shellCasings) scene.remove(shell.mesh);
   shellCasings.length = 0;
 
+  for (const hole of bulletHoles) {
+    scene.remove(hole);
+    hole.traverse((node) => {
+      if (!node.isMesh) return;
+      node.geometry?.dispose?.();
+      if (Array.isArray(node.material)) {
+        node.material.forEach((material) => material?.dispose?.());
+      } else {
+        node.material?.dispose?.();
+      }
+    });
+  }
+  bulletHoles.length = 0;
+
   const selected =
     window.__WARFLEX_SELECTED_WAVE === 'endless'
       ? -1
@@ -6696,6 +6992,67 @@ function getShotDirection() {
   return base;
 }
 
+function createBulletHole(point, normal) {
+  if (!point || !normal || normal.lengthSq() < .0001) return;
+
+  const holeRoot = new THREE.Group();
+  holeRoot.name = 'BulletHole';
+  holeRoot.position
+    .copy(point)
+    .addScaledVector(normal, .014);
+
+  const orientation = new THREE.Quaternion()
+    .setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      normal.clone().normalize(),
+    );
+  holeRoot.quaternion.copy(orientation);
+  holeRoot.rotateZ(Math.random() * Math.PI * 2);
+
+  const outer = new THREE.Mesh(
+    new THREE.CircleGeometry(.075 + Math.random() * .028, 11),
+    new THREE.MeshStandardMaterial({
+      color: 0x34302a,
+      roughness: 1,
+      metalness: 0,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  outer.position.z = .001;
+  holeRoot.add(outer);
+
+  const inner = new THREE.Mesh(
+    new THREE.CircleGeometry(.033 + Math.random() * .010, 10),
+    new THREE.MeshBasicMaterial({
+      color: 0x080909,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  inner.position.z = .003;
+  holeRoot.add(inner);
+
+  scene.add(holeRoot);
+  bulletHoles.push(holeRoot);
+
+  while (bulletHoles.length > 320) {
+    const oldest = bulletHoles.shift();
+    scene.remove(oldest);
+    oldest.traverse((node) => {
+      if (!node.isMesh) return;
+      node.geometry?.dispose?.();
+      if (Array.isArray(node.material)) {
+        node.material.forEach((material) => material?.dispose?.());
+      } else {
+        node.material?.dispose?.();
+      }
+    });
+  }
+}
+
 function shoot() {
   if (
     !state.active ||
@@ -6753,9 +7110,13 @@ function shoot() {
     });
   }
 
+  const surfaceTargets = simpleTerrainMesh
+    ? [...obstacles, simpleTerrainMesh]
+    : obstacles;
+
   const wallHits =
     raycaster.intersectObjects(
-      obstacles,
+      surfaceTargets,
       false,
     );
 
@@ -6970,6 +7331,21 @@ function shoot() {
   } else if (wallHits[0]) {
     hitPoint =
       wallHits[0].point;
+
+    const surfaceNormal =
+      wallHits[0].face?.normal
+        ? wallHits[0].face.normal
+            .clone()
+            .transformDirection(
+              wallHits[0].object.matrixWorld,
+            )
+            .normalize()
+        : direction.clone().negate().normalize();
+
+    createBulletHole(
+      hitPoint,
+      surfaceNormal,
+    );
 
     spawnBurst(
       hitPoint.clone(),
@@ -7781,6 +8157,19 @@ function updateWeapon(dt) {
   }
 
   weapon.visible = state.active && !state.over;
+
+  if (weapon.visible) {
+    const activeModel = weapon.userData.activeModel;
+    if (activeModel) {
+      activeModel.visible = true;
+      activeModel.traverse((child) => {
+        if (!child.isMesh) return;
+        child.visible = true;
+        child.frustumCulled = false;
+        child.renderOrder = 1000;
+      });
+    }
+  }
 
   updateAK47Animation(dt);
 
