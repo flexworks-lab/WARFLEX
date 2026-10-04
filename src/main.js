@@ -4013,7 +4013,7 @@ function addVariantBox(model, name, size, position, material, rotation = [0, 0, 
       size[0],
       size[1],
       size[2],
-      2,
+      4,
       Math.min(bevel, Math.min(...size) * .16),
     ),
     material,
@@ -4073,7 +4073,7 @@ function addStandaloneBox(model, name, size, position, material, rotation = [0, 
   );
 }
 
-function addStandaloneCylinder(model, name, radius, length, position, material, rotation = [Math.PI / 2, 0, 0], segments = 24) {
+function addStandaloneCylinder(model, name, radius, length, position, material, rotation = [Math.PI / 2, 0, 0], segments = 40) {
   return addStandaloneWeaponMesh(
     model,
     new THREE.CylinderGeometry(radius, radius * .94, length, segments),
@@ -4088,66 +4088,167 @@ function addStandaloneHands(model, variant = 'standard') {
   const glove = createMaterial(
     variant === 'pistol' ? 0x171b1f : 0x11171c,
     .08,
-    .80,
+    .76,
   );
   const sleeve = createMaterial(
     variant === 'pistol' ? 0x9ca8b1 : 0x737f87,
     .16,
     .58,
   );
-
-  const leftHand = new THREE.Mesh(
-    new THREE.SphereGeometry(.115, 18, 12),
-    glove,
+  const seam = createMaterial(
+    variant === 'pistol' ? 0x59656d : 0x4c5860,
+    .22,
+    .50,
   );
-  leftHand.name = 'WeaponLeftHand';
-  leftHand.scale.set(1, .68, 1.3);
-  leftHand.position.set(
-    variant === 'pistol' ? -.02 : -.17,
-    variant === 'pistol' ? -.10 : -.17,
-    variant === 'pistol' ? -.72 : -1.02,
-  );
-  leftHand.castShadow = true;
-  model.add(leftHand);
 
-  const rightHand = new THREE.Mesh(
-    new THREE.SphereGeometry(.11, 18, 12),
-    glove,
-  );
-  rightHand.name = 'WeaponRightHand';
-  rightHand.scale.set(.98, .68, 1.22);
-  rightHand.position.set(
-    variant === 'pistol' ? .12 : .17,
-    variant === 'pistol' ? -.19 : -.16,
-    variant === 'pistol' ? -.08 : .10,
-  );
-  rightHand.castShadow = true;
-  model.add(rightHand);
+  const makeHand = (
+    name,
+    position,
+    rotation = [0, 0, 0],
+  ) => {
+    const hand = new THREE.Group();
+    hand.name = name;
+    hand.position.set(...position);
+    hand.rotation.set(...rotation);
+    model.add(hand);
 
-  const leftArm = new THREE.Group();
-  const rightArm = new THREE.Group();
-  leftArm.name = 'WeaponLeftArm';
-  rightArm.name = 'WeaponRightArm';
+    const palm = new THREE.Mesh(
+      new RoundedBoxGeometry(.20, .14, .30, 4, .045),
+      glove,
+    );
+    palm.name = name + 'Palm';
+    palm.castShadow = true;
+    palm.receiveShadow = true;
+    hand.add(palm);
 
-  const sleeveL = new THREE.Mesh(
-    new THREE.CapsuleGeometry(.10, .42, 6, 12),
-    sleeve,
+    for (let finger = 0; finger < 4; finger += 1) {
+      const curl = new THREE.Mesh(
+        new THREE.CapsuleGeometry(.028, .10, 6, 12),
+        glove,
+      );
+      curl.name = name + 'Finger' + finger;
+      curl.rotation.x = Math.PI / 2;
+      curl.position.set(
+        (finger - 1.5) * .042,
+        -.015 + Math.abs(finger - 1.5) * .006,
+        -.17,
+      );
+      curl.castShadow = true;
+      hand.add(curl);
+    }
+
+    const thumb = new THREE.Mesh(
+      new THREE.CapsuleGeometry(.032, .11, 6, 12),
+      glove,
+    );
+    thumb.name = name + 'Thumb';
+    thumb.rotation.set(.35, 0, name.includes('Left') ? -.85 : .85);
+    thumb.position.set(
+      name.includes('Left') ? .115 : -.115,
+      -.01,
+      -.055,
+    );
+    thumb.castShadow = true;
+    hand.add(thumb);
+
+    const knuckle = new THREE.Mesh(
+      new THREE.SphereGeometry(.045, 24, 16),
+      seam,
+    );
+    knuckle.name = name + 'KnuckleGuard';
+    knuckle.scale.set(1.25, .56, 1);
+    knuckle.position.set(0, .078, -.02);
+    knuckle.castShadow = true;
+    hand.add(knuckle);
+
+    return hand;
+  };
+
+  const makeArm = (name, side) => {
+    const arm = new THREE.Group();
+    arm.name = name;
+    arm.position.set(
+      side * (variant === 'pistol' ? .38 : .43),
+      variant === 'pistol' ? -.08 : -.03,
+      variant === 'pistol' ? .18 : .16,
+    );
+    arm.rotation.z = -side * .17;
+    model.add(arm);
+
+    const upper = new THREE.Mesh(
+      new THREE.CapsuleGeometry(.125, .40, 8, 18),
+      sleeve,
+    );
+    upper.name = name + 'UpperSleeve';
+    upper.position.y = -.20;
+    upper.rotation.z = side * .10;
+    upper.castShadow = true;
+    arm.add(upper);
+
+    const elbow = new THREE.Mesh(
+      new THREE.SphereGeometry(.13, 24, 16),
+      seam,
+    );
+    elbow.name = name + 'Elbow';
+    elbow.position.y = -.48;
+    elbow.scale.set(1.02, .85, 1.0);
+    elbow.castShadow = true;
+    arm.add(elbow);
+
+    const forearm = new THREE.Mesh(
+      new THREE.CapsuleGeometry(.115, .48, 8, 18),
+      sleeve,
+    );
+    forearm.name = name + 'Forearm';
+    forearm.position.y = -.75;
+    forearm.rotation.z = side * .12;
+    forearm.castShadow = true;
+    arm.add(forearm);
+
+    const cuff = new THREE.Mesh(
+      new THREE.RingGeometry(.095, .125, 20, 2),
+      seam,
+    );
+    cuff.name = name + 'Cuff';
+    cuff.rotation.x = Math.PI / 2;
+    cuff.position.y = -1.00;
+    cuff.castShadow = true;
+    arm.add(cuff);
+
+    return arm;
+  };
+
+  const leftArm = makeArm('WeaponLeftArm', -1);
+  const rightArm = makeArm('WeaponRightArm', 1);
+
+  const leftHand = makeHand(
+    'WeaponLeftHand',
+    variant === 'pistol'
+      ? [.03, -.29, -.45]
+      : [-.17, -.24, -.82],
+    [0, 0, variant === 'pistol' ? -.10 : -.04],
   );
-  sleeveL.rotation.z = -.35;
-  sleeveL.position.set(-.25, -.02, -.57);
-  sleeveL.castShadow = true;
-  leftArm.add(sleeveL);
-
-  const sleeveR = new THREE.Mesh(
-    new THREE.CapsuleGeometry(.10, .42, 6, 12),
-    sleeve,
+  const rightHand = makeHand(
+    'WeaponRightHand',
+    variant === 'pistol'
+      ? [.11, -.27, .05]
+      : [.17, -.24, .04],
+    [0, 0, variant === 'pistol' ? .06 : .04],
   );
-  sleeveR.rotation.z = .35;
-  sleeveR.position.set(.25, -.02, -.57);
-  sleeveR.castShadow = true;
-  rightArm.add(sleeveR);
 
-  model.add(leftArm, rightArm);
+  // Grip anchors make the hands feel attached to the weapon instead of
+  // floating beside it.
+  leftHand.userData.gripAnchor =
+    variant === 'pistol' ? 'PistolSupportGrip' : 'WeaponSupportGrip';
+  rightHand.userData.gripAnchor =
+    variant === 'pistol' ? 'PistolMainGrip' : 'WeaponMainGrip';
+
+  return {
+    leftArm,
+    rightArm,
+    leftHand,
+    rightHand,
+  };
 }
 
 function addStandaloneMuzzle(model, z, color = 0xffcf6a) {
@@ -4268,26 +4369,26 @@ function finishStandaloneWeapon(model, id) {
   weaponModels.push(finishStandaloneWeapon(model, 'sniper'));
 }
 
-// PISTOL — compact slide/frame/grip; no rifle chassis.
+// PISTOL — compact sidearm. No stock, no extended grip, short slide/barrel.
 {
   const model = new THREE.Group();
   const frame = createMaterial(0x20262b, .74, .34);
   const polymer = createMaterial(0x151a1e, .10, .75);
   const metal = createMaterial(0x747c7d, .94, .15);
+  const accent = createMaterial(0x394147, .48, .34);
 
-  addStandaloneBox(model, 'PistolFrame', [.32, .28, .86], [0, -.04, -.28], frame, [0, 0, 0], .045);
-  addStandaloneBox(model, 'PistolSlide', [.28, .19, 1.12], [0, .18, -1.00], metal, [0, 0, 0], .028);
-  addStandaloneBox(model, 'PistolGrip', [.24, .54, .38], [0, -.30, .28], polymer, [0, 0, -.12], .04);
-  addStandaloneBox(model, 'PistolTriggerGuard', [.23, .17, .38], [0, -.14, -.55], frame, [0, 0, 0], .025);
-  addStandaloneBox(model, 'PistolMagazine', [.16, .54, .25], [0, -.58, .27], metal, [0, 0, 0], .025);
-  addStandaloneCylinder(model, 'PistolBarrel', .040, .84, [0, .20, -1.83], metal);
-  addStandaloneBox(model, 'PistolFrontSight', [.07, .10, .12], [0, .30, -1.55], frame, [0, 0, 0], .01);
-  addStandaloneBox(model, 'PistolRearSight', [.08, .11, .13], [0, .30, -.60], frame, [0, 0, 0], .01);
+  addStandaloneBox(model, 'PistolFrame', [.31, .27, .66], [0, -.03, -.22], frame, [0, 0, 0], .052);
+  addStandaloneBox(model, 'PistolSlide', [.265, .18, .78], [0, .17, -.78], metal, [0, 0, 0], .032);
+  addStandaloneBox(model, 'PistolRearSlideBlock', [.275, .20, .20], [0, .17, -.38], accent, [0, 0, 0], .025);
+  addStandaloneBox(model, 'PistolGrip', [.235, .42, .31], [0, -.27, .16], polymer, [0, 0, -.11], .042);
+  addStandaloneBox(model, 'PistolGripBase', [.22, .055, .28], [0, -.49, .20], accent, [0, 0, -.11], .018);
+  addStandaloneBox(model, 'PistolTriggerGuard', [.225, .15, .28], [0, -.12, -.53], frame, [0, 0, 0], .026);
+  addStandaloneCylinder(model, 'PistolBarrel', .039, .54, [0, .19, -1.42], metal, [Math.PI / 2, 0, 0], 40);
+  addStandaloneBox(model, 'PistolFrontSight', [.062, .09, .10], [0, .29, -1.25], frame, [0, 0, 0], .012);
+  addStandaloneBox(model, 'PistolRearSight', [.075, .10, .11], [0, .29, -.47], frame, [0, 0, 0], .012);
   addStandaloneHands(model, 'pistol');
-  addStandaloneMuzzle(model, -2.25);
-  // The previous pistol was stretched too far forward. Keep its height and
-  // width but compress its length substantially for a compact sidearm.
-  model.scale.set(.96, 1.0, .72);
+  addStandaloneMuzzle(model, -1.72);
+  model.scale.set(.98, 1.0, .72);
   model.position.z = .38;
   weaponModels.push(finishStandaloneWeapon(model, 'pistol'));
 }
@@ -6118,22 +6219,51 @@ function getActiveEnemySpawns() {
 }
 
 function getSpawnPoint(index) {
-  // Put the first wave in a clear forward arc so enemies are immediately
-  // visible after spawning instead of appearing mostly behind the player.
-  const forwardArc = [
-    new THREE.Vector3(-64, 0, -61),
-    new THREE.Vector3(-34, 0, -64),
-    new THREE.Vector3(0, 0, -64),
-    new THREE.Vector3(34, 0, -64),
-    new THREE.Vector3(64, 0, -61),
-    new THREE.Vector3(-96, 0, -48),
-    new THREE.Vector3(96, 0, -48),
-    new THREE.Vector3(0, 0, -57),
-  ];
+  // Spawn squads over a wide perimeter so the wave starts as a formation
+  // instead of a single pile of enemies.
+  const slot = Number(index) || 0;
+  const count = Math.max(1, state.spawnTotal || 1);
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  const angle =
+    slot * goldenAngle +
+    state.wave * .73 +
+    Math.random() * .22;
 
-  const p = forwardArc[index % forwardArc.length].clone();
-  if (p.distanceTo(player.position) < 12) p.z -= 8;
-  return p;
+  const radiusX = 82 + Math.random() * 34;
+  const radiusZ = 44 + Math.random() * 18;
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const a = angle + attempt * .31;
+    const jitter = 1 + (Math.random() - .5) * .16;
+    const p = new THREE.Vector3(
+      player.position.x + Math.cos(a) * radiusX * jitter,
+      0,
+      player.position.z + Math.sin(a) * radiusZ * jitter,
+    );
+
+    p.x = THREE.MathUtils.clamp(p.x, -HALF_W + 7, HALF_W - 7);
+    p.z = THREE.MathUtils.clamp(p.z, -HALF_D + 7, HALF_D - 7);
+
+    if (
+      p.distanceTo(player.position) >= 28 &&
+      !pointInsideObstacle(p)
+    ) {
+      p.y =
+        getGroundHeightAt(p.x, p.z) +
+        ENEMY_GROUND_Y;
+      return p;
+    }
+  }
+
+  const fallback = new THREE.Vector3(
+    THREE.MathUtils.clamp(player.position.x + 70, -HALF_W + 7, HALF_W - 7),
+    0,
+    THREE.MathUtils.clamp(player.position.z - 42, -HALF_D + 7, HALF_D - 7),
+  );
+  fallback.y =
+    getGroundHeightAt(fallback.x, fallback.z) +
+    ENEMY_GROUND_Y;
+  return fallback;
 }
 
 function spawnWave() {
@@ -6343,6 +6473,8 @@ function spawnEnemy(index = 0, spawnPosition = null) {
       damage: 8,
       cooldown: .72,
       range: 16,
+      meleeDamage: 11,
+      meleeRange: 2.85,
     },
     rifleman: {
       health: 1.00,
@@ -6350,6 +6482,8 @@ function spawnEnemy(index = 0, spawnPosition = null) {
       damage: 7,
       cooldown: .95,
       range: 42,
+      meleeDamage: 12,
+      meleeRange: 2.75,
     },
     heavy: {
       health: 1.85,
@@ -6357,6 +6491,8 @@ function spawnEnemy(index = 0, spawnPosition = null) {
       damage: 13,
       cooldown: 1.25,
       range: 38,
+      meleeDamage: 17,
+      meleeRange: 2.95,
     },
   }[role];
 
@@ -6387,6 +6523,13 @@ function spawnEnemy(index = 0, spawnPosition = null) {
     inCover: false,
     suppressedTimer: 0,
     flankSeed: index + Math.random() * 12,
+    combatMode: role === 'rusher' ? 'melee' : 'ranged',
+    meleeCommitTimer: role === 'rusher' ? 99 : 0,
+    meleeExitDistance: 7.5 + Math.random() * 1.8,
+    coverCheckTimer: .2 + Math.random() * .8,
+    coverHoldTimer: 0,
+    orbitSign: Math.random() < .5 ? -1 : 1,
+    spacingBias: (Math.random() - .5) * 3.5,
   };
   aiState.target.copy(player.position);
 
@@ -6422,6 +6565,13 @@ function spawnEnemy(index = 0, spawnPosition = null) {
             : role === 'rifleman'
               ? 24
               : 26,
+        getNeighbors: () =>
+          enemies
+            .filter(other => !other.dying)
+            .map(other => other.group),
+        separationRadius: 5.5,
+        repathInterval:
+          .22 + Math.random() * .12,
       })
     : null;
 
@@ -6437,6 +6587,10 @@ function spawnEnemy(index = 0, spawnPosition = null) {
     damage:
       roleStats.damage +
       Math.floor(state.wave * .35),
+    meleeDamage:
+      roleStats.meleeDamage +
+      Math.floor(state.wave * .20),
+    meleeRange: roleStats.meleeRange,
     attackTimer:
       .55 + Math.random() * roleStats.cooldown,
     attackCooldown: roleStats.cooldown,
@@ -7617,6 +7771,10 @@ function findEnemyCoverPoint(enemy) {
     new THREE.Vector3(-1, 0, 0),
     new THREE.Vector3(0, 0, 1),
     new THREE.Vector3(0, 0, -1),
+    new THREE.Vector3(1, 0, 1).normalize(),
+    new THREE.Vector3(-1, 0, 1).normalize(),
+    new THREE.Vector3(1, 0, -1).normalize(),
+    new THREE.Vector3(-1, 0, -1).normalize(),
   ];
 
   for (const obstacle of obstacles) {
@@ -7681,98 +7839,292 @@ function updateEnemyTactics(enemy, slot, dt, toPlayer) {
   ai.decisionTimer -= dt;
   ai.sightTimer -= dt;
   ai.suppressedTimer = Math.max(0, ai.suppressedTimer - dt);
+  ai.meleeCommitTimer = Math.max(0, ai.meleeCommitTimer - dt);
+  ai.coverCheckTimer = Math.max(0, ai.coverCheckTimer - dt);
+  ai.coverHoldTimer = Math.max(0, ai.coverHoldTimer - dt);
 
   if (ai.sightTimer <= 0) {
     const sight = enemyHasLineOfSight(enemy);
     ai.seenPlayer = sight.clear;
-    ai.sightTimer = .24 + Math.random() * .18;
+    ai.sightTimer = .16 + Math.random() * .18;
 
     if (sight.clear) {
       ai.lastKnownPlayer.copy(player.position);
     }
   }
 
-  if (ai.decisionTimer > 0) return;
-
-  ai.decisionTimer =
-    enemy.role === 'rusher'
-      ? .28 + Math.random() * .24
-      : .48 + Math.random() * .42;
-
   const flatToPlayer = toPlayer.clone();
-  if (flatToPlayer.lengthSq() < .001) flatToPlayer.set(0, 0, -1);
-  else flatToPlayer.normalize();
+  if (flatToPlayer.lengthSq() < .001) {
+    flatToPlayer.set(0, 0, -1);
+  } else {
+    flatToPlayer.normalize();
+  }
 
+  const awayFromPlayer = flatToPlayer.clone().negate();
   const side = new THREE.Vector3(
     -flatToPlayer.z,
     0,
     flatToPlayer.x,
   );
 
-  const phase = ai.flankSeed + performance.now() * .00045;
+  // Every enemy can transition to melee when the fight collapses into CQB.
+  // Rushers commit immediately; gun users can choose to commit when cornered,
+  // low on health, or suddenly inside their preferred firing envelope.
+  const lowHealth =
+    enemy.health <= enemy.maxHealth * .36;
+  const cqb =
+    toPlayer.length() <=
+    (enemy.role === 'heavy' ? 4.0 : 5.4);
+
+  if (
+    ai.combatMode !== 'melee' &&
+    (
+      enemy.role === 'rusher' ||
+      (
+        cqb &&
+        ai.seenPlayer &&
+        (
+          lowHealth ||
+          Math.random() < .34
+        )
+      )
+    )
+  ) {
+    ai.combatMode = 'melee';
+    ai.meleeCommitTimer =
+      enemy.role === 'rusher'
+        ? 99
+        : 1.9 + Math.random() * 2.6;
+    ai.inCover = false;
+    ai.coverHoldTimer = 0;
+  }
+
+  if (
+    ai.combatMode === 'melee' &&
+    enemy.role !== 'rusher' &&
+    (
+      ai.meleeCommitTimer <= 0 ||
+      toPlayer.length() > ai.meleeExitDistance
+    )
+  ) {
+    ai.combatMode = 'ranged';
+  }
+
+  if (ai.decisionTimer > 0) return;
+
+  ai.decisionTimer =
+    enemy.role === 'rusher'
+      ? .20 + Math.random() * .18
+      : .28 + Math.random() * .34;
+
+  const enemyCount = Math.max(1, enemies.length);
+  const centeredSlot =
+    slot - (enemyCount - 1) * .5;
+
+  // Give every soldier an intentionally different lane. This is in addition
+  // to navigation separation, so they spread before they even get close.
+  const laneSpacing =
+    enemy.role === 'rusher'
+      ? 3.8
+      : 5.6;
   const lane =
-    ((slot % 5) - 2) *
-    (enemy.role === 'rusher' ? 1.9 : 3.6);
+    THREE.MathUtils.clamp(
+      centeredSlot * laneSpacing +
+      ai.spacingBias,
+      -34,
+      34,
+    );
+
+  const phase =
+    ai.flankSeed +
+    performance.now() * .00042;
+
+  const orbit =
+    Math.sin(
+      phase * (enemy.role === 'rusher' ? 1.4 : .72),
+    ) *
+    (enemy.role === 'rusher' ? 3.8 : 5.4) *
+    ai.orbitSign;
 
   const lateral =
-    lane +
-    Math.sin(phase * .9) *
-    (enemy.role === 'rusher' ? 2.4 : 3.2);
+    lane + orbit;
+
+  // Push the target away from nearby allies. This remains active while
+  // pathfinding so squads keep personal space around cover as well.
+  const separationTarget = new THREE.Vector3();
+  for (const other of enemies) {
+    if (!other || other === enemy || other.dying) continue;
+
+    const away =
+      enemy.group.position
+        .clone()
+        .sub(other.group.position);
+    away.y = 0;
+
+    const distance = away.length();
+    if (
+      distance < .001 ||
+      distance > 11
+    ) continue;
+
+    away.normalize();
+    separationTarget.addScaledVector(
+      away,
+      Math.pow(1 - distance / 11, 2),
+    );
+  }
+  if (separationTarget.lengthSq() > .001) {
+    separationTarget.normalize();
+  }
+
+  if (ai.combatMode === 'melee') {
+    const meleeTarget = player.position.clone()
+      .addScaledVector(
+        flatToPlayer,
+        -1.5,
+      )
+      .addScaledVector(
+        side,
+        THREE.MathUtils.clamp(
+          lateral * .24,
+          -4.5,
+          4.5,
+        ),
+      )
+      .addScaledVector(
+        separationTarget,
+        5.0,
+      );
+
+    meleeTarget.x = THREE.MathUtils.clamp(
+      meleeTarget.x,
+      -HALF_W + 4,
+      HALF_W - 4,
+    );
+    meleeTarget.z = THREE.MathUtils.clamp(
+      meleeTarget.z,
+      -HALF_D + 4,
+      HALF_D - 4,
+    );
+    meleeTarget.y =
+      getGroundHeightAt(
+        meleeTarget.x,
+        meleeTarget.z,
+      ) + ENEMY_GROUND_Y;
+
+    ai.desiredDistance = 1.05;
+    ai.target.copy(meleeTarget);
+    return;
+  }
 
   const desiredRange =
-    enemy.role === 'rusher'
-      ? 2.2
-      : enemy.role === 'rifleman'
-        ? 24
-        : 29;
+    enemy.role === 'rifleman'
+      ? 26
+      : 31;
 
-  const wantsCover =
+  // Ranged soldiers actively retreat when the player closes the distance,
+  // rather than repeatedly pathing through the player.
+  let tacticalTarget;
+
+  if (
+    toPlayer.length() <
+    desiredRange - 2.5
+  ) {
+    const retreatDistance =
+      THREE.MathUtils.clamp(
+        desiredRange - toPlayer.length() + 9,
+        8,
+        20,
+      );
+
+    tacticalTarget =
+      enemy.group.position.clone()
+        .addScaledVector(
+          awayFromPlayer,
+          retreatDistance,
+        );
+  } else {
+    tacticalTarget =
+      player.position.clone()
+        .addScaledVector(
+          flatToPlayer,
+          -desiredRange,
+        );
+  }
+
+  tacticalTarget
+    .addScaledVector(side, lateral)
+    .addScaledVector(separationTarget, 7.5);
+
+  // Gun users look for cover not only when they lose sight, but also while
+  // exposed and under pressure. They periodically re-evaluate so they can
+  // abandon a bad position instead of camping forever.
+  const shouldCheckCover =
     enemy.role !== 'rusher' &&
-    (!ai.seenPlayer || ai.suppressedTimer > 0);
+    ai.coverCheckTimer <= 0 &&
+    (
+      ai.suppressedTimer > 0 ||
+      !ai.seenPlayer ||
+      toPlayer.length() > 11
+    );
 
-  if (wantsCover) {
-    const cover = findEnemyCoverPoint(enemy);
-    if (cover) {
-      ai.coverPoint = cover;
-      ai.inCover = true;
-      ai.desiredDistance = 1.15;
-      ai.target.copy(cover);
-      return;
+  if (shouldCheckCover) {
+    ai.coverCheckTimer =
+      1.1 + Math.random() * 2.2;
+
+    const coverChance =
+      ai.suppressedTimer > 0
+        ? .96
+        : ai.seenPlayer
+          ? .58
+          : .92;
+
+    if (Math.random() < coverChance) {
+      const cover = findEnemyCoverPoint(enemy);
+      if (cover) {
+        ai.coverPoint = cover;
+        ai.inCover = true;
+        ai.coverHoldTimer =
+          .9 + Math.random() * 2.5;
+        ai.desiredDistance = 1.0;
+        ai.target.copy(cover);
+        return;
+      }
     }
+  }
+
+  // Hold existing cover until the pressure eases, then reposition to a new
+  // lane instead of all soldiers immediately leaving at once.
+  if (
+    ai.inCover &&
+    ai.coverPoint &&
+    ai.coverHoldTimer > 0 &&
+    !pointInsideObstacle(ai.coverPoint)
+  ) {
+    ai.desiredDistance = 1.0;
+    ai.target.copy(ai.coverPoint);
+    return;
   }
 
   ai.inCover = false;
   ai.desiredDistance = 1.15;
-
-  const tacticalTarget = player.position.clone()
-    .addScaledVector(flatToPlayer, -desiredRange)
-    .addScaledVector(side, lateral);
-
-  if (enemy.role === 'rusher') {
-    tacticalTarget.addScaledVector(
-      side,
-      Math.sin(phase * 1.7) * 2.8,
-    );
-  }
-
-  tacticalTarget.x = THREE.MathUtils.clamp(
-    tacticalTarget.x,
-    -HALF_W + 5,
-    HALF_W - 5,
-  );
-  tacticalTarget.z = THREE.MathUtils.clamp(
-    tacticalTarget.z,
-    -HALF_D + 5,
-    HALF_D - 5,
-  );
-
-  tacticalTarget.y =
-    getGroundHeightAt(
-      tacticalTarget.x,
-      tacticalTarget.z,
-    ) + ENEMY_GROUND_Y;
-
   ai.target.copy(tacticalTarget);
+
+  ai.target.x = THREE.MathUtils.clamp(
+    ai.target.x,
+    -HALF_W + 4,
+    HALF_W - 4,
+  );
+  ai.target.z = THREE.MathUtils.clamp(
+    ai.target.z,
+    -HALF_D + 4,
+    HALF_D - 4,
+  );
+  ai.target.y =
+    getGroundHeightAt(
+      ai.target.x,
+      ai.target.z,
+    ) + ENEMY_GROUND_Y;
 }
 
 function updateEnemies(dt) {
@@ -7822,13 +8174,18 @@ function updateEnemies(dt) {
         navMesh: navMeshService,
         getTarget: () => enemy.ai?.target || player.position,
         speed: enemy.speed,
-        repathInterval: .35,
+        repathInterval: .24,
         obstacles,
         radius:
           enemy.role === 'heavy'
             ? .68
             : .58,
         desiredDistance: 1.15,
+        getNeighbors: () =>
+          enemies
+            .filter(other => !other.dying)
+            .map(other => other.group),
+        separationRadius: 5.5,
       });
     }
 
@@ -7916,19 +8273,22 @@ function updateEnemies(dt) {
     }
 
     if (
-      enemy.role === 'rusher' &&
-      dist < 2.65 &&
+      enemy.ai?.combatMode === 'melee' &&
+      dist < (enemy.meleeRange || 2.8) + .35 &&
       enemy.attackTimer <= 0
     ) {
       enemy.attackTimer =
-        enemy.attackCooldown;
+        enemy.attackCooldown *
+        (.72 + Math.random() * .18);
+      enemy.shootRecoil = 0;
+      enemy.ai.lastKnownPlayer.copy(player.position);
 
       damagePlayer(
+        enemy.meleeDamage ||
         enemy.damage + 2,
       );
-    }
-
-    if (
+    } else if (
+      enemy.ai?.combatMode !== 'melee' &&
       enemy.role !== 'rusher' &&
       enemy.attackTimer <= 0 &&
       dist < enemy.attackRange
