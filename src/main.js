@@ -10367,6 +10367,25 @@ function frame() {
       .05,
     );
 
+  // Grass uses coarse chunk culling rather than per-blade visibility checks.
+  // This keeps the dense vegetation cheap even on long sightline maps.
+  optimizedGrassCullTimer -= dt;
+  if (optimizedGrassCullTimer <= 0 && optimizedGrassChunks.length) {
+    optimizedGrassCullTimer = .20;
+    const px = player.position.x;
+    const pz = player.position.z;
+    const maxDistance = 88;
+    const maxDistanceSq = maxDistance * maxDistance;
+
+    for (const chunk of optimizedGrassChunks) {
+      const dx = chunk.x - px;
+      const dz = chunk.z - pz;
+      const distanceSq = dx * dx + dz * dz;
+      chunk.mesh.visible =
+        distanceSq <= (maxDistance + chunk.radius) * (maxDistance + chunk.radius);
+    }
+  }
+
   updateBoundaryGrid();
   mapEditor.update(dt);
   updateLiveClouds(dt);
