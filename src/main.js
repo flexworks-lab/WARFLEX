@@ -1062,8 +1062,8 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
   const scale = enemy.baseScale || enemy.group.userData.baseScale || .54;
   model.scale.setScalar(scale);
 
-  // One rigid root at the hips. The body is allowed to translate, fall and
-  // rotate as a single mass while the limbs solve as damped joints.
+  // The hips are the physical root. Every visible part remains parented to
+  // the same skeleton, so the corpse cannot visually "separate".
   const root = new THREE.Group();
   root.name = 'RagdollFallPivot';
   root.position.copy(enemy.group.position);
@@ -1092,164 +1092,139 @@ function createRagdoll(enemy, impactPoint, direction, headshot = false) {
   };
   model.userData.ragdollParts = parts;
 
-  // Hit impulse at the actual impact point.
   const center = root.position.clone().add(new THREE.Vector3(0, 1.05 * scale, 0));
   const hit = impactPoint?.clone() || center.clone();
-  const hitOffset = hit.sub(center);
+  const hitOffset = hit.clone().sub(center);
   const hitDir = direction?.clone().normalize() || new THREE.Vector3(0, 0, -1);
 
-  const impulseStrength = headshot ? 5.0 : 3.35;
-  const linearImpulse = hitDir.clone().multiplyScalar(impulseStrength);
+  const force = headshot ? 5.4 : 3.6;
+  const impulse = hitDir.clone().multiplyScalar(force);
 
-  // r x F gives the body-specific twist. A shoulder shot should not spin
-  // like a pelvis shot.
-  const torque = hitOffset.cross(linearImpulse);
+  // Force the corpse to tip over as one body. The axis is perpendicular to
+  // the shot direction, so a forward hit produces a forward fall instead of
+  // a slow upright wobble.
+  const fallAxisWorld = new THREE.Vector3(
+    -hitDir.z,
+    0,
+    hitDir.x
+  );
+  if (fallAxisWorld.lengthSq() < .001) fallAxisWorld.set(1, 0, 0);
+  fallAxisWorld.normalize();
 
-  const side = new THREE.Vector3(-hitDir.z, 0, hitDir.x);
-  const sideKick = side.multiplyScalar((Math.random() - .5) * .85);
+  const inverseRoot = root.quaternion.clone().invert();
+  const fallAxisLocal = fallAxisWorld.clone().applyQuaternion(inverseRoot).normalize();
 
-  const makeJoint = (
-    upper,
-    lower,
-    options
-  ) => upper && lower ? {
-    upper,
-    lower,
-    upperAngle: 0,
-    lowerAngle: 0,
-    upperVelocity: options.upperKick || 0,
-    lowerVelocity: options.lowerKick || 0,
-    upperZ: 0,
-    lowerZ: 0,
-    upperVelocityZ: options.upperKickZ || 0,
-    lowerVelocityZ: options.lowerKickZ || 0,
-    upperLimit: options.upperLimit,
-    lowerLimit: options.lowerLimit,
-    upperRest: options.upperRest,
-    lowerRest: options.lowerRest,
-    stiffness: options.stiffness,
-    damping: options.damping,
-    gravity: options.gravity,
-  } : null;
+  // Height of the hit controls how hard the body tips. Upper-body/head hits
+  // create more leverage than shots near the pelvis.
+  const leverage = THREE.MathUtils.clamp(
+    1 + hitOffset.y / Math.max(.45 * scale, .001),
+    .8,
+    1.8
+  );
 
-  const joints = [
-    makeJoint(
-      parts.leftArm,
-      parts.leftElbow,
-      {
-        upperLimit: 1.48, lowerLimit: 1.28,
-        upperRest: -.28, lowerRest: .20,
-        stiffness: 3.0, damping: 1.15, gravity: 6.2,
-        upperKick: (Math.random() - .5) * 2.0 - torque.z * .30,
-        lowerKick: (Math.random() - .5) * 2.7 - torque.z * .22,
-        upperKickZ: (Math.random() - .5) * 1.7 + torque.x * .22,
-        lowerKickZ: (Math.random() - .5) * 2.0 + torque.x * .28,
-      }
-    ),
-    makeJoint(
-      parts.rightArm,
-      parts.rightElbow,
-      {
-        upperLimit: 1.48, lowerLimit: 1.28,
-        upperRest: -.28, lowerRest: .20,
-        stiffness: 3.0, damping: 1.15, gravity: 6.2,
-        upperKick: (Math.random() - .5) * 2.0 - torque.z * .30,
-        lowerKick: (Math.random() - .5) * 2.7 - torque.z * .22,
-        upperKickZ: (Math.random() - .5) * 1.7 - torque.x * .22,
-        lowerKickZ: (Math.random() - .5) * 2.0 - torque.x * .28,
-      }
-    ),
-    makeJoint(
-      parts.leftLeg,
-      parts.leftKnee,
-      {
-        upperLimit: .92, lowerLimit: .92,
-        upperRest: .08, lowerRest: .16,
-        stiffness: 4.5, damping: 1.55, gravity: 7.5,
-        upperKick: (Math.random() - .5) * 1.0 - torque.z * .10,
-        lowerKick: (Math.random() - .5) * 1.3,
-        upperKickZ: (Math.random() - .5) * .55,
-        lowerKickZ: (Math.random() - .5) * .65,
-      }
-    ),
-    makeJoint(
-      parts.rightLeg,
-      parts.rightKnee,
-      {
-        upperLimit: .92, lowerLimit: .92,
-        upperRest: .08, lowerRest: .16,
-        stiffness: 4.5, damping: 1.55, gravity: 7.5,
-        upperKick: (Math.random() - .5) * 1.0 + torque.z * .10,
-        lowerKick: (Math.random() - .5) * 1.3,
-        upperKickZ: (Math.random() - .5) * .55,
-        lowerKickZ: (Math.random() - .5) * .65,
-      }
-    ),
-  ].filter(Boolean);
+  const joints = [];
+
+  const addJoint = (upperName, lowerName, upperLimit, lowerLimit, type) => {
+    const upper = model.getObjectByName(upperName);
+    const lower = model.getObjectByName(lowerName);
+    if (!upper || !lower) return;
+
+    const isArm = type === 'arm';
+
+    joints.push({
+      upper,
+      lower,
+      upperAngle: 0,
+      lowerAngle: 0,
+      upperVelocity: (Math.random() - .5) * (isArm ? .45 : .20),
+      lowerVelocity: (Math.random() - .5) * (isArm ? .55 : .25),
+      upperZ: 0,
+      lowerZ: 0,
+      upperVelocityZ: (Math.random() - .5) * .30,
+      lowerVelocityZ: (Math.random() - .5) * .35,
+      upperLimit,
+      lowerLimit,
+      stiffness: isArm ? 7.5 : 10.0,
+      damping: isArm ? 2.8 : 3.5,
+      upperRest: isArm ? -.08 : .04,
+      lowerRest: isArm ? .10 : .10,
+    });
+  };
+
+  addJoint('RagdollLeftArm', 'RagdollLeftElbow', 1.15, 1.0, 'arm');
+  addJoint('RagdollRightArm', 'RagdollRightElbow', 1.15, 1.0, 'arm');
+  addJoint('RagdollLeftLeg', 'RagdollLeftKnee', .58, .72, 'leg');
+  addJoint('RagdollRightLeg', 'RagdollRightKnee', .58, .72, 'leg');
 
   const spine = {
     object: parts.upperBody,
     angleX: 0,
     angleZ: 0,
-    velocityX: torque.z * .42 + (Math.random() - .5) * .65,
-    velocityZ: -torque.x * .42 + (Math.random() - .5) * .65,
-    stiffness: 2.8,
-    damping: .9,
+    velocityX: (Math.random() - .5) * .35,
+    velocityZ: (Math.random() - .5) * .35,
+    stiffness: 8.0,
+    damping: 2.6,
   };
 
   const pelvis = {
     object: parts.lowerBody,
     angleX: 0,
     angleZ: 0,
-    velocityX: torque.z * .14,
-    velocityZ: -torque.x * .14,
-    stiffness: 3.8,
-    damping: 1.25,
+    velocityX: 0,
+    velocityZ: 0,
+    stiffness: 9.0,
+    damping: 3.0,
   };
 
   const neck = {
     object: parts.head,
     angleX: 0,
     angleY: 0,
-    velocityX: torque.z * .40 + (Math.random() - .5) * 1.0,
-    velocityY: torque.y * .25 + (Math.random() - .5) * 1.1,
-    stiffness: 4.4,
-    damping: 1.15,
+    velocityX: (Math.random() - .5) * .45,
+    velocityY: (Math.random() - .5) * .55,
+    stiffness: 8.0,
+    damping: 2.5,
   };
 
-  const rootVelocity = linearImpulse
-    .add(sideKick)
-    .multiplyScalar(headshot ? 1.05 : .86);
-  rootVelocity.y = headshot ? 2.05 : 1.45;
+  const rootVelocity = impulse.multiplyScalar(.82);
+  rootVelocity.y = headshot ? 2.15 : 1.55;
 
-  const rootAngularVelocity = new THREE.Vector3(
-    torque.x * .32 + (Math.random() - .5) * .55,
-    torque.y * .23 + (Math.random() - .5) * .85,
-    torque.z * .32 + (Math.random() - .5) * .55
+  // Main fall + a smaller hit-dependent twist. This is the important part:
+  // the soldier tips over immediately rather than disintegrating upright.
+  const rootAngularVelocity = fallAxisLocal.multiplyScalar(
+    (headshot ? 6.2 : 5.1) * leverage
+  );
+  rootAngularVelocity.add(new THREE.Vector3(
+    (Math.random() - .5) * .35,
+    (Math.random() - .5) * .65,
+    (Math.random() - .5) * .35
+  ));
+
+  const impactTorque = hitOffset.cross(impulse);
+  rootAngularVelocity.addScaledVector(
+    impactTorque.applyQuaternion(inverseRoot),
+    .18
   );
 
-  // Give the dead soldier a slight forward collapse. This is small enough to
-  // let the hit torque dominate instead of forcing one universal fall.
-  rootAngularVelocity.x += .35 * (hitDir.y >= 0 ? -1 : 1);
+  if (headshot) {
+    rootAngularVelocity.multiplyScalar(1.12);
+  }
 
-  // Drop the rifle with separate, lighter physics.
   const droppedRifle = parts.rifle;
   if (droppedRifle) {
     scene.attach(droppedRifle);
     droppedRifle.visible = true;
 
     const gunVelocity = hitDir.clone().multiplyScalar(1.8 + Math.random() * .8);
-    gunVelocity.y = 1.15 + Math.random() * 1.1;
-    gunVelocity.x += (Math.random() - .5) * 1.2;
-    gunVelocity.z += (Math.random() - .5) * 1.2;
+    gunVelocity.y = 1.1 + Math.random() * .9;
 
     droppedGuns.push({
       mesh: droppedRifle,
       velocity: gunVelocity,
       angularVelocity: new THREE.Vector3(
-        (Math.random() - .5) * 9,
-        (Math.random() - .5) * 11,
-        (Math.random() - .5) * 9
+        (Math.random() - .5) * 8,
+        (Math.random() - .5) * 10,
+        (Math.random() - .5) * 8
       ),
       bounds: new THREE.Box3(),
       life: 9 + Math.random() * 3,
@@ -1576,49 +1551,47 @@ function applyRagdollHit(rag, hitPoint, direction, hitObject) {
   const hitDir = direction?.clone().normalize() || new THREE.Vector3(0, 0, -1);
 
   rag.model.updateMatrixWorld(true);
+  const bodyCenter = rag.group.getWorldPosition(new THREE.Vector3());
   const localImpact = rag.model.worldToLocal(hitPoint.clone());
 
-  const partScale =
-    hitPart === 'head' ? 1.35 :
-    hitPart === 'leftArm' || hitPart === 'rightArm' ? .78 :
-    hitPart === 'leftLeg' || hitPart === 'rightLeg' ? .72 :
-    1.0;
+  const force =
+    hitPart === 'head' ? 3.8 :
+    hitPart === 'leftArm' || hitPart === 'rightArm' ? 1.9 :
+    hitPart === 'leftLeg' || hitPart === 'rightLeg' ? 1.7 :
+    2.5;
 
-  const force = 2.4 * partScale;
-  const impulse = hitDir.multiplyScalar(force);
-
+  const impulse = hitDir.clone().multiplyScalar(force);
   rag.velocity.add(impulse);
-  rag.velocity.y += hitPart === 'head' ? 1.0 : .22;
+  if (hitPart === 'head') rag.velocity.y += 1.0;
 
-  const center = rag.group.getWorldPosition(new THREE.Vector3());
-  const lever = hitPoint.clone().sub(center);
+  // Kick the whole body, but don't re-randomize every limb on every shot.
+  const lever = hitPoint.clone().sub(bodyCenter);
   const torque = lever.cross(impulse);
+  rag.angularVelocity.addScaledVector(torque, .42);
 
-  rag.angularVelocity.addScaledVector(torque, .55);
-
-  // Extra local motion only goes into the struck limb. Other limbs keep their
-  // existing momentum instead of every limb exploding on every bullet.
-  const targetMap = {
-    leftArm: rag.joints.find(j => j.upper.name === 'RagdollLeftArm'),
-    rightArm: rag.joints.find(j => j.upper.name === 'RagdollRightArm'),
-    leftLeg: rag.joints.find(j => j.upper.name === 'RagdollLeftLeg'),
-    rightLeg: rag.joints.find(j => j.upper.name === 'RagdollRightLeg'),
-  };
-  const target = targetMap[hitPart];
+  const target = {
+    leftArm: 'RagdollLeftArm',
+    rightArm: 'RagdollRightArm',
+    leftLeg: 'RagdollLeftLeg',
+    rightLeg: 'RagdollRightLeg',
+  }[hitPart];
 
   if (target) {
-    target.upperVelocity += (Math.random() - .5) * 4.5 + localImpact.x * 1.8;
-    target.lowerVelocity += (Math.random() - .5) * 5.0 + localImpact.y * 1.4;
-    target.upperVelocityZ += (Math.random() - .5) * 3.0;
-    target.lowerVelocityZ += (Math.random() - .5) * 3.4;
+    const joint = rag.joints.find(j => j.upper.name === target);
+    if (joint) {
+      joint.upperVelocity += (Math.random() - .5) * 2.8 + localImpact.x * 1.0;
+      joint.lowerVelocity += (Math.random() - .5) * 3.1 + localImpact.y * 1.0;
+      joint.upperVelocityZ += (Math.random() - .5) * 1.8;
+      joint.lowerVelocityZ += (Math.random() - .5) * 2.0;
+    }
   }
 
   if (hitPart === 'upperBody' || hitPart === 'body') {
-    rag.spine.velocityX += localImpact.z * 1.5;
-    rag.spine.velocityZ -= localImpact.x * 1.5;
+    rag.spine.velocityX += localImpact.z * 1.0;
+    rag.spine.velocityZ -= localImpact.x * 1.0;
   } else if (hitPart === 'head') {
-    rag.neck.velocityX += (Math.random() - .5) * 3.5;
-    rag.neck.velocityY += localImpact.x * 2.2;
+    rag.neck.velocityX += (Math.random() - .5) * 2.0;
+    rag.neck.velocityY += localImpact.x * 1.3;
   }
 
   rag.grounded = false;
@@ -1811,8 +1784,8 @@ function updateEnemies(dt) {
 }
 
 function updateRagdolls(dt) {
-  const subSteps = 2;
-  const step = Math.min(dt / subSteps, .025);
+  const subSteps = 3;
+  const step = Math.min(dt / subSteps, .018);
 
   for (let i = ragdolls.length - 1; i >= 0; i -= 1) {
     const rag = ragdolls[i];
@@ -1821,67 +1794,80 @@ function updateRagdolls(dt) {
     for (let sub = 0; sub < subSteps; sub += 1) {
       rag.age += step;
 
-      // ---------------- Root body ----------------
-      rag.velocity.y -= CONFIG.ragdollGravity * step;
+      // Phase 1: tip the whole corpse. Limbs stay strongly constrained so
+      // the body reads as one connected person while falling.
+      const fallBlend = THREE.MathUtils.clamp(1 - rag.age / .75, 0, 1);
+      const settleBlend = THREE.MathUtils.clamp((rag.age - .55) / 2.0, 0, 1);
 
-      const airDrag = rag.grounded ? 3.2 : .12;
-      rag.velocity.x *= Math.exp(-airDrag * step);
-      rag.velocity.z *= Math.exp(-airDrag * step);
+      rag.velocity.y -= CONFIG.ragdollGravity * step;
+      const horizontalDrag = rag.grounded ? 4.0 : .10;
+      rag.velocity.x *= Math.exp(-horizontalDrag * step);
+      rag.velocity.z *= Math.exp(-horizontalDrag * step);
       rag.group.position.addScaledVector(rag.velocity, step);
 
-      const angularDrag = rag.grounded ? 2.6 : .06;
+      const angularDrag = rag.grounded ? 3.5 : .045;
       rag.angularVelocity.multiplyScalar(Math.exp(-angularDrag * step));
+
+      // Preserve the fall momentum strongly through the first ~0.75 sec.
+      // Then friction and joint damping gradually take over.
       rag.group.rotation.x += rag.angularVelocity.x * step;
       rag.group.rotation.y += rag.angularVelocity.y * step;
       rag.group.rotation.z += rag.angularVelocity.z * step;
 
-      // ---------------- Joint physics ----------------
-      // Gravity acts in each joint's local frame. This gives the limbs a
-      // natural hanging motion instead of random pre-baked animation.
-      const gravityWorld = new THREE.Vector3(0, -1, 0);
-      const parentQuat = rag.group.getWorldQuaternion(new THREE.Quaternion());
-      const localGravity = gravityWorld.clone().applyQuaternion(parentQuat.invert());
-
-      const settle = THREE.MathUtils.clamp((rag.age - .7) / 2.5, 0, 1);
+      // ---------------- Connected limbs ----------------
+      const rootQuat = rag.group.getWorldQuaternion(new THREE.Quaternion());
+      const localDown = new THREE.Vector3(0, -1, 0)
+        .applyQuaternion(rootQuat.invert());
 
       for (const joint of rag.joints) {
-        const gravityTarget = Math.atan2(localGravity.z, -localGravity.y);
+        const gravityAngle = THREE.MathUtils.clamp(
+          Math.atan2(localDown.z, -localDown.y),
+          -.65,
+          .65
+        );
+
+        // Strong constraint during the fall; only after impact do we loosen.
+        const stiffnessMultiplier = THREE.MathUtils.lerp(
+          1.15,
+          .62,
+          settleBlend
+        );
+        const stiffness = joint.stiffness * stiffnessMultiplier;
+        const damping = joint.damping * THREE.MathUtils.lerp(
+          1.35,
+          .95,
+          settleBlend
+        );
 
         const upperTarget = THREE.MathUtils.clamp(
-          joint.upperRest + gravityTarget * .18,
+          joint.upperRest + gravityAngle * .16,
           -joint.upperLimit,
           joint.upperLimit
         );
         const lowerTarget = THREE.MathUtils.clamp(
-          joint.lowerRest + gravityTarget * .12,
+          joint.lowerRest + gravityAngle * .10,
           -joint.lowerLimit,
           joint.lowerLimit
         );
 
-        // Airborne limbs stay loose. As the body settles, springs regain
-        // enough strength to stop impossible 360-degree limb rotation.
-        const stiffness = THREE.MathUtils.lerp(.9, joint.stiffness, settle);
-
         joint.upperVelocity += (
-          Math.sin(joint.upperAngle) * joint.gravity
-          - (joint.upperAngle - upperTarget) * stiffness
-          - joint.upperVelocity * joint.damping
+          -(joint.upperAngle - upperTarget) * stiffness
+          - joint.upperVelocity * damping
         ) * step;
 
         joint.lowerVelocity += (
-          Math.sin(joint.lowerAngle) * (joint.gravity * .72)
-          - (joint.lowerAngle - lowerTarget) * (stiffness + .55)
-          - joint.lowerVelocity * (joint.damping + .18)
+          -(joint.lowerAngle - lowerTarget) * (stiffness * 1.08)
+          - joint.lowerVelocity * (damping * 1.05)
         ) * step;
 
         joint.upperVelocityZ += (
-          -joint.upperZ * (stiffness * .72)
-          - joint.upperVelocityZ * (joint.damping * .88)
+          -joint.upperZ * stiffness * .7
+          -joint.upperVelocityZ * damping
         ) * step;
 
         joint.lowerVelocityZ += (
-          -joint.lowerZ * (stiffness * .76)
-          - joint.lowerVelocityZ * (joint.damping * .94)
+          -joint.lowerZ * stiffness * .72
+          -joint.lowerVelocityZ * damping
         ) * step;
 
         joint.upperAngle += joint.upperVelocity * step;
@@ -1899,8 +1885,8 @@ function updateRagdolls(dt) {
           -joint.lowerLimit,
           joint.lowerLimit
         );
-        joint.upperZ = THREE.MathUtils.clamp(joint.upperZ, -1.0, 1.0);
-        joint.lowerZ = THREE.MathUtils.clamp(joint.lowerZ, -1.0, 1.0);
+        joint.upperZ = THREE.MathUtils.clamp(joint.upperZ, -.7, .7);
+        joint.lowerZ = THREE.MathUtils.clamp(joint.lowerZ, -.7, .7);
 
         joint.upper.rotation.x = joint.upperAngle;
         joint.lower.rotation.x = joint.lowerAngle;
@@ -1909,61 +1895,58 @@ function updateRagdolls(dt) {
       }
 
       // ---------------- Torso / head ----------------
-      const spineGravityX = THREE.MathUtils.clamp(localGravity.z * .24, -.30, .30);
-      const spineGravityZ = THREE.MathUtils.clamp(-localGravity.x * .24, -.30, .30);
+      const spineTargetX = THREE.MathUtils.clamp(localDown.z * .18, -.24, .24);
+      const spineTargetZ = THREE.MathUtils.clamp(-localDown.x * .18, -.24, .24);
 
-      const spineStiffness = THREE.MathUtils.lerp(.75, rag.spine.stiffness, settle);
       rag.spine.velocityX += (
-        (spineGravityX - rag.spine.angleX) * spineStiffness
+        (spineTargetX - rag.spine.angleX) * rag.spine.stiffness
         - rag.spine.velocityX * rag.spine.damping
       ) * step;
       rag.spine.velocityZ += (
-        (spineGravityZ - rag.spine.angleZ) * spineStiffness
+        (spineTargetZ - rag.spine.angleZ) * rag.spine.stiffness
         - rag.spine.velocityZ * rag.spine.damping
       ) * step;
+
       rag.spine.angleX += rag.spine.velocityX * step;
       rag.spine.angleZ += rag.spine.velocityZ * step;
-      rag.spine.angleX = THREE.MathUtils.clamp(rag.spine.angleX, -1.1, 1.1);
-      rag.spine.angleZ = THREE.MathUtils.clamp(rag.spine.angleZ, -.85, .85);
+      rag.spine.angleX = THREE.MathUtils.clamp(rag.spine.angleX, -.48, .48);
+      rag.spine.angleZ = THREE.MathUtils.clamp(rag.spine.angleZ, -.40, .40);
       rag.spine.object.rotation.x = rag.spine.angleX;
       rag.spine.object.rotation.z = rag.spine.angleZ;
 
-      const pelvisStiffness = THREE.MathUtils.lerp(1.2, rag.pelvis.stiffness, settle);
       rag.pelvis.velocityX += (
-        -rag.pelvis.angleX * pelvisStiffness
+        -rag.pelvis.angleX * rag.pelvis.stiffness
         - rag.pelvis.velocityX * rag.pelvis.damping
       ) * step;
       rag.pelvis.velocityZ += (
-        -rag.pelvis.angleZ * pelvisStiffness
+        -rag.pelvis.angleZ * rag.pelvis.stiffness
         - rag.pelvis.velocityZ * rag.pelvis.damping
       ) * step;
       rag.pelvis.angleX += rag.pelvis.velocityX * step;
       rag.pelvis.angleZ += rag.pelvis.velocityZ * step;
-      rag.pelvis.angleX = THREE.MathUtils.clamp(rag.pelvis.angleX, -.36, .36);
-      rag.pelvis.angleZ = THREE.MathUtils.clamp(rag.pelvis.angleZ, -.30, .30);
+      rag.pelvis.angleX = THREE.MathUtils.clamp(rag.pelvis.angleX, -.20, .20);
+      rag.pelvis.angleZ = THREE.MathUtils.clamp(rag.pelvis.angleZ, -.18, .18);
       rag.pelvis.object.rotation.x = rag.pelvis.angleX;
       rag.pelvis.object.rotation.z = rag.pelvis.angleZ;
 
-      const neckStiffness = THREE.MathUtils.lerp(1.0, rag.neck.stiffness, settle);
-      const headTargetX = THREE.MathUtils.clamp(localGravity.z * .48, -1.0, 1.0);
-      const headTargetY = THREE.MathUtils.clamp(-localGravity.x * .30, -.9, .9);
-
+      const headTargetX = THREE.MathUtils.clamp(localDown.z * .35, -0.6, 0.6);
+      const headTargetY = THREE.MathUtils.clamp(-localDown.x * .18, -.45, .45);
       rag.neck.velocityX += (
-        (headTargetX - rag.neck.angleX) * neckStiffness
+        (headTargetX - rag.neck.angleX) * rag.neck.stiffness
         - rag.neck.velocityX * rag.neck.damping
       ) * step;
       rag.neck.velocityY += (
-        (headTargetY - rag.neck.angleY) * neckStiffness
+        (headTargetY - rag.neck.angleY) * rag.neck.stiffness
         - rag.neck.velocityY * rag.neck.damping
       ) * step;
       rag.neck.angleX += rag.neck.velocityX * step;
       rag.neck.angleY += rag.neck.velocityY * step;
-      rag.neck.angleX = THREE.MathUtils.clamp(rag.neck.angleX, -1.15, 1.15);
-      rag.neck.angleY = THREE.MathUtils.clamp(rag.neck.angleY, -1.0, 1.0);
+      rag.neck.angleX = THREE.MathUtils.clamp(rag.neck.angleX, -0.7, 0.7);
+      rag.neck.angleY = THREE.MathUtils.clamp(rag.neck.angleY, -.55, .55);
       rag.neck.object.rotation.x = rag.neck.angleX;
       rag.neck.object.rotation.y = rag.neck.angleY;
 
-      // ---------------- Floor collision ----------------
+      // ---------------- Floor contact ----------------
       rag.model.updateMatrixWorld(true);
       rag.bounds.makeEmpty();
 
@@ -1988,61 +1971,58 @@ function updateRagdolls(dt) {
           rag.groundTime = 0;
         }
 
-        // Small bounce for hard impacts; soft contacts simply settle.
-        if (rag.velocity.y < -1.6) {
-          rag.velocity.y *= -.16;
+        // Give the body one small rebound on a hard impact, then kill energy.
+        if (rag.velocity.y < -2.0) {
+          rag.velocity.y *= -.13;
         } else {
           rag.velocity.y = 0;
         }
 
-        const impactFriction = rag.justLanded ? 3.2 : 6.0;
-        rag.velocity.x *= Math.exp(-impactFriction * step);
-        rag.velocity.z *= Math.exp(-impactFriction * step);
-        rag.angularVelocity.multiplyScalar(
-          Math.exp(-(rag.justLanded ? 2.0 : 4.8) * step)
-        );
+        rag.velocity.x *= Math.exp(-6.2 * step);
+        rag.velocity.z *= Math.exp(-6.2 * step);
+        rag.angularVelocity.multiplyScalar(Math.exp(-5.2 * step));
 
-        // A hard landing knocks energy out of the joints.
         if (rag.justLanded) {
           for (const joint of rag.joints) {
-            joint.upperVelocity *= .72;
-            joint.lowerVelocity *= .74;
-            joint.upperVelocityZ *= .75;
-            joint.lowerVelocityZ *= .77;
+            joint.upperVelocity *= .52;
+            joint.lowerVelocity *= .56;
+            joint.upperVelocityZ *= .58;
+            joint.lowerVelocityZ *= .60;
           }
-          rag.spine.velocityX *= .72;
-          rag.spine.velocityZ *= .72;
-          rag.neck.velocityX *= .72;
-          rag.neck.velocityY *= .72;
+          rag.spine.velocityX *= .58;
+          rag.spine.velocityZ *= .58;
+          rag.neck.velocityX *= .60;
+          rag.neck.velocityY *= .62;
           rag.justLanded = false;
         }
       } else {
         rag.grounded = false;
         rag.groundTime = 0;
       }
+
+      // After the body lands, ease off the initial fall speed rather than
+      // letting it keep cartwheeling forever.
+      if (settleBlend > 0) {
+        rag.angularVelocity.multiplyScalar(
+          Math.exp(-1.35 * settleBlend * step)
+        );
+      }
     }
 
-    // Stop tiny jitter without freezing corpses that are still moving.
     if (
       rag.grounded &&
-      rag.age > 1.0 &&
-      rag.groundTime > .85 &&
-      rag.velocity.lengthSq() < .012 &&
-      rag.angularVelocity.lengthSq() < .012
+      rag.age > 1.15 &&
+      rag.groundTime > .65 &&
+      rag.velocity.lengthSq() < .02 &&
+      rag.angularVelocity.lengthSq() < .018
     ) {
-      for (const joint of rag.joints) {
-        if (
-          Math.abs(joint.upperVelocity) > .035 ||
-          Math.abs(joint.lowerVelocity) > .035 ||
-          Math.abs(joint.upperVelocityZ) > .035 ||
-          Math.abs(joint.lowerVelocityZ) > .035
-        ) {
-          rag.sleep = false;
-          break;
-        }
-        rag.sleep = true;
-      }
-      if (rag.joints.length === 0) rag.sleep = true;
+      const jointsStillMoving = rag.joints.some((joint) =>
+        Math.abs(joint.upperVelocity) > .04 ||
+        Math.abs(joint.lowerVelocity) > .04 ||
+        Math.abs(joint.upperVelocityZ) > .04 ||
+        Math.abs(joint.lowerVelocityZ) > .04
+      );
+      rag.sleep = !jointsStillMoving;
     }
   }
 
