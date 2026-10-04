@@ -3600,7 +3600,7 @@ function createWeapon() {
 const weapon = createWeapon();
 weapon.visible = false;
 
-const menuGunPairs = [];
+const menuGunPairs = []; // AK47 menu import rebuilt on clean containers
 
 function installImportedWeaponModel(target, sourceScene, {
   keepHands = true,
