@@ -166,6 +166,19 @@ const els = {
   playerNameError: document.querySelector('#player-name-error'),
   weaponSelector: document.querySelector('#weapon-selector'),
   weaponSlots: [...document.querySelectorAll('[data-weapon-slot]')],
+  loadoutButton: document.querySelector('#loadout-button'),
+  loadoutScreen: document.querySelector('#loadout-screen'),
+  loadoutBack: document.querySelector('#loadout-back'),
+  loadoutDeploy: document.querySelector('#loadout-deploy'),
+  loadoutCards: [...document.querySelectorAll('[data-loadout-slot]')],
+  loadoutCurrentName: document.querySelector('#loadout-current-name'),
+  loadoutCurrentRole: document.querySelector('#loadout-current-role'),
+  loadoutCurrentCopy: document.querySelector('#loadout-current-copy'),
+  loadoutPower: document.querySelector('#loadout-power'),
+  loadoutControl: document.querySelector('#loadout-control'),
+  loadoutMag: document.querySelector('#loadout-mag'),
+  loadoutClass: document.querySelector('#loadout-class'),
+  loadoutReadyLabel: document.querySelector('#loadout-ready-label'),
 };
 
 const scene = new THREE.Scene();
@@ -541,10 +554,14 @@ function initializePlayerNameGate() {
   if (locked && !validatePlayerName(existing)) {
     applyLockedPlayerName(existing);
     els.playerNameGate?.classList.add('hidden');
+    els.start?.classList.remove('hidden');
     return;
   }
 
+  // The callsign screen owns the entire front layer until the player enters a name.
   els.playerNameGate?.classList.remove('hidden');
+  els.start?.classList.add('hidden');
+  els.loadoutScreen?.classList.add('hidden');
 
   if (els.playerNameInput) {
     els.playerNameInput.value = existing || '';
@@ -563,9 +580,11 @@ function confirmPlayerName() {
 
   applyLockedPlayerName(name);
   if (els.playerNameError) els.playerNameError.textContent = '';
-  if (els.playerNameInput) els.playerNameInput.readOnly = true;
-  if (els.playerNameConfirm) els.playerNameConfirm.disabled = true;
   els.playerNameGate?.classList.add('hidden');
+  els.playerNameInput?.blur();
+  els.playerNameConfirm?.blur();
+  els.start?.classList.remove('hidden');
+  showMenuView('main');
 }
 
 const savedMultiplayerUsername =
@@ -3919,6 +3938,205 @@ addVariantCylinder(
 );
 weaponModels.push(smgModel);
 
+loadoutPreviewRoot = new THREE.Group();
+loadoutPreviewRoot.name = 'WARFLEX_LOADOUT_PREVIEW';
+loadoutPreviewRoot.visible = false;
+gunViewportScene.add(loadoutPreviewRoot);
+
+const stripPreviewModel = (source, index) => {
+  const preview = source.clone(true);
+  preview.name = 'LoadoutPreview_' + WEAPON_DEFS[index].id;
+  preview.visible = true;
+
+  preview.traverse((node) => {
+    if (
+      node.name === 'WeaponLeftArm' ||
+      node.name === 'WeaponRightArm' ||
+      node.name === 'WeaponLeftHand' ||
+      node.name === 'WeaponRightHand' ||
+      node.name === 'WeaponLeftHandGrip' ||
+      node.name === 'WeaponRightHandGrip' ||
+      node.name === 'WeaponMuzzleLight' ||
+      node.name === 'WeaponMuzzleFlash'
+    ) {
+      node.visible = false;
+    }
+
+    if (node.isMesh) {
+      node.frustumCulled = false;
+      node.castShadow = false;
+      node.receiveShadow = false;
+
+      const materials = Array.isArray(node.material)
+        ? node.material
+        : [node.material];
+
+      node.material = materials.map((material) => {
+        const next = material?.clone?.() || material;
+        if (next) {
+          next.transparent = true;
+          next.opacity = .96;
+          next.depthWrite = true;
+        }
+        return next;
+      });
+
+      if (!Array.isArray(node.material)) node.material = node.material[0];
+    }
+  });
+
+  preview.position.z = -4.15;
+  loadoutPreviewRoot.add(preview);
+  loadoutPreviewModels.push(preview);
+  return preview;
+};
+
+for (let i = 0; i < weaponModels.length; i += 1) {
+  stripPreviewModel(weaponModels[i], i);
+}
+
+function updateLoadoutPreview(dt) {
+  if (!loadoutPreviewRoot) return;
+
+  loadoutPreviewRoot.visible = loadoutOpen && !state.active && !state.over;
+  if (!loadoutPreviewRoot.visible) return;
+
+  const time = performance.now() * .001;
+
+  for (let i = 0; i < loadoutPreviewModels.length; i += 1) {
+    const model = loadoutPreviewModels[i];
+    const selected = i === selectedLoadoutIndex;
+    const offset = i - (loadoutPreviewModels.length - 1) * .5;
+
+    const targetX = selected
+      ? 0
+      : offset * 2.35;
+    const targetY = selected ? -.62 : -1.25;
+    const targetZ = selected ? -3.25 : -4.35;
+    const targetScale = selected ? 1.08 : .56;
+
+    model.position.x = THREE.MathUtils.damp(
+      model.position.x,
+      targetX,
+      6,
+      dt,
+    );
+    model.position.y = THREE.MathUtils.damp(
+      model.position.y,
+      targetY,
+      6,
+      dt,
+    );
+    model.position.z = THREE.MathUtils.damp(
+      model.position.z,
+      targetZ,
+      6,
+      dt,
+    );
+
+    const scale = THREE.MathUtils.damp(
+      model.scale.x,
+      targetScale,
+      6,
+      dt,
+    );
+    model.scale.setScalar(scale);
+
+    model.rotation.x = THREE.MathUtils.damp(
+      model.rotation.x,
+      selected ? -.10 : -.03,
+      5,
+      dt,
+    );
+    model.rotation.y =
+      selected
+        ? .35 + Math.sin(time * .45) * .16
+        : .24 + Math.sin(time * .32 + i) * .08;
+    model.rotation.z = THREE.MathUtils.damp(
+      model.rotation.z,
+      selected ? .025 : 0,
+      5,
+      dt,
+    );
+
+    model.children?.forEach((child) => {
+      // Keep all five models crisp in the armory viewport.
+      child.renderOrder = selected ? 20 : 10;
+    });
+  }
+}
+
+function refreshLoadoutUI() {
+  const def = WEAPON_DEFS[selectedLoadoutIndex] || WEAPON_DEFS[0];
+
+  const metrics = {
+    rifle: [82, 76],
+    shotgun: [94, 45],
+    sniper: [100, 38],
+    pistol: [56, 91],
+    smg: [68, 84],
+  };
+  const copy = {
+    rifle: 'Balanced automatic rifle built for aggressive mid-range control.',
+    shotgun: 'Close-quarters power weapon with brutal burst damage.',
+    sniper: 'Long-range precision platform built for high-value shots.',
+    pistol: 'Compact secondary with fast handling and instant readiness.',
+    smg: 'High-speed automatic weapon for close-range pressure.',
+  };
+
+  const [power, control] = metrics[def.id] || [70, 70];
+
+  els.loadoutCards.forEach((card, index) => {
+    card.classList.toggle('active', index === selectedLoadoutIndex);
+    card.setAttribute('aria-selected', index === selectedLoadoutIndex ? 'true' : 'false');
+  });
+
+  if (els.loadoutCurrentName) els.loadoutCurrentName.textContent = def.display;
+  if (els.loadoutCurrentRole) els.loadoutCurrentRole.textContent = def.label + ' // PRIMARY';
+  if (els.loadoutCurrentCopy) els.loadoutCurrentCopy.textContent = copy[def.id] || 'FIELD-READY WEAPON PACKAGE.';
+  if (els.loadoutPower) els.loadoutPower.textContent = power;
+  if (els.loadoutControl) els.loadoutControl.textContent = control;
+  if (els.loadoutMag) els.loadoutMag.textContent = def.magSize;
+  if (els.loadoutClass) els.loadoutClass.textContent = def.label;
+  if (els.loadoutReadyLabel) els.loadoutReadyLabel.textContent = def.label + ' READY';
+
+  window.__WARFLEX_SELECTED_LOADOUT = selectedLoadoutIndex;
+}
+
+function selectLoadout(index, { open = false } = {}) {
+  const next = THREE.MathUtils.clamp(
+    Number(index) || 0,
+    0,
+    WEAPON_DEFS.length - 1,
+  );
+
+  selectedLoadoutIndex = next;
+  refreshLoadoutUI();
+
+  if (open) {
+    openLoadout();
+  }
+}
+
+function openLoadout() {
+  loadoutOpen = true;
+  els.start?.classList.add('hidden');
+  els.loadoutScreen?.classList.remove('hidden');
+  selectLoadout(selectedLoadoutIndex);
+  try { document.exitPointerLock?.(); } catch {}
+}
+
+function closeLoadout() {
+  loadoutOpen = false;
+  els.loadoutScreen?.classList.add('hidden');
+  if (!state.active && !state.over) {
+    els.start?.classList.remove('hidden');
+    showMenuView('main');
+  }
+}
+
+weaponModels.push(smgModel);
+
 let activeWeaponDef = WEAPON_DEFS[0];
 function getCurrentWeaponDef() {
   return activeWeaponDef || WEAPON_DEFS[0];
@@ -3983,6 +4201,10 @@ const weaponAmmoState = new Map(
 );
 
 const menuGunPairs = [];
+let loadoutOpen = false;
+let selectedLoadoutIndex = 0;
+let loadoutPreviewRoot = null;
+const loadoutPreviewModels = [];
 
 function installAK47Model(target, sourceScene, {
   keepProceduralHands = true,
@@ -4520,7 +4742,8 @@ function setMenuGunOpacity(gun, opacity) {
 function updateMenuGuns(dt) {
   const show =
     !state.active &&
-    !state.over;
+    !state.over &&
+    !loadoutOpen;
 
   if (!show) {
     for (const pair of menuGunPairs) {
@@ -5470,7 +5693,7 @@ function resetGame(spawnImmediately = true) {
       ? -1
       : Number(window.__WARFLEX_SELECTED_WAVE || state.selectedWave || 1);
 
-  setActiveWeapon(0, { resetAmmo: true });
+  setActiveWeapon(selectedLoadoutIndex, { resetAmmo: true });
 
   Object.assign(state, {
     active: true,
@@ -5480,8 +5703,8 @@ function resetGame(spawnImmediately = true) {
     verticalVelocity: 0,
     onGround: true,
     health: CONFIG.maxHealth,
-    ammo: CONFIG.magSize,
-    reserve: CONFIG.reserveAmmo,
+    ammo: getCurrentWeaponDef().magSize,
+    reserve: getCurrentWeaponDef().reserve,
     kills: 0,
     score: 0,
     wave: selected > 0 ? selected : 1,
@@ -7875,6 +8098,7 @@ function frame() {
   atmosphere.composer.render(dt);
 
   updateMenuGuns(dt);
+  updateLoadoutPreview(dt);
 
   const showMenuWeapon =
     !state.active &&
@@ -8142,6 +8366,20 @@ waveDirector = new WaveDirector({
 for (const button of els.waveChoices) {
   button.addEventListener('click', () => setWaveChoice(button.dataset.waveChoice));
 }
+
+els.loadoutButton?.addEventListener('click', () => openLoadout());
+els.loadoutBack?.addEventListener('click', () => closeLoadout());
+els.loadoutDeploy?.addEventListener('click', () => {
+  closeLoadout();
+  enterGame();
+});
+els.loadoutCards.forEach((card) => {
+  card.addEventListener('click', () => {
+    selectLoadout(Number(card.dataset.loadoutSlot));
+  });
+});
+
+refreshLoadoutUI();
 
 els.wavesButton.addEventListener('click', () => { refreshMapList(); showMenuView('waves'); });
 els.backFromMultiplayer?.addEventListener('click', () => showMenuView('main'));
