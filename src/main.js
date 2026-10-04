@@ -128,9 +128,23 @@ document.body.appendChild(gunViewportRenderer.domElement);
 gunViewportScene.add(
   new THREE.HemisphereLight(0xdbe9ff, 0x11151a, 1.8),
 );
-const gunKeyLight = new THREE.DirectionalLight(0xffffff, 2.2);
-gunKeyLight.position.set(2.5, 4.5, 2.5);
+const gunKeyLight = new THREE.DirectionalLight(0xffffff, 2.4);
+gunKeyLight.position.set(2.8, 4.8, 2.2);
 gunViewportScene.add(gunKeyLight);
+
+const gunFillLight = new THREE.DirectionalLight(
+  0x9eb8ff,
+  1.15,
+);
+gunFillLight.position.set(-3.5, 2.0, 3.0);
+gunViewportScene.add(gunFillLight);
+
+const gunRimLight = new THREE.DirectionalLight(
+  0xffffff,
+  1.35,
+);
+gunRimLight.position.set(-2.0, 4.0, -4.5);
+gunViewportScene.add(gunRimLight);
 
 const atmosphere = configureAtmosphere(
   scene,
