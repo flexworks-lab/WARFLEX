@@ -648,107 +648,176 @@ function makeArenaCylinder(
 
 function addArena() {
   // -------------------------------------------------------------------------
-  // WARFLEX FALLBACK MAP
+  // WARFLEX WIDE BATTLEFIELD
   //
-  // Three combat lanes:
-  //   1. CENTRAL PRESSURE LANE  -> fastest route, most contested.
-  //   2. WEST FLANK             -> tighter cover + short sightlines.
-  //   3. EAST FLANK             -> longer sightlines + stronger rifle positions.
+  // The map is organized into readable military districts rather than
+  // scattered props:
   //
-  // The map is intentionally asymmetric so waves do not feel like enemies
-  // spawning into the same mirrored fight every time.
+  // SOUTH  -> forward staging / player deployment
+  // CENTER -> main supply road + open combat boulevard
+  // WEST   -> fortified command / barracks district
+  // EAST   -> logistics / container yard / maintenance district
+  // NORTH  -> defensive line / artillery / hardened positions
+  //
+  // Overall footprint: 260m x 150m.
   // -------------------------------------------------------------------------
+
+  const MAP_WIDTH = 260;
+  const MAP_DEPTH = 150;
+  const HALF_W = MAP_WIDTH * .5;
+  const HALF_D = MAP_DEPTH * .5;
 
   const floor =
     makeBox(
-      new THREE.Vector3(110, 1, 110),
-      new THREE.Vector3(0, -.5, 0),
-      0x12181d,
+      new THREE.Vector3(
+        MAP_WIDTH,
+        1,
+        MAP_DEPTH,
+      ),
+      new THREE.Vector3(
+        0,
+        -.5,
+        0,
+      ),
+      0x151b1f,
       false,
       1,
-      .02,
+      .015,
     );
 
   floor.material.roughness = 1;
 
-  // Slightly different floor panels make the arena feel constructed instead
-  // of like one giant plane.
-  const floorPanelMat =
+  // Large asphalt/concrete slabs create intentional road geometry.
+  const roadMaterial =
     new THREE.MeshStandardMaterial({
-      color: 0x181f25,
-      roughness: .96,
-      metalness: .03,
+      color: 0x20272b,
+      roughness: .94,
+      metalness: .02,
     });
 
-  const panelGeo =
-    new RoundedBoxGeometry(
-      21.5,
-      .035,
-      21.5,
-      2,
-      .012,
-    );
+  const concreteMaterial =
+    new THREE.MeshStandardMaterial({
+      color: 0x3b4144,
+      roughness: .90,
+      metalness: .08,
+    });
 
-  for (const x of [-32.25, -10.75, 10.75, 32.25]) {
-    for (const z of [-32.25, -10.75, 10.75, 32.25]) {
-      const panel =
-        new THREE.Mesh(
-          panelGeo,
-          floorPanelMat,
-        );
+  const shoulderMaterial =
+    new THREE.MeshStandardMaterial({
+      color: 0x515047,
+      roughness: .98,
+      metalness: .01,
+    });
 
-      panel.position.set(x, .017, z);
+  const makeVisualSlab = (
+    size,
+    position,
+    material,
+    rotation = 0,
+  ) => {
+    const slab =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          size.x,
+          size.y,
+          size.z,
+          2,
+          Math.min(.025, size.y * .4),
+        ),
+        material,
+      );
 
-      if (
-        Math.abs(x) === 10.75 &&
-        Math.abs(z) === 10.75
-      ) {
-        panel.material = floorPanelMat.clone();
-        panel.material.color.setHex(0x1c252b);
-      }
+    slab.position.copy(position);
+    slab.rotation.y = rotation;
+    slab.receiveShadow = true;
+    fallbackArenaRoot.add(slab);
+    return slab;
+  };
 
-      panel.receiveShadow = true;
-      fallbackArenaRoot.add(panel);
-    }
-  }
+  // Main north/south military avenue.
+  makeVisualSlab(
+    new THREE.Vector3(19, .07, 142),
+    new THREE.Vector3(0, .035, 0),
+    roadMaterial,
+  );
 
-  // Outer containment.
+  makeVisualSlab(
+    new THREE.Vector3(46, .055, 18),
+    new THREE.Vector3(0, .045, -2),
+    roadMaterial,
+  );
+
+  // Secondary east/west roads split the districts cleanly.
+  makeVisualSlab(
+    new THREE.Vector3(244, .055, 12),
+    new THREE.Vector3(0, .03, 30),
+    roadMaterial,
+  );
+
+  makeVisualSlab(
+    new THREE.Vector3(244, .055, 12),
+    new THREE.Vector3(0, .03, -27),
+    roadMaterial,
+  );
+
+  // Concrete hardstand areas define the major military facilities.
+  makeVisualSlab(
+    new THREE.Vector3(52, .06, 48),
+    new THREE.Vector3(-80, .035, 22),
+    concreteMaterial,
+  );
+
+  makeVisualSlab(
+    new THREE.Vector3(58, .06, 46),
+    new THREE.Vector3(79, .035, 18),
+    concreteMaterial,
+  );
+
+  makeVisualSlab(
+    new THREE.Vector3(70, .06, 38),
+    new THREE.Vector3(32, .035, -48),
+    shoulderMaterial,
+  );
+
+  // Outer containment wall.
   const border = [
     [
-      new THREE.Vector3(110, 10, 1.2),
-      new THREE.Vector3(0, 5, -55),
+      new THREE.Vector3(MAP_WIDTH, 10, 1.5),
+      new THREE.Vector3(0, 5, -HALF_D),
     ],
     [
-      new THREE.Vector3(110, 10, 1.2),
-      new THREE.Vector3(0, 5, 55),
+      new THREE.Vector3(MAP_WIDTH, 10, 1.5),
+      new THREE.Vector3(0, 5, HALF_D),
     ],
     [
-      new THREE.Vector3(1.2, 10, 110),
-      new THREE.Vector3(-55, 5, 0),
+      new THREE.Vector3(1.5, 10, MAP_DEPTH),
+      new THREE.Vector3(-HALF_W, 5, 0),
     ],
     [
-      new THREE.Vector3(1.2, 10, 110),
-      new THREE.Vector3(55, 5, 0),
+      new THREE.Vector3(1.5, 10, MAP_DEPTH),
+      new THREE.Vector3(HALF_W, 5, 0),
     ],
   ];
+
+  const borderMaterial = 0x11171b;
 
   for (const [size, position] of border) {
     obstacles.push(
       makeBox(
         size,
         position,
-        0x0c1116,
+        borderMaterial,
         true,
-        .78,
-        .18,
+        .72,
+        .25,
       ),
     );
   }
 
-  const coverColor = 0x273139;
-  const darkCover = 0x1c252c;
-  const concrete = 0x343b40;
-  const metal = 0x38464d;
+  const coverColor = 0x303a40;
+  const concrete = 0x41484c;
+  const metal = 0x46545b;
+  const darkCover = 0x20292e;
 
   const addCover = (
     sx,
@@ -761,8 +830,16 @@ function addArena() {
   ) => {
     obstacles.push(
       makeBox(
-        new THREE.Vector3(sx, sy, sz),
-        new THREE.Vector3(x, y, z),
+        new THREE.Vector3(
+          sx,
+          sy,
+          sz,
+        ),
+        new THREE.Vector3(
+          x,
+          y,
+          z,
+        ),
         color,
         true,
         .82,
@@ -771,208 +848,29 @@ function addArena() {
     );
   };
 
-  // =========================================================================
-  // CENTRAL PRESSURE LANE
-  // =========================================================================
-
-  // Spawn-side cover. It gives the player choices without making the first
-  // wave disappear behind a wall immediately.
-  addCover(7.2, 1.55, 2.0, -8, .78, 10, darkCover);
-  addCover(4.8, 1.35, 2.0, 7, .68, 12, coverColor);
-
-  // Broken center barricade creates two micro-lanes through mid.
-  addCover(3.0, 2.6, 7.0, -3.8, 1.3, -1.5, concrete);
-  addCover(4.6, 1.25, 2.2, 4.8, .63, -2.5, darkCover);
-
-  // Main mid objective/cover island.
-  addCover(10.0, 1.25, 2.5, -1.0, .63, -13.0, metal);
-  addCover(2.5, 2.8, 4.0, 8.0, 1.4, -17.5, concrete);
-
-  // Deep center fallback cover.
-  addCover(5.8, 2.0, 2.2, -5.0, 1.0, -28.5, coverColor);
-  addCover(3.2, 3.4, 3.2, 10.5, 1.7, -31.0, darkCover);
-
-  // =========================================================================
-  // WEST FLANK — close quarters
-  // =========================================================================
-
-  // Outer warehouse-like mass, leaving a narrow lane around it.
-  addCover(8.5, 5.2, 11.5, -39, 2.6, -17, concrete);
-
-  // Broken wall and offsets create peek-and-rotate fights.
-  addCover(2.5, 2.4, 8.0, -28.0, 1.2, -5.0, metal);
-  addCover(7.0, 1.15, 2.0, -34.0, .58, 3.0, darkCover);
-  addCover(3.5, 2.7, 3.0, -26.0, 1.35, 11.5, concrete);
-
-  // Back-west staggered cover.
-  addCover(4.4, 1.45, 2.2, -34.0, .73, 20.5, coverColor);
-  addCover(3.0, 3.0, 6.2, -25.0, 1.5, 31.0, darkCover);
-
-  // =========================================================================
-  // EAST FLANK — longer sightlines
-  // =========================================================================
-
-  // Large side structure creates a long peek lane down the east edge.
-  addCover(7.0, 4.8, 10.0, 38.0, 2.4, 18.0, concrete);
-
-  // Long low walls for rifle fights.
-  addCover(11.0, 1.15, 1.8, 27.0, .58, 4.0, darkCover);
-  addCover(3.0, 2.8, 5.5, 24.0, 1.4, -9.5, metal);
-  addCover(4.5, 1.45, 2.0, 34.0, .73, -4.0, coverColor);
-
-  // East backline firing position.
-  addCover(6.0, 2.2, 2.0, 29.0, 1.1, -26.0, concrete);
-  addCover(3.5, 3.5, 3.5, 40.0, 1.75, -31.0, darkCover);
-
-  // =========================================================================
-  // NORTH / DEEP COMBAT SPACE
-  // =========================================================================
-
-  // Large broken wall creates an anchor without sealing the entire north end.
-  addCover(2.8, 4.0, 12.0, -14.5, 2.0, -38.0, concrete);
-  addCover(7.5, 1.2, 2.2, 1.5, .60, -41.0, metal);
-  addCover(3.0, 2.4, 7.0, 15.0, 1.2, -40.0, coverColor);
-
-  // Diagonal-feeling visual masses by rotating only their meshes. They remain
-  // simple box collision shapes, but break the grid-like look.
-  const angled = [
-    [-20, 2.0, -22, .18],
-    [20, 1.6, -21, -.16],
-    [-19, 1.6, 28, -.22],
-    [20, 2.0, 30, .14],
-  ];
-
-  for (const [x, y, z, rot] of angled) {
-    const mesh =
-      makeBox(
-        new THREE.Vector3(4.8, y * 2, 2.4),
-        new THREE.Vector3(x, y, z),
-        0x2a353c,
-        true,
-        .84,
-        .14,
-      );
-
-    mesh.rotation.y = rot;
-    // The rotated mesh still serves as a visual landmark. Collision remains
-    // axis-aligned through the obstacle body generated below from this mesh.
-    obstacles.push(mesh);
-  }
-
-  // Decorative industrial clutter. These are visual only, so they don't
-  // overcomplicate pathfinding.
-  for (const [x, z, scale] of [
-    [-43, -30, 1.0],
-    [-44, 7, .86],
-    [43, -8, 1.08],
-    [42, 27, .92],
-    [16, 31, .82],
-    [-12, 28, .9],
-  ]) {
-    const crate =
-      makeBox(
-        new THREE.Vector3(
-          1.5 * scale,
-          1.25 * scale,
-          1.5 * scale,
-        ),
-        new THREE.Vector3(
-          x,
-          .625 * scale,
-          z,
-        ),
-        0x4b4339,
-        true,
-        .95,
-        .02,
-      );
-
-    crate.rotation.y =
-      (Math.random() - .5) * .22;
-  }
-
-  // Drums visually establish the flanking lanes.
-  for (const [x, z] of [
-    [-31, -30],
-    [-32, -27],
-    [32, 24],
-    [35, 22],
-    [18, -34],
-  ]) {
-    makeArenaCylinder(
-      .48,
-      1.05,
-      new THREE.Vector3(x, .525, z),
-      0x46525a,
-    );
-  }
-
-  // =========================================================================
-  // DENSE INDUSTRIAL EXPANSION
-  // =========================================================================
-
-  const structureMat = new THREE.MeshStandardMaterial({
-    color: 0x303b43,
-    roughness: .72,
-    metalness: .22,
-  });
-
-  const structureDark = new THREE.MeshStandardMaterial({
-    color: 0x171f25,
-    roughness: .84,
-    metalness: .18,
-  });
-
-  const paintedMetal = new THREE.MeshStandardMaterial({
-    color: 0x586773,
-    roughness: .52,
-    metalness: .46,
-  });
-
-  const hazardYellow = new THREE.MeshStandardMaterial({
-    color: 0x9b7b22,
-    roughness: .58,
-    metalness: .32,
-  });
-
-  const warningBlack = new THREE.MeshStandardMaterial({
-    color: 0x121619,
-    roughness: .72,
-    metalness: .24,
-  });
-
-  const emissiveBlue = new THREE.MeshStandardMaterial({
-    color: 0x18323d,
-    emissive: 0x38a6c5,
-    emissiveIntensity: 2.5,
-    roughness: .34,
-    metalness: .55,
-  });
-
-  const glassBlue = new THREE.MeshStandardMaterial({
-    color: 0x12303c,
-    emissive: 0x207894,
-    emissiveIntensity: 1.6,
-    roughness: .16,
-    metalness: .65,
-    transparent: true,
-    opacity: .82,
-  });
-
   const addSolid = (
     size,
     position,
-    material = structureMat,
+    material = concrete,
     rotation = 0,
   ) => {
-    const mesh = makeBox(
-      new THREE.Vector3(...size),
-      new THREE.Vector3(...position),
-      material.color.getHex(),
-      true,
-      material.roughness,
-      material.metalness,
-    );
+    const mesh =
+      makeBox(
+        new THREE.Vector3(
+          size[0],
+          size[1],
+          size[2],
+        ),
+        new THREE.Vector3(
+          position[0],
+          position[1],
+          position[2],
+        ),
+        material.color.getHex(),
+        true,
+        material.roughness,
+        material.metalness,
+      );
 
     mesh.material = material;
     mesh.rotation.y = rotation;
@@ -984,22 +882,23 @@ function addArena() {
     parent,
     size,
     position,
-    material = paintedMetal,
+    material,
     rotation = 0,
   ) => {
-    const mesh = new THREE.Mesh(
-      new RoundedBoxGeometry(
-        size[0],
-        size[1],
-        size[2],
-        2,
-        Math.min(
-          .055,
-          Math.min(...size) * .12,
+    const mesh =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          size[0],
+          size[1],
+          size[2],
+          2,
+          Math.min(
+            .045,
+            Math.min(...size) * .12,
+          ),
         ),
-      ),
-      material,
-    );
+        material,
+      );
 
     mesh.position.set(...position);
     mesh.rotation.y = rotation;
@@ -1009,26 +908,337 @@ function addArena() {
     return mesh;
   };
 
+  const addRoadLine = (
+    x,
+    z,
+    width,
+    depth,
+    rotation = 0,
+    color = 0xb5a95d,
+  ) => {
+    const mat =
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness: .86,
+        metalness: .02,
+        emissive: color,
+        emissiveIntensity: .04,
+      });
+
+    makeVisualSlab(
+      new THREE.Vector3(
+        width,
+        .018,
+        depth,
+      ),
+      new THREE.Vector3(
+        x,
+        .078,
+        z,
+      ),
+      mat,
+      rotation,
+    );
+  };
+
+  // Deliberate lane markings on the main roads.
+  for (
+    let z = -56;
+    z <= 56;
+    z += 14
+  ) {
+    addRoadLine(
+      0,
+      z,
+      3.2,
+      1.0,
+    );
+  }
+
+  for (
+    let x = -110;
+    x <= 110;
+    x += 18
+  ) {
+    addRoadLine(
+      x,
+      30,
+      8.2,
+      .18,
+    );
+  }
+
+  for (
+    let x = -110;
+    x <= 110;
+    x += 18
+  ) {
+    addRoadLine(
+      x,
+      -27,
+      8.2,
+      .18,
+    );
+  }
+
+  // =========================================================================
+  // BUILDINGS
+  // =========================================================================
+
+  const buildingWall =
+    new THREE.MeshStandardMaterial({
+      color: 0x3a4448,
+      roughness: .82,
+      metalness: .13,
+    });
+
+  const buildingDark =
+    new THREE.MeshStandardMaterial({
+      color: 0x1a2125,
+      roughness: .78,
+      metalness: .16,
+    });
+
+  const windowMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x162e39,
+      emissive: 0x2b90ad,
+      emissiveIntensity: 1.35,
+      roughness: .18,
+      metalness: .55,
+    });
+
+  const interiorLightMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x8f742c,
+      emissive: 0xffbf57,
+      emissiveIntensity: 1.9,
+      roughness: .35,
+      metalness: .22,
+    });
+
+  const addBuilding = ({
+    x,
+    z,
+    width,
+    depth,
+    height,
+    doorWidth = 3.4,
+    rotation = 0,
+    label = 'FACILITY',
+  }) => {
+    const root =
+      new THREE.Group();
+
+    root.position.set(x, 0, z);
+    root.rotation.y = rotation;
+    fallbackArenaRoot.add(root);
+
+    // Interior floor.
+    addTrimBox(
+      root,
+      [width - .6, .08, depth - .6],
+      [0, .04, 0],
+      buildingDark,
+    );
+
+    // Four wall sides; the front has a deliberate door opening.
+    addSolid(
+      [width, height, .55],
+      [x, height * .5, z - depth * .5],
+      buildingWall,
+      rotation,
+    );
+
+    addSolid(
+      [.55, height, depth],
+      [x - width * .5, height * .5, z],
+      buildingWall,
+      rotation,
+    );
+
+    addSolid(
+      [.55, height, depth],
+      [x + width * .5, height * .5, z],
+      buildingWall,
+      rotation,
+    );
+
+    const frontSegment =
+      (width - doorWidth) * .5;
+
+    addSolid(
+      [frontSegment, height, .55],
+      [
+        x - doorWidth * .5 - frontSegment * .5,
+        height * .5,
+        z + depth * .5,
+      ],
+      buildingWall,
+      rotation,
+    );
+
+    addSolid(
+      [frontSegment, height, .55],
+      [
+        x + doorWidth * .5 + frontSegment * .5,
+        height * .5,
+        z + depth * .5,
+      ],
+      buildingWall,
+      rotation,
+    );
+
+    // Roof / parapet is visual only.
+    addTrimBox(
+      root,
+      [width + .35, .32, depth + .35],
+      [0, height + .08, 0],
+      buildingDark,
+    );
+
+    // Entrance frame.
+    addTrimBox(
+      root,
+      [.16, 3.7, .18],
+      [-doorWidth * .5, 1.9, depth * .5 + .08],
+      paintedMetal,
+    );
+
+    addTrimBox(
+      root,
+      [.16, 3.7, .18],
+      [doorWidth * .5, 1.9, depth * .5 + .08],
+      paintedMetal,
+    );
+
+    addTrimBox(
+      root,
+      [doorWidth + .25, .16, .18],
+      [0, 3.72, depth * .5 + .08],
+      hazardYellow,
+    );
+
+    // Exterior windows are consistent around the district.
+    for (
+      let wx = -width * .32;
+      wx <= width * .32;
+      wx += width * .32
+    ) {
+      if (Math.abs(wx) < doorWidth * .35) continue;
+
+      addTrimBox(
+        root,
+        [Math.max(.95, width * .18), 1.0, .06],
+        [wx, height * .57, depth * .5 + .06],
+        windowMat,
+      );
+    }
+
+    // Rooftop HVAC and cable tray.
+    addTrimBox(
+      root,
+      [2.0, .55, 1.25],
+      [-width * .25, height + .42, -.05],
+      buildingDark,
+    );
+
+    addPipeRun(
+      [
+        [-width * .38, height + .15, -.35],
+        [-width * .16, height + .52, -.35],
+        [width * .08, height + .52, -.35],
+      ],
+      .035,
+      paintedMetal,
+    );
+
+    // Interior ceiling lamp visible from the entrance.
+    const lamp =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          .72,
+          .08,
+          .24,
+          1,
+          .02,
+        ),
+        interiorLightMat,
+      );
+
+    lamp.position.set(
+      0,
+      height - .22,
+      0,
+    );
+    root.add(lamp);
+
+    const point =
+      new THREE.PointLight(
+        0xffbc58,
+        14,
+        12,
+        2,
+      );
+
+    point.position.set(
+      0,
+      height - .8,
+      0,
+    );
+    root.add(point);
+
+    // Small facade sign.
+    const sign =
+      addTrimBox(
+        root,
+        [2.5, .42, .08],
+        [0, height * .82, depth * .5 + .10],
+        buildingDark,
+      );
+
+    const signLight =
+      addTrimBox(
+        root,
+        [1.95, .08, .04],
+        [0, height * .82, depth * .55],
+        windowMat,
+      );
+
+    sign.userData.facilityLabel = label;
+    signLight.userData.facilityLabel = label;
+
+    return root;
+  };
+
   const addPipeRun = (
     points,
     radius = .055,
     material = paintedMetal,
   ) => {
-    for (let i = 0; i < points.length - 1; i += 1) {
+    for (
+      let i = 0;
+      i < points.length - 1;
+      i += 1
+    ) {
       const a = new THREE.Vector3(...points[i]);
       const b = new THREE.Vector3(...points[i + 1]);
-      const midpoint = a.clone().add(b).multiplyScalar(.5);
-      const length = a.distanceTo(b);
-      const pipe = new THREE.Mesh(
-        new THREE.CylinderGeometry(
-          radius,
-          radius,
-          length,
-          14,
-          2,
-        ),
-        material,
-      );
+      const midpoint =
+        a.clone()
+          .add(b)
+          .multiplyScalar(.5);
+
+      const pipe =
+        new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            radius,
+            radius,
+            a.distanceTo(b),
+            14,
+            2,
+          ),
+          material,
+        );
 
       pipe.position.copy(midpoint);
       pipe.quaternion.setFromUnitVectors(
@@ -1041,714 +1251,845 @@ function addArena() {
     }
   };
 
-  const addWarningStripe = (
-    parent,
-    position,
-    rotation = 0,
-    width = .72,
-    depth = .06,
-  ) => {
-    const stripe = new THREE.Mesh(
-      new RoundedBoxGeometry(
-        width,
-        .035,
-        depth,
-        1,
-        .008,
-      ),
-      hazardYellow,
-    );
-    stripe.position.set(...position);
-    stripe.rotation.y = rotation;
-    parent.add(stripe);
-    return stripe;
-  };
+  const paintedMetal =
+    new THREE.MeshStandardMaterial({
+      color: 0x66747b,
+      roughness: .48,
+      metalness: .52,
+    });
 
-  const addShippingContainer = (
+  const hazardYellow =
+    new THREE.MeshStandardMaterial({
+      color: 0x927626,
+      roughness: .58,
+      metalness: .30,
+    });
+
+  // West command compound.
+  addBuilding({
+    x: -82,
+    z: 18,
+    width: 22,
+    depth: 18,
+    height: 6.2,
+    doorWidth: 4.2,
+    rotation: 0,
+    label: 'COMMAND',
+  });
+
+  addBuilding({
+    x: -57,
+    z: 39,
+    width: 16,
+    depth: 13,
+    height: 5.1,
+    doorWidth: 3.5,
+    rotation: 0,
+    label: 'BARRACKS',
+  });
+
+  addBuilding({
+    x: 74,
+    z: 18,
+    width: 30,
+    depth: 20,
+    height: 7.0,
+    doorWidth: 6.5,
+    rotation: 0,
+    label: 'LOGISTICS',
+  });
+
+  addBuilding({
+    x: 49,
+    z: 40,
+    width: 17,
+    depth: 13,
+    height: 5.4,
+    doorWidth: 3.5,
+    rotation: 0,
+    label: 'WORKSHOP',
+  });
+
+  // Small southern guard building keeps the deployment area purposeful.
+  addBuilding({
+    x: -50,
+    z: 56,
+    width: 13,
+    depth: 8,
+    height: 4.4,
+    doorWidth: 2.8,
+    rotation: 0,
+    label: 'GUARD',
+  });
+
+  // =========================================================================
+  // WEST: FORTIFIED COMMAND DISTRICT
+  // =========================================================================
+
+  // Command courtyard walls.
+  addCover(
+    15,
+    2.0,
+    1.2,
+    -101,
+    1.0,
+    18,
+    concrete,
+  );
+
+  addCover(
+    1.2,
+    2.0,
+    12,
+    -94,
+    1.0,
+    25,
+    concrete,
+  );
+
+  addCover(
+    1.2,
+    2.0,
+    12,
+    -67,
+    1.0,
+    25,
+    concrete,
+  );
+
+  // Motor-pool parking bays.
+  for (const x of [-77, -68, -59]) {
+    addCover(
+      7.0,
+      .95,
+      .95,
+      x,
+      .48,
+      53,
+      darkCover,
+    );
+  }
+
+  // =========================================================================
+  // EAST: LOGISTICS / CONTAINER YARD
+  // =========================================================================
+
+  const containerMatA =
+    new THREE.MeshStandardMaterial({
+      color: 0x365767,
+      roughness: .55,
+      metalness: .38,
+    });
+
+  const containerMatB =
+    new THREE.MeshStandardMaterial({
+      color: 0x625246,
+      roughness: .58,
+      metalness: .34,
+    });
+
+  const addContainer = (
     x,
     z,
-    rotation = 0,
-    color = 0x3a5964,
+    rotation,
+    material,
   ) => {
-    const root = new THREE.Group();
+    const root =
+      new THREE.Group();
+
     root.position.set(x, 2.0, z);
     root.rotation.y = rotation;
     fallbackArenaRoot.add(root);
 
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color,
-      roughness: .58,
-      metalness: .38,
-    });
-
-    addTrimBox(root, [7.2, 3.6, .20], [0, 0, -1.55], bodyMat);
-    addTrimBox(root, [7.2, 3.6, .20], [0, 0, 1.55], bodyMat);
-    addTrimBox(root, [.20, 3.6, 3.1], [-3.5, 0, 0], bodyMat);
-    addTrimBox(root, [.20, 3.6, 3.1], [3.5, 0, 0], bodyMat);
-    addTrimBox(root, [6.9, .18, 3.1], [0, 1.72, 0], bodyMat);
-    addTrimBox(root, [6.9, .18, 3.1], [0, -1.72, 0], structureDark);
-
-    for (const sx of [-2.65, -1.75, -.85, .05, .95, 1.85, 2.75]) {
-      addTrimBox(
-        root,
-        [.055, 3.1, .055],
-        [sx, 0, -1.67],
-        structureDark,
-      );
-    }
-
-    const door = addTrimBox(
+    addTrimBox(
       root,
-      [1.7, 3.05, .055],
-      [2.25, 0, -1.70],
-      paintedMetal,
+      [8.0, 3.7, .18],
+      [0, 0, -1.72],
+      material,
     );
 
-    addWarningStripe(
+    addTrimBox(
       root,
-      [2.25, -.92, -1.745],
-      0,
-      1.22,
-      .08,
+      [8.0, 3.7, .18],
+      [0, 0, 1.72],
+      material,
     );
 
-    for (const y of [-1.1, -.35, .4, 1.15]) {
+    addTrimBox(
+      root,
+      [.18, 3.7, 3.5],
+      [-3.9, 0, 0],
+      material,
+    );
+
+    addTrimBox(
+      root,
+      [.18, 3.7, 3.5],
+      [3.9, 0, 0],
+      material,
+    );
+
+    addTrimBox(
+      root,
+      [7.7, .18, 3.4],
+      [0, 1.77, 0],
+      material,
+    );
+
+    for (const xPos of [
+      -2.9,
+      -1.95,
+      -1.0,
+      -.05,
+      .90,
+      1.85,
+      2.8,
+    ]) {
       addTrimBox(
         root,
-        [1.35, .045, .035],
-        [2.25, y, -1.755],
-        structureDark,
+        [.045, 3.2, .06],
+        [xPos, 0, -1.83],
+        buildingDark,
       );
     }
 
     addTrimBox(
       root,
-      [.12, .22, .03],
-      [3.02, .2, -1.77],
-      emissiveBlue,
+      [1.7, 3.1, .08],
+      [2.7, 0, -1.84],
+      paintedMetal,
     );
 
-    const underside =
+    addTrimBox(
+      root,
+      [1.25, .12, .08],
+      [2.7, -.95, -1.9],
+      hazardYellow,
+    );
+
+    // Collision volume stays separate and clean.
+    addSolid(
+      [7.9, 3.5, 3.5],
+      [x, 1.78, z],
+      buildingDark,
+      rotation,
+    ).visible = false;
+  };
+
+  // Containers are aligned into two logistics rows.
+  for (const [x, z, rot, mat] of [
+    [52, 7, 0, containerMatA],
+    [61, 7, 0, containerMatA],
+    [70, 7, 0, containerMatB],
+    [79, 7, 0, containerMatB],
+    [52, -5, 0, containerMatB],
+    [61, -5, 0, containerMatB],
+    [70, -5, 0, containerMatA],
+    [79, -5, 0, containerMatA],
+  ]) {
+    addContainer(
+      x,
+      z,
+      rot,
+      mat,
+    );
+  }
+
+  // =========================================================================
+  // NORTH: DEFENSIVE LINE / ARTILLERY
+  // =========================================================================
+
+  const addBunker =
+    (x, z, rotation = 0, width = 11) => {
+      const root =
+        new THREE.Group();
+
+      root.position.set(x, 0, z);
+      root.rotation.y = rotation;
+      fallbackArenaRoot.add(root);
+
       addSolid(
-        [7.2, .28, 3.1],
-        [x, .15, z],
-        structureDark,
+        [width, 3.8, 6.2],
+        [x, 1.9, z],
+        concrete,
         rotation,
       );
 
-    // Do not visually duplicate the solid collision volume; the detailed
-    // container remains the player-facing mesh.
-    underside.visible = false;
-
-    return root;
-  };
-
-  const addWatchTower = (x, z, height = 6.8) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    fallbackArenaRoot.add(root);
-
-    const postMat = structureDark;
-
-    for (const px of [-1.9, 1.9]) {
-      for (const pz of [-1.9, 1.9]) {
-        addTrimBox(
-          root,
-          [.22, height, .22],
-          [px, height * .5, pz],
-          postMat,
-        );
-
-        addTrimBox(
-          root,
-          [.34, .16, .34],
-          [px, .32, pz],
-          paintedMetal,
-        );
-      }
-    }
-
-    addTrimBox(
-      root,
-      [4.5, .25, 4.5],
-      [0, height, 0],
-      paintedMetal,
-    );
-
-    addTrimBox(
-      root,
-      [4.1, .14, 4.1],
-      [0, height + .18, 0],
-      structureDark,
-    );
-
-    for (const y of [height * .35, height * .7]) {
-      for (const px of [-1.9, 1.9]) {
-        addPipeRun(
-          [
-            [px, y, -1.9],
-            [px, y, 1.9],
-          ],
-          .035,
-          paintedMetal,
-        );
-      }
-      for (const pz of [-1.9, 1.9]) {
-        addPipeRun(
-          [
-            [-1.9, y, pz],
-            [1.9, y, pz],
-          ],
-          .035,
-          paintedMetal,
-        );
-      }
-    }
-
-    const beacon = new THREE.Mesh(
-      new THREE.CylinderGeometry(.16, .16, .18, 16),
-      emissiveBlue,
-    );
-    beacon.position.set(0, height + .40, 0);
-    root.add(beacon);
-
-    addSolid(
-      [4.4, .15, 4.4],
-      [x, height - .02, z],
-      structureDark,
-    );
-
-    return root;
-  };
-
-  const addGenerator = (x, z, rotation = 0) => {
-    const root = new THREE.Group();
-    root.position.set(x, .6, z);
-    root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
-
-    addTrimBox(root, [2.25, 1.15, 1.25], [0, 0, 0], structureDark);
-    addTrimBox(root, [1.76, .68, .08], [0, .02, -.66], paintedMetal);
-
-    for (const px of [-.74, -.25, .25, .74]) {
       addTrimBox(
         root,
-        [.09, .46, .055],
-        [px, .02, -.72],
-        structureMat,
+        [width - .8, .85, .25],
+        [0, 2.52, 3.06],
+        buildingDark,
       );
-    }
 
-    addTrimBox(
-      root,
-      [.55, .12, .18],
-      [.70, .38, -.70],
-      emissiveBlue,
+      addTrimBox(
+        root,
+        [width * .54, .16, .18],
+        [0, 2.15, 3.18],
+        hazardYellow,
+      );
+
+      for (
+        let bx = -width * .32;
+        bx <= width * .32;
+        bx += width * .32
+      ) {
+        addTrimBox(
+          root,
+          [1.2, .55, .12],
+          [bx, 2.08, 3.20],
+          windowMat,
+        );
+      }
+
+      return root;
+    };
+
+  addBunker(-56, -54, 0, 13);
+  addBunker(-28, -55, 0, 12);
+  addBunker(0, -54, 0, 14);
+  addBunker(29, -55, 0, 12);
+  addBunker(58, -53, 0, 13);
+
+  // Parallel trench lips create readable defensive geometry.
+  for (const x of [-70, -42, -14, 14, 42, 70]) {
+    addCover(
+      16,
+      1.35,
+      1.25,
+      x,
+      .68,
+      -44,
+      darkCover,
     );
 
-    addPipeRun(
-      [
-        [1.05, .42, .32],
-        [1.30, 1.12, .32],
-        [1.65, 1.12, .32],
-      ],
-      .055,
-      paintedMetal,
+    addCover(
+      10,
+      1.15,
+      1.15,
+      x + 5,
+      .58,
+      -37,
+      concrete,
     );
+  }
 
-    // Small service box.
-    addTrimBox(
-      root,
-      [.40, .55, .32],
-      [-.68, .42, .30],
-      paintedMetal,
-    );
-  };
+  // Artillery pads are aligned behind the bunkers.
+  const gunMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x39464d,
+      roughness: .62,
+      metalness: .48,
+    });
 
-  const addSandbagLine = (x, z, count, rotation = 0) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
+  const addArtillery =
+    (x, z, rotation = 0) => {
+      const root =
+        new THREE.Group();
 
-    const bagMat = new THREE.MeshStandardMaterial({
-      color: 0x6c6251,
+      root.position.set(x, .2, z);
+      root.rotation.y = rotation;
+      fallbackArenaRoot.add(root);
+
+      addTrimBox(
+        root,
+        [5.5, .18, 3.8],
+        [0, 0, 0],
+        buildingDark,
+      );
+
+      addTrimBox(
+        root,
+        [1.25, .50, 1.25],
+        [0, .48, 0],
+        gunMat,
+      );
+
+      const barrel =
+        new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            .13,
+            .18,
+            4.4,
+            20,
+            2,
+          ),
+          gunMat,
+        );
+
+      barrel.rotation.z = Math.PI / 2;
+      barrel.position.set(
+        1.35,
+        .78,
+        0,
+      );
+      barrel.castShadow = true;
+      root.add(barrel);
+
+      addTrimBox(
+        root,
+        [.35, .52, 2.0],
+        [-.35, .43, 0],
+        paintedMetal,
+      );
+
+      return root;
+    };
+
+  addArtillery(-50, -31, 0);
+  addArtillery(0, -31, 0);
+  addArtillery(50, -31, Math.PI);
+
+  // =========================================================================
+  // FIELD DETAILS / WAR DAMAGE
+  // =========================================================================
+
+  const wreckMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x252b2e,
+      roughness: .90,
+      metalness: .25,
+    });
+
+  const rustMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x4d3225,
+      roughness: .94,
+      metalness: .12,
+    });
+
+  const addWreck =
+    (x, z, rotation = 0, scale = 1) => {
+      const root =
+        new THREE.Group();
+
+      root.position.set(x, .28, z);
+      root.rotation.y = rotation;
+      root.scale.setScalar(scale);
+      fallbackArenaRoot.add(root);
+
+      const hull =
+        new THREE.Mesh(
+          new RoundedBoxGeometry(
+            5.2,
+            1.15,
+            2.7,
+            3,
+            .18,
+          ),
+          wreckMat,
+        );
+
+      hull.castShadow = true;
+      hull.receiveShadow = true;
+      root.add(hull);
+
+      for (const side of [-1, 1]) {
+        for (let i = -1; i <= 1; i += 1) {
+          const wheel =
+            new THREE.Mesh(
+              new THREE.CylinderGeometry(
+                .58,
+                .58,
+                .30,
+                18,
+              ),
+              rustMat,
+            );
+
+          wheel.rotation.z = Math.PI / 2;
+          wheel.position.set(
+            i * 1.35,
+            -.42,
+            side * 1.18,
+          );
+          wheel.castShadow = true;
+          root.add(wheel);
+        }
+      }
+
+      const turret =
+        new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            .72,
+            .78,
+            .38,
+            20,
+          ),
+          wreckMat,
+        );
+
+      turret.position.set(
+        -.25,
+        .78,
+        0,
+      );
+      turret.castShadow = true;
+      root.add(turret);
+
+      const barrel =
+        new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            .12,
+            .18,
+            2.8,
+            16,
+          ),
+          rustMat,
+        );
+
+      barrel.rotation.z = Math.PI / 2;
+      barrel.position.set(
+        1.25,
+        .90,
+        0,
+      );
+      root.add(barrel);
+
+      const smoke =
+        new THREE.Mesh(
+          new THREE.SphereGeometry(
+            .42,
+            16,
+            12,
+          ),
+          new THREE.MeshStandardMaterial({
+            color: 0x141818,
+            emissive: 0x1d2324,
+            emissiveIntensity: .55,
+            roughness: 1,
+          }),
+        );
+
+      smoke.position.set(
+        -.35,
+        1.65,
+        .15,
+      );
+      root.add(smoke);
+    };
+
+  // Wrecks sit alongside the main road as intentional battle-story props.
+  addWreck(
+    -25,
+    42,
+    .08,
+    1.0,
+  );
+
+  addWreck(
+    30,
+    -16,
+    -.18,
+    1.08,
+  );
+
+  addWreck(
+    84,
+    -38,
+    .04,
+    .92,
+  );
+
+  // Craters stay in open ground, not inside the roads or building doors.
+  const craterMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x171a19,
+      roughness: 1,
+      metalness: 0,
+    });
+
+  const rubbleMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x44423d,
       roughness: .96,
-      metalness: .01,
+      metalness: .03,
     });
 
-    for (let i = 0; i < count; i += 1) {
-      const row = i % 2;
-      const column = Math.floor(i / 2);
-      const bag = new THREE.Mesh(
-        new THREE.SphereGeometry(.48, 16, 10),
-        bagMat,
-      );
-      bag.scale.set(1.18, .56, .68);
-      bag.position.set(
-        column * .86 - (count / 4) * .86,
-        .36 + row * .24,
-        row * .58 - .29,
-      );
-      bag.castShadow = true;
-      bag.receiveShadow = true;
-      root.add(bag);
-    }
-
-    // One low collision rail behind the bags.
-    const blocker = addSolid(
-      [Math.max(1.8, Math.ceil(count / 2) * .9), .66, .65],
-      [x, .33, z],
-      structureDark,
-      rotation,
-    );
-    blocker.visible = false;
-  };
-
-  const addConcreteBunker = (x, z, rotation = 0) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
-
-    addTrimBox(
-      root,
-      [8.4, 4.3, 4.8],
-      [0, 2.15, 0],
-      structureMat,
-    );
-
-    addTrimBox(
-      root,
-      [7.0, 2.0, .18],
-      [0, 2.35, -2.48],
-      structureDark,
-    );
-
-    for (const px of [-2.5, -1.25, 0, 1.25, 2.5]) {
-      addTrimBox(
-        root,
-        [.72, .72, .08],
-        [px, 2.1, -2.58],
-        glassBlue,
-      );
-    }
-
-    addWarningStripe(
-      root,
-      [0, .36, -2.55],
-      0,
-      5.2,
-      .09,
-    );
-
-    // Rooftop equipment.
-    addTrimBox(
-      root,
-      [2.0, .45, 1.25],
-      [0, 4.45, .35],
-      structureDark,
-    );
-
-    addPipeRun(
-      [
-        [-.72, 4.70, .05],
-        [-.72, 5.55, .05],
-        [.72, 5.55, .05],
-        [.72, 4.70, .05],
-      ],
-      .045,
-      paintedMetal,
-    );
-
-    addSolid(
-      [8.4, 4.3, 4.8],
-      [x, 2.15, z],
-      structureDark,
-      rotation,
-    );
-  };
-
-  const addArchTunnel = (x, z, rotation = 0) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
-
-    const sideMat = structureDark;
-    const accent = paintedMetal;
-
-    addTrimBox(
-      root,
-      [10.0, 4.9, 1.1],
-      [0, 2.45, 0],
-      sideMat,
-    );
-    addTrimBox(
-      root,
-      [1.1, 4.9, 8.0],
-      [-4.45, 2.45, 0],
-      sideMat,
-    );
-    addTrimBox(
-      root,
-      [1.1, 4.9, 8.0],
-      [4.45, 2.45, 0],
-      sideMat,
-    );
-
-    const inner =
+  const addCrater = (
+    x,
+    z,
+    radius,
+  ) => {
+    const crater =
       new THREE.Mesh(
-        new THREE.PlaneGeometry(7.8, 4.0),
-        structureMat,
+        new THREE.CylinderGeometry(
+          radius,
+          radius * .84,
+          .025,
+          28,
+        ),
+        craterMat,
       );
-    inner.position.set(0, 2.15, -.54);
-    inner.rotation.y = Math.PI;
-    root.add(inner);
 
-    for (const zPos of [-3.2, -1.6, 0, 1.6, 3.2]) {
-      addTrimBox(
-        root,
-        [.08, 4.1, .08],
-        [-3.96, 2.0, zPos],
-        accent,
-      );
-      addTrimBox(
-        root,
-        [.08, 4.1, .08],
-        [3.96, 2.0, zPos],
-        accent,
-      );
-    }
-
-    addSolid(
-      [10.0, 4.9, 1.1],
-      [x, 2.45, z],
-      sideMat,
-      rotation,
+    crater.position.set(
+      x,
+      .02,
+      z,
     );
+    crater.rotation.y = .18;
+    crater.receiveShadow = true;
+    fallbackArenaRoot.add(crater);
+
+    for (const angle of [0, 1.9, 3.7]) {
+      const piece =
+        new THREE.Mesh(
+          new THREE.IcosahedronGeometry(
+            radius * .12,
+            0,
+          ),
+          rubbleMat,
+        );
+
+      piece.position.set(
+        x + Math.cos(angle) * radius * .82,
+        .08,
+        z + Math.sin(angle) * radius * .82,
+      );
+      piece.castShadow = true;
+      fallbackArenaRoot.add(piece);
+    }
   };
 
-  const addAntenna = (x, z) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    fallbackArenaRoot.add(root);
+  addCrater(-39, 6, 2.7);
+  addCrater(41, 31, 3.1);
+  addCrater(17, -17, 2.25);
+  addCrater(-22, -32, 2.8);
+  addCrater(101, -12, 2.1);
 
-    addTrimBox(
-      root,
-      [1.5, .24, 1.5],
-      [0, .12, 0],
-      structureDark,
-    );
-
-    addPipeRun(
-      [
-        [0, .24, 0],
-        [0, 7.2, 0],
-      ],
-      .06,
-      paintedMetal,
-    );
-
-    for (const y of [1.7, 3.4, 5.1]) {
-      addPipeRun(
-        [
-          [-.55, y, 0],
-          [.55, y, 0],
-        ],
-        .032,
-        paintedMetal,
-      );
-    }
-
-    const rings = [1.9, 3.7, 5.5].map((y) => {
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(.42, .025, 8, 20),
-        paintedMetal,
-      );
-      ring.position.set(0, y, 0);
-      root.add(ring);
-      return ring;
+  // Barbed-wire style perimeter pieces are deliberately confined to the
+  // northern defensive belt and the outer command perimeter.
+  const wireMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x272d30,
+      roughness: .58,
+      metalness: .62,
     });
 
-    const topLight = new THREE.Mesh(
-      new THREE.SphereGeometry(.10, 14, 10),
-      emissiveBlue,
-    );
-    topLight.position.set(0, 7.28, 0);
-    root.add(topLight);
-  };
+  const addWireFence = (
+    x,
+    z,
+    width,
+    rotation = 0,
+  ) => {
+    const root =
+      new THREE.Group();
 
-  const addRoadPlate = (x, z, width, depth, rotation = 0) => {
-    const root = new THREE.Group();
-    root.position.set(x, .038, z);
+    root.position.set(x, 0, z);
     root.rotation.y = rotation;
     fallbackArenaRoot.add(root);
 
-    addTrimBox(
-      root,
-      [width, .05, depth],
-      [0, 0, 0],
-      structureDark,
-    );
+    for (let i = 0; i <= 4; i += 1) {
+      const px =
+        i * (width / 4) -
+        width * .5;
 
-    addTrimBox(
-      root,
-      [width * .88, .018, .05],
-      [0, .035, -depth * .24],
-      paintedMetal,
-    );
+      const post =
+        new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            .035,
+            .035,
+            1.6,
+            10,
+          ),
+          wireMat,
+        );
 
-    addTrimBox(
-      root,
-      [width * .88, .018, .05],
-      [0, .035, depth * .24],
-      paintedMetal,
-    );
-
-    for (let i = -2; i <= 2; i += 1) {
-      addTrimBox(
-        root,
-        [.04, .025, depth * .72],
-        [i * width * .16, .035, 0],
-        structureMat,
+      post.position.set(
+        px,
+        .8,
+        0,
       );
+      post.castShadow = true;
+      root.add(post);
     }
+
+    for (const y of [.58, 1.10]) {
+      const wire =
+        new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            .014,
+            .014,
+            width,
+            8,
+          ),
+          wireMat,
+        );
+
+      wire.rotation.z = Math.PI / 2;
+      wire.position.set(
+        0,
+        y,
+        0,
+      );
+      root.add(wire);
+    }
+
+    const concertina =
+      new THREE.Mesh(
+        new THREE.TorusGeometry(
+          width * .31,
+          .022,
+          8,
+          46,
+        ),
+        wireMat,
+      );
+
+    concertina.scale.x = 1.6;
+    concertina.rotation.y = Math.PI / 2;
+    concertina.position.y = .28;
+    root.add(concertina);
   };
 
-  // Large silhouettes that define new areas.
-  addShippingContainer(-10, 36, .03, 0x425867);
-  addShippingContainer(12, 36, -.12, 0x5a4b43);
-  addShippingContainer(-36, 7, Math.PI / 2, 0x49616b);
-  addShippingContainer(36, -8, Math.PI / 2, 0x62524a);
-
-  addConcreteBunker(-2, 26, 0);
-  addConcreteBunker(26, 27, -.10);
-  addConcreteBunker(-27, -27, .08);
-
-  addArchTunnel(0, -8, 0);
-  addArchTunnel(-30, -8, Math.PI / 2);
-
-  // Elevated visual landmarks. These are decorative/cover anchors; the AI
-  // stays grounded on the combat floor.
-  addWatchTower(-43, -4, 7.4);
-  addWatchTower(43, 18, 6.8);
-  addAntenna(8, 42);
-  addAntenna(-42, 39);
-
-  // Close-quarter clutter clusters.
-  addGenerator(-44, 19, .16);
-  addGenerator(-39, 22, -.22);
-  addGenerator(42, -24, .08);
-  addGenerator(37, -29, -.12);
-  addGenerator(15, 14, .10);
-  addGenerator(-16, -33, -.16);
-
-  addSandbagLine(-17, 17, 8, .08);
-  addSandbagLine(18, 6, 10, -.18);
-  addSandbagLine(-5, -35, 8, .12);
-  addSandbagLine(31, -17, 7, Math.PI / 2);
-
-  // Road/maintenance plates and drains break up huge empty floor areas.
-  addRoadPlate(0, 16, 18, 5.2, 0);
-  addRoadPlate(-21, -1, 17, 4.8, Math.PI / 2);
-  addRoadPlate(22, -4, 19, 4.8, Math.PI / 2);
-  addRoadPlate(0, -24, 20, 5.0, 0);
-
-  // Hazard poles, cones and loose service gear.
-  const coneMat = new THREE.MeshStandardMaterial({
-    color: 0xb45d1e,
-    roughness: .78,
-    metalness: .06,
-  });
-
-  for (const [x, z, rot] of [
-    [-8, 15, .1],
-    [-6.7, 15.3, -.08],
-    [8, 17, .05],
-    [9.2, 16.8, .18],
-    [-24, 6, -.10],
-    [24, 6, .04],
-    [4, -30, .14],
-    [6, -30.5, -.12],
-  ]) {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rot;
-    fallbackArenaRoot.add(root);
-
-    addTrimBox(
-      root,
-      [.34, .08, .34],
-      [0, .04, 0],
-      warningBlack,
-    );
-
-    const cone = new THREE.Mesh(
-      new THREE.ConeGeometry(.16, .52, 16, 2),
-      coneMat,
-    );
-    cone.position.y = .33;
-    cone.castShadow = true;
-    root.add(cone);
-
-    addWarningStripe(
-      root,
-      [0, .28, -.015],
-      0,
-      .22,
-      .035,
-    );
-  }
-
-  // Communication / electrical clutter: overhead cable runs make the space
-  // feel occupied even between the large combat structures.
-  addPipeRun(
-    [[-44, 5.8, 18], [-22, 7.0, 18], [-3, 6.3, 18]],
-    .035,
-    warningBlack,
-  );
-  addPipeRun(
-    [[44, 5.8, -22], [27, 6.7, -22], [8, 5.8, -22]],
-    .035,
-    warningBlack,
-  );
-  addPipeRun(
-    [[-38, 4.8, -4], [-18, 5.9, -4], [4, 5.1, -4]],
-    .028,
-    paintedMetal,
+  addWireFence(
+    -84,
+    2,
+    24,
+    Math.PI / 2,
   );
 
-  // Roof edge / service trim on major existing anchors.
-  for (const [x, z, width] of [
-    [-39, -17, 8.2],
-    [38, 18, 6.8],
-    [15, -40, 6.4],
-    [-15, -38, 5.2],
-  ]) {
-    addTrimBox(
-      fallbackArenaRoot,
-      [width, .11, .12],
-      [x, 5.24, z],
-      hazardYellow,
-    );
-  }
+  addWireFence(
+    94,
+    -2,
+    24,
+    Math.PI / 2,
+  );
 
-  // Dense small props prevent the arena from reading as empty between the
-  // major pieces. These are visual-only so AI pathfinding stays fast.
-  for (const [x, z, rot] of [
-    [-48, 18, .2],
-    [-47, 20, -.1],
-    [-41, 29, .05],
-    [-34, 31, .18],
-    [-28, 35, -.08],
-    [-21, 40, .12],
-    [20, 39, -.12],
-    [29, 36, .16],
-    [35, 31, -.04],
-    [44, 13, .08],
-    [47, 11, -.16],
-    [46, -3, .12],
-    [45, -13, -.06],
-    [33, -35, .15],
-    [23, -42, -.12],
-    [11, -46, .08],
-    [-4, -44, -.14],
-    [-17, -43, .04],
-    [-29, -41, .16],
-    [-42, -34, -.08],
-    [-47, -24, .12],
-  ]) {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rot;
-    fallbackArenaRoot.add(root);
-
-    addTrimBox(
-      root,
-      [.85, .72, .58],
-      [0, .36, 0],
-      structureDark,
-    );
-    addTrimBox(
-      root,
-      [.62, .12, .08],
-      [0, .72, -.30],
-      paintedMetal,
-    );
-    addTrimBox(
-      root,
-      [.18, .42, .11],
-      [-.23, .52, -.34],
-      emissiveBlue,
-    );
-  }
+  addWireFence(
+    0,
+    -63,
+    200,
+    0,
+  );
 
   // =========================================================================
-  // LIGHTING / VISUAL LANDMARKS
+  // LOCAL LIGHTING / NIGHT-WAR DETAIL
   // =========================================================================
 
-  const lightPositions = [
-    [-35, 8, -35],
-    [0, 10, -36],
-    [34, 9, -31],
-    [-36, 8, 5],
-    [33, 8, 10],
-    [-29, 7, 33],
-    [30, 9, 34],
-    [0, 10, 5],
+  const localLights = [
+    [-82, 8, 12, 0xffb85c, 32],
+    [-57, 8, 39, 0xffb85c, 22],
+    [74, 9, 18, 0xa6d9ff, 44],
+    [49, 8, 40, 0xa6d9ff, 26],
+    [-70, 7, 54, 0xff9d48, 18],
+    [70, 7, 6, 0xa6d9ff, 28],
+    [-53, 7, -46, 0xff8f45, 20],
+    [2, 7, -46, 0xff8f45, 20],
+    [53, 7, -46, 0xff8f45, 20],
   ];
 
-  for (const [x, y, z] of lightPositions) {
+  for (const [
+    x,
+    y,
+    z,
+    color,
+    intensity,
+  ] of localLights) {
     const light =
       new THREE.PointLight(
-        0xcfe5ff,
-        42,
-        28,
+        color,
+        intensity,
+        24,
         2,
       );
 
     light.position.set(x, y, z);
     scene.add(light);
     arenaLights.push(light);
-  }
 
-  const accentMat =
-    new THREE.MeshStandardMaterial({
-      color: 0x23313a,
-      emissive: 0x224754,
-      emissiveIntensity: 2.4,
-      metalness: .64,
-      roughness: .32,
-    });
-
-  // Broken perimeter light strips instead of a perfect rectangle.
-  const strips = [
-    [new THREE.Vector3(-36, .08, -49), new THREE.Vector3(26, .08, -49), .12],
-    [new THREE.Vector3(-49, .08, -20), new THREE.Vector3(-49, .08, 32), .12],
-    [new THREE.Vector3(14, .08, 49), new THREE.Vector3(48, .08, 49), .12],
-    [new THREE.Vector3(49, .08, -2), new THREE.Vector3(49, .08, 22), .12],
-  ];
-
-  for (const [from, to, thickness] of strips) {
-    const midpoint = from.clone().add(to).multiplyScalar(.5);
-    const length = from.distanceTo(to);
-    const horizontal = Math.abs(from.x - to.x) > Math.abs(from.z - to.z);
-
-    const strip =
+    const bulb =
       new THREE.Mesh(
-        new RoundedBoxGeometry(
-          horizontal ? length : thickness,
-          thickness,
-          horizontal ? thickness : length,
-          2,
-          .025,
+        new THREE.SphereGeometry(
+          .10,
+          12,
+          8,
         ),
-        accentMat,
+        new THREE.MeshStandardMaterial({
+          color,
+          emissive: color,
+          emissiveIntensity: 2.8,
+        }),
       );
 
-    strip.position.copy(midpoint);
-    scene.add(strip);
+    bulb.position.set(
+      x,
+      y,
+      z,
+    );
+
+    fallbackArenaRoot.add(bulb);
+  }
+
+  // A few elevated light poles keep the wide battlefield readable.
+  const poleMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x252c30,
+      roughness: .62,
+      metalness: .52,
+    });
+
+  for (const [x, z] of [
+    [-105, 47],
+    [-25, 49],
+    [25, 49],
+    [105, 47],
+    [-104, -18],
+    [104, -18],
+  ]) {
+    const pole =
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          .075,
+          .11,
+          9.5,
+          14,
+        ),
+        poleMat,
+      );
+
+    pole.position.set(
+      x,
+      4.75,
+      z,
+    );
+    pole.castShadow = true;
+    fallbackArenaRoot.add(pole);
+
+    const lamp =
+      new THREE.PointLight(
+        0xffd58d,
+        40,
+        30,
+        2,
+      );
+
+    lamp.position.set(
+      x,
+      9.2,
+      z,
+    );
+    scene.add(lamp);
+    arenaLights.push(lamp);
+
+    const head =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          .55,
+          .13,
+          .32,
+          2,
+          .03,
+        ),
+        interiorLightMat,
+      );
+
+    head.position.set(
+      x,
+      9.3,
+      z,
+    );
+    fallbackArenaRoot.add(head);
   }
 }
 addArena();
