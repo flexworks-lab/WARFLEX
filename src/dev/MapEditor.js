@@ -84,36 +84,66 @@ export class MapEditor {
   }
 
   createUI() {
-    if(this.ui) return;
-    const panel=document.createElement('div');
-    panel.id='warfex-editor';
-    panel.innerHTML=''
-NaN
-NaN
-NaN
-NaN
-NaN
-NaN
-NaN
-NaN
-NaN
-NaN
-NaN
-NaN
-NaN
-    document.body.appendChild(panel); this.ui=panel;
-    panel.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>this.addPart(b.dataset.p));
-    panel.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>this.addPrefab(b.dataset.f));
-    panel.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>this.setTool(b.dataset.t));
-    panel.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>this.action(b.dataset.a));
-    panel.querySelector('#we-snap').onchange=e=>this.snap=Math.max(.05,Number(e.target.value)||.5);
-    panel.querySelector('#we-rot').onchange=e=>this.rotSnap=Math.max(1,Number(e.target.value)||15);
-    panel.querySelector('#we-speed').onchange=e=>this.speed=Math.max(1,Number(e.target.value)||18);
-    panel.querySelector('#we-grid').onchange=e=>this.grid.visible=e.target.checked;
-    panel.querySelector('#we-built').onchange=e=>this.fallbackRoot.visible=e.target.checked;
-    panel.querySelector('#we-file').onchange=e=>this.importFile(e.target.files[0]);
-  }
+    if (this.ui) return;
+    const panel = document.createElement('div');
+    panel.id = 'warfex-editor';
 
+    const top = document.createElement('div');
+    top.className = 'we-topbar';
+    const title = document.createElement('div');
+    title.innerHTML = '<strong>WARFLEX MAP EDITOR</strong><span> DEV BUILD // CUSTOM MAP WORKSPACE</span>';
+    const actions = document.createElement('div');
+    actions.className = 'we-actions';
+    const addAction = (label, action) => { const b=document.createElement('button'); b.textContent=label; b.dataset.a=action; b.addEventListener('click',()=>this.action(action)); actions.appendChild(b); };
+    [['SAVE','save'],['LOAD','load'],['EXPORT JSON','export'],['IMPORT JSON','import'],['PLAYTEST','play'],['EXIT','exit']].forEach(([label,action])=>addAction(label,action));
+    top.append(title, actions);
+
+    const left = document.createElement('aside');
+    left.className = 'we-left';
+    const heading = (text) => { const h=document.createElement('h4'); h.textContent=text; left.appendChild(h); };
+    const grid = () => { const g=document.createElement('div'); g.className='we-grid'; left.appendChild(g); return g; };
+    const addButton = (parent,label,fn) => { const b=document.createElement('button'); b.textContent=label; b.addEventListener('click',fn); parent.appendChild(b); };
+
+    heading('PARTS');
+    const parts=grid();
+    [['BOX','box'],['WALL','wall'],['FLOOR','floor'],['PILLAR','pillar'],['BEAM','beam'],['CYLINDER','cylinder'],['SPHERE','sphere'],['RAMP','ramp']].forEach(([label,type])=>addButton(parts,label,()=>this.addPart(type)));
+    heading('PREBUILDS');
+    const prefabs=grid();
+    [['ROOM','room'],['WAREHOUSE','warehouse'],['BUNKER','bunker'],['CONTAINER','container'],['CONTAINER STACK','containerStack'],['GATE','gate'],['TOWER','tower'],['HESCO','hesco'],['ROAD','road'],['TANK PAD','tankPad'],['CHECKPOINT','checkpoint'],['FUEL TANK','fuel']].forEach(([label,type])=>addButton(prefabs,label,()=>this.addPrefab(type)));
+    heading('TOOLS');
+    const tools=grid();
+    [['MOVE','translate'],['ROTATE','rotate'],['SCALE','scale']].forEach(([label,type])=>addButton(tools,label,()=>this.setTool(type)));
+    [['DUPLICATE','duplicate'],['GROUP','group'],['UNGROUP','ungroup'],['FOCUS','focus'],['DELETE','delete']].forEach(([label,action])=>addButton(tools,label,()=>this.action(action)));
+
+    heading('SETTINGS');
+    const options=document.createElement('div'); options.className='we-options'; left.appendChild(options);
+    const numberSetting=(label,id,value,min,max,step,fn)=>{ const row=document.createElement('label'); row.textContent=label+' '; const input=document.createElement('input'); input.id=id; input.type='number'; input.value=String(value); input.min=String(min); input.max=String(max); input.step=String(step); input.addEventListener('change',()=>{const n=Number(input.value);if(Number.isFinite(n))fn(n);}); row.appendChild(input); options.appendChild(row); };
+    numberSetting('POSITION SNAP','#we-snap',this.snap,0.05,20,0.05,(v)=>{this.snap=Math.max(0.05,v);this.refreshStatus();});
+    numberSetting('ROTATION SNAP','#we-rot',this.rotSnap,1,90,1,(v)=>{this.rotSnap=Math.max(1,v);this.refreshStatus();});
+    numberSetting('CAMERA SPEED','#we-speed',this.speed,1,200,1,(v)=>{this.speed=this.THREE.MathUtils.clamp(v,1,200);this.refreshStatus();});
+    const checkSetting=(label,id,checked,fn)=>{const row=document.createElement('label'); const span=document.createElement('span'); span.textContent=label; const input=document.createElement('input'); input.id=id; input.type='checkbox'; input.checked=checked; input.addEventListener('change',()=>fn(Boolean(input.checked))); row.append(span,input); options.appendChild(row);};
+    checkSetting('SHOW GRID','we-grid',this.grid.visible,(v)=>{this.grid.visible=v;});
+    checkSetting('SHOW BUILT-IN MAP','we-built',this.fallbackRoot.visible,(v)=>{this.fallbackRoot.visible=v;});
+    checkSetting('COLLISION PREVIEW','we-collision',true,(v)=>{this.collisionPreview=v;this.refreshColliders();});
+
+    const help=document.createElement('div'); help.className='we-help';
+    help.innerHTML='<b>CAMERA</b><span>WASD move • Q/E vertical • RMB look • MMB pan • wheel speed</span><b>EDITING</b><span>Click select • Shift-click multi • Ctrl+D duplicate • Delete remove</span><span>G group • F focus • Alt+W move • Alt+E rotate • Alt+R scale</span><span>Arrow keys nudge • PageUp/PageDown vertical</span>';
+    left.appendChild(help);
+
+    const right=document.createElement('aside'); right.className='we-right';
+    const h1=document.createElement('h4'); h1.textContent='HIERARCHY'; right.appendChild(h1);
+    const tree=document.createElement('div'); tree.id='we-tree'; right.appendChild(tree);
+    const h2=document.createElement('h4'); h2.textContent='INSPECTOR'; right.appendChild(h2);
+    const inspect=document.createElement('div'); inspect.id='we-inspect'; right.appendChild(inspect);
+    const h3=document.createElement('h4'); h3.textContent='STATUS'; right.appendChild(h3);
+    const status=document.createElement('div'); status.id='we-status'; status.className='we-status'; right.appendChild(status);
+    const file=document.createElement('input'); file.id='we-file'; file.type='file'; file.accept='application/json'; file.hidden=true; file.addEventListener('change',()=>{this.importFile(file.files?.[0]||null);file.value='';}); right.appendChild(file);
+    const toast=document.createElement('div'); toast.id='we-toast'; toast.className='we-toast'; right.appendChild(toast);
+
+    panel.append(top,left,right);
+    document.body.appendChild(panel);
+    this.ui=panel;
+  }
   destroyUI(){ this.ui?.remove(); this.ui=null; }
 
   material(color=0x596872){ return new this.THREE.MeshStandardMaterial({color,roughness:.78,metalness:.16}); }
