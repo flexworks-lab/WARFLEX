@@ -4071,42 +4071,19 @@ function prepareMenuGun(
 for (let i = 0; i < menuGunPalettes.length; i += 1) {
   const palette = menuGunPalettes[i];
 
-  const hero =
-    prepareMenuGun(
-      weapon,
-      palette,
-      1.22 - i * .045,
-      i,
-    );
+  const hero = new THREE.Group();
+  hero.name = 'MenuAK47Hero_' + i;
+  hero.position.set(2.65, -.05, -3.20);
+  hero.rotation.set(-.12, .62 + i * .22, .06);
 
-  const secondary =
-    prepareMenuGun(
-      weapon,
-      palette,
-      .72 - i * .025,
-      i,
-    );
+  const secondary = new THREE.Group();
+  secondary.name = 'MenuAK47Secondary_' + i;
+  secondary.position.set(3.65, -.82, -4.55);
+  secondary.rotation.set(-.12, -.42 - i * .08, .06);
+  secondary.scale.setScalar(.78);
 
-  hero.position.set(
-    2.65,
-    -.05,
-    -3.20,
-  );
-  hero.rotation.y += i * .22;
-
-  secondary.position.set(
-    3.65,
-    -.82,
-    -4.55,
-  );
-  secondary.rotation.y -= .42 - i * .08;
-  secondary.rotation.z = .06;
-
-  menuGunPairs.push({
-    hero,
-    secondary,
-    palette,
-  });
+  gunViewportScene.add(hero, secondary);
+  menuGunPairs.push({ hero, secondary, palette });
 }
 
 menuGunLights.key =
