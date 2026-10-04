@@ -50,9 +50,12 @@ export class MapLoader {
 
     this.mapRoot = root;
 
+    const meshes = [];
     root.traverse((object) => {
-      if (!object.isMesh) return;
+      if (object.isMesh) meshes.push(object);
+    });
 
+    for (const object of meshes) {
       if (this.isCollisionMesh(object)) {
         /*
          * Collision meshes are hidden from rendering.
@@ -98,7 +101,7 @@ export class MapLoader {
 
         this.obstacles.push(object);
 
-        return;
+        continue;
       }
 
       object.visible = true;
@@ -106,7 +109,7 @@ export class MapLoader {
       object.receiveShadow = true;
 
       this.visualRoot.attach(object);
-    });
+    }
 
     this.loaded = true;
     return {
