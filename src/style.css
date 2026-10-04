@@ -1770,3 +1770,23 @@ body {
   background: rgba(120,180,255,.55);
   color: #fff;
 }
+
+/* Error layer must remain interactive even while the callsign screen is open. */
+#warfex-boot-status,
+#warfex-debug-error,
+#warfex-copy-error {
+  z-index: 100000 !important;
+  pointer-events: auto !important;
+  isolation: isolate;
+}
+
+#player-name-gate {
+  z-index: 5000;
+}
+
+#warfex-copy-error-text,
+#warfex-debug-error,
+#warfex-boot-status {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
