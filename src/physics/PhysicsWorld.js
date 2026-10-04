@@ -69,14 +69,93 @@ export class PhysicsWorld {
     );
   }
 
-  syncArena(obstacles = []) {
+  addTerrainHeightfield({
+    width,
+    depth,
+    sampleHeight,
+    minHeight = -1,
+    resolutionX = 64,
+    resolutionZ = 40,
+  } = {}) {
+    if (typeof sampleHeight !== 'function') return null;
+
+    const data = [];
+    let terrainMin = Infinity;
+
+    for (let ix = 0; ix <= resolutionX; ix += 1) {
+      const column = [];
+      const x = THREE_TO_CANNON * (-width * 0.5 + (ix / resolutionX) * width);
+
+      for (let iz = 0; iz <= resolutionZ; iz += 1) {
+        const z = THREE_TO_CANNON * (-depth * 0.5 + (iz / resolutionZ) * depth);
+        const y = Number(sampleHeight(x, z));
+        const safeY = Number.isFinite(y) ? y : minHeight;
+        terrainMin = Math.min(terrainMin, safeY);
+        column.push(safeY);
+      }
+
+      data.push(column);
+    }
+
+    terrainMin = Math.min(terrainMin, minHeight);
+
+    // Cannon's Heightfield uses Z as its local height axis. Rotate the shape
+    // so Cannon-Z becomes world-Y, matching WARFLEX's Three.js coordinate system.
+    const shifted = data.map(column =>
+      column.map(y => y - terrainMin)
+    );
+
+    const shape = new CANNON.Heightfield(shifted, {
+      elementSize: (width / resolutionX) * THREE_TO_CANNON,
+    });
+
+    const body = new CANNON.Body({
+      mass: 0,
+      type: CANNON.Body.STATIC,
+      material: new CANNON.Material({
+        friction: 0.82,
+        restitution: 0.01,
+      }),
+      collisionFilterGroup: this.staticGroup,
+      collisionFilterMask: this.ragdollGroup,
+    });
+
+    body.addShape(
+      shape,
+      new CANNON.Vec3(0, 0, 0),
+      new CANNON.Quaternion(
+        -Math.SQRT1_2,
+        0,
+        0,
+        Math.SQRT1_2,
+      ),
+    );
+
+    body.position.set(
+      -width * 0.5,
+      terrainMin,
+      depth * 0.5,
+    );
+
+    this.world.addBody(body);
+    return body;
+  }
+
+  syncArena(obstacles = [], terrain = null) {
     const bodies = [];
 
-    // The fallback battlefield is 260m x 150m. Keep the physics floor
-    // larger than the playable footprint so ragdolls never fall off the map.
-    bodies.push(
-      this.addGround(264, 154, -0.5),
-    );
+    if (
+      terrain &&
+      typeof terrain.sampleHeight === 'function'
+    ) {
+      const terrainBody = this.addTerrainHeightfield(terrain);
+      if (terrainBody) bodies.push(terrainBody);
+    } else {
+      // Flat fallback ground for custom/editor maps.
+      bodies.push(
+        this.addGround(264, 154, -0.5),
+      );
+    }
 
     for (const obstacle of obstacles) {
       const p = obstacle.geometry?.parameters;
