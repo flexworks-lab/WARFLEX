@@ -3,6 +3,13 @@ import { PhysicsWorld } from './physics/PhysicsWorld.js';
 import { RagdollController } from './physics/RagdollController.js';
 import { WaveDirector } from './systems/WaveDirector.js';
 import { SteeringAgent } from './systems/SteeringAgent.js';
+import { AssetManager } from './assets/AssetManager.js';
+import { MapLoader } from './world/MapLoader.js';
+import { PropInstancer } from './world/PropInstancer.js';
+import { applyBakedLightmap } from './world/BakedLighting.js';
+import { configureAtmosphere } from './world/Atmosphere.js';
+import { NavMeshService } from './ai/NavMeshService.js';
+import { NavMeshAgent } from './ai/NavMeshAgent.js';
 
 const CONFIG = {
   maxHealth: 100,
@@ -78,12 +85,20 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'hi
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.18;
+renderer.toneMapping = THREE.AgXToneMapping;
+renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 renderer.domElement.style.display = 'none';
+
+const atmosphere = configureAtmosphere(
+  scene,
+  renderer,
+  camera,
+);
+
+const assetManager = new AssetManager(renderer);
 
 scene.add(new THREE.HemisphereLight(0xaec4d8, 0x11151c, 1.5));
 const sun = new THREE.DirectionalLight(0xffffff, 2.4);
@@ -253,6 +268,10 @@ async function checkForUpdates(initial = false) {
   }
 }
 
+const fallbackArenaRoot = new THREE.Group();
+fallbackArenaRoot.name = 'FallbackArena';
+scene.add(fallbackArenaRoot);
+
 function makeBox(size, position, color, cast = true) {
   const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
   const material = new THREE.MeshStandardMaterial({ color, roughness: .9, metalness: .05 });
@@ -260,7 +279,7 @@ function makeBox(size, position, color, cast = true) {
   mesh.position.copy(position);
   mesh.castShadow = cast;
   mesh.receiveShadow = true;
-  scene.add(mesh);
+  fallbackArenaRoot.add(mesh);
   return mesh;
 }
 
@@ -315,6 +334,8 @@ function addArena() {
 
 addArena();
 
+const fallbackObstacleCount = obstacles.length;
+
 const arenaGrid = new THREE.GridHelper(108, 54, 0x33404b, 0x1b242d);
 arenaGrid.position.y = 0.015;
 arenaGrid.material.transparent = true;
@@ -335,6 +356,167 @@ const ragdollController = new RagdollController({
 });
 
 let waveDirector = null;
+
+const mapLoader = new MapLoader({
+  scene,
+  assetManager,
+  physicsWorld,
+  obstacles,
+});
+
+const propInstancer = new PropInstancer(scene);
+const navMeshService = new NavMeshService({
+  assetManager,
+});
+
+let environmentTexture = null;
+let bakedLightmapTexture = null;
+let worldAssetsReady = false;
+
+async function loadWorldAssets() {
+  /*
+   * Optional production map:
+   *   public/assets/maps/warfex-map.glb
+   *
+   * Meshes named COL_ / COLLISION / PHYS_ become invisible physics boxes.
+   */
+  try {
+    const loadedMap = await mapLoader.loadMap(
+      './assets/maps/warfex-map.glb',
+    );
+
+    /*
+     * Remove the fallback collision/raycast objects from gameplay once the
+     * production map successfully supplies its own collision meshes.
+     */
+    for (
+      let i = 0;
+      i < fallbackObstacleCount;
+      i += 1
+    ) {
+      const fallback = obstacles.shift();
+      if (fallback) {
+        fallbackArenaRoot.remove(fallback);
+      }
+    }
+
+    fallbackArenaRoot.visible = false;
+    arenaGrid.visible = false;
+
+    /*
+     * Optional baked lighting texture. The map must export a second UV set.
+     */
+    try {
+      bakedLightmapTexture =
+        await applyBakedLightmap(
+          loadedMap.root,
+          new THREE.TextureLoader(),
+          './assets/maps/warfex-lightmap.jpg',
+          1.0,
+        );
+    } catch (error) {
+      console.info(
+        '[WARFLEX] No baked lightmap loaded; using dynamic PBR lighting.',
+        error,
+      );
+    }
+
+    /*
+     * Optional HDR environment. If absent, the dynamic lights remain active.
+     */
+    try {
+      environmentTexture =
+        await assetManager.loadHDR(
+          './assets/environment/warfex.hdr',
+        );
+
+      scene.environment =
+        environmentTexture;
+    } catch (error) {
+      console.info(
+        '[WARFLEX] No HDR environment loaded; keeping fallback lighting.',
+        error,
+      );
+    }
+
+    worldAssetsReady = true;
+    return true;
+  } catch (error) {
+    console.info(
+      '[WARFLEX] Production map not present yet; keeping built-in arena.',
+      error,
+    );
+    return false;
+  }
+}
+
+async function loadNavMeshAsset() {
+  try {
+    await navMeshService.load(
+      './assets/maps/warfex-navmesh.glb',
+    );
+
+    console.info(
+      '[WARFLEX] NavMesh loaded.',
+    );
+    return true;
+  } catch (error) {
+    console.info(
+      '[WARFLEX] NavMesh not present yet; using steering fallback.',
+      error,
+    );
+    return false;
+  }
+}
+
+function buildInstancedProps() {
+  /*
+   * Decorative props are GPU-instanced. They do not become gameplay
+   * collision bodies, which keeps CPU physics/raycast work low.
+   */
+  const crates = propInstancer.createBoxProp({
+    name: 'InstancedCrates',
+    count: 72,
+    size: new THREE.Vector3(1.2, 1.0, 1.2),
+    color: 0x4e4236,
+    roughness: .92,
+  });
+
+  propInstancer.populate(crates, {
+    halfExtents: new THREE.Vector2(45, 45),
+    avoidRadius: 13,
+    minScale: .82,
+    maxScale: 1.18,
+  });
+
+  const barriers = propInstancer.createBoxProp({
+    name: 'InstancedBarriers',
+    count: 40,
+    size: new THREE.Vector3(2.8, 1.1, .55),
+    color: 0x5c6368,
+    metalness: .32,
+    roughness: .78,
+  });
+
+  propInstancer.populate(barriers, {
+    halfExtents: new THREE.Vector2(47, 47),
+    avoidRadius: 15,
+    minScale: .9,
+    maxScale: 1.1,
+    rotationSnap: Math.PI / 2,
+  });
+}
+
+buildInstancedProps();
+
+Promise.all([
+  loadWorldAssets(),
+  loadNavMeshAsset(),
+]).then(() => {
+  console.info(
+    '[WARFLEX] World systems initialized.',
+  );
+});
 
 function createMaterial(color, metalness = .1, roughness = .65) {
   return new THREE.MeshStandardMaterial({ color, metalness, roughness });
@@ -1201,6 +1383,25 @@ function spawnEnemy(index = 0, spawnPosition = null) {
   group.userData.usedFallback = usedFallback;
   scene.add(group);
 
+  const navAgent = navMeshService.ready
+    ? new NavMeshAgent({
+        object: group,
+        navMesh: navMeshService,
+        getTarget: () => player.position,
+        speed:
+          (CONFIG.enemySpeed +
+            Math.min(state.wave * .08, 1.2)) *
+          roleStats.speed,
+        repathInterval: .35,
+        desiredDistance:
+          role === 'rusher'
+            ? 2.25
+            : role === 'rifleman'
+              ? 24
+              : 26,
+      })
+    : null;
+
   enemies.push({
     group,
     role,
@@ -1239,6 +1440,7 @@ function spawnEnemy(index = 0, spawnPosition = null) {
     deathTimer: 0,
     dying: false,
     steering,
+    navAgent,
   });
 }
 
@@ -1954,14 +2156,19 @@ function updateEnemies(dt) {
           ? 24
           : 26;
 
-    enemy.steering?.update(
-      dt,
-      player.position,
-      {
-        speed: enemy.speed,
-        desiredDistance,
-      },
-    );
+    if (enemy.navAgent) {
+      enemy.navAgent.speed = enemy.speed;
+      enemy.navAgent.update(dt);
+    } else {
+      enemy.steering?.update(
+        dt,
+        player.position,
+        {
+          speed: enemy.speed,
+          desiredDistance,
+        },
+      );
+    }
 
     /*
      * Ranged enemies add a mild lateral strafe while their steering agent
@@ -2352,10 +2559,7 @@ function frame() {
       .7;
   }
 
-  renderer.render(
-    scene,
-    camera,
-  );
+  atmosphere.composer.render(dt);
 }
 
 function setWaveChoice(value) {
@@ -2538,6 +2742,7 @@ window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  atmosphere.resize(innerWidth, innerHeight);
 });
 
 camera.position.set(0, 0, 0);
