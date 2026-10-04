@@ -608,8 +608,9 @@ const DEBUG_MODE = new URLSearchParams(location.search).has('debug');
 let startRequestedBeforeBoot = Boolean(window.__WARFLEX_START_REQUESTED);
 window.addEventListener('warfex-start-request', () => {
   startRequestedBeforeBoot = true;
-  if (typeof window.WARFLEX_START_GAME === 'function') {
-    window.WARFLEX_START_GAME();
+  if (typeof openLoadout === 'function') {
+    startRequestedBeforeBoot = false;
+    openLoadout('waves', 'main');
   }
 });
 
@@ -3993,6 +3994,8 @@ weaponModels.push(smgModel);
 
 let loadoutOpen = false;
 let selectedLoadoutIndex = 0;
+let loadoutDestination = 'waves';
+let loadoutReturnView = 'main';
 let loadoutPreviewRoot = null;
 const loadoutPreviewModels = [];
 
@@ -4032,9 +4035,11 @@ const stripPreviewModel = (source, index) => {
       node.material = materials.map((material) => {
         const next = material?.clone?.() || material;
         if (next) {
-          next.transparent = true;
-          next.opacity = .96;
+          next.transparent = false;
+          next.opacity = 1;
           next.depthWrite = true;
+          next.depthTest = false;
+          if (next.color) next.color.multiplyScalar(1.0);
         }
         return next;
       });
@@ -4176,20 +4181,32 @@ function selectLoadout(index, { open = false } = {}) {
   }
 }
 
-function openLoadout() {
+function openLoadout(destination = 'waves', returnView = 'main') {
+  loadoutDestination = destination;
+  loadoutReturnView = returnView;
   loadoutOpen = true;
+
   els.start?.classList.add('hidden');
   els.loadoutScreen?.classList.remove('hidden');
+
+  if (els.loadoutDeploy) {
+    els.loadoutDeploy.textContent =
+      destination === 'multiplayer'
+        ? 'DEPLOY TO PVP'
+        : 'DEPLOY WITH LOADOUT';
+  }
+
   selectLoadout(selectedLoadoutIndex);
   try { document.exitPointerLock?.(); } catch {}
 }
 
-function closeLoadout() {
+function closeLoadout({ restoreMenu = true } = {}) {
   loadoutOpen = false;
   els.loadoutScreen?.classList.add('hidden');
-  if (!state.active && !state.over) {
+
+  if (restoreMenu && !state.active && !state.over) {
     els.start?.classList.remove('hidden');
-    showMenuView('main');
+    showMenuView(loadoutReturnView);
   }
 }
 
@@ -4804,6 +4821,7 @@ function updateMenuGuns(dt) {
       pair.hero.visible = false;
       pair.secondary.visible = false;
     }
+    menuStaticOverlay.style.opacity = '0';
     return;
   }
 
@@ -8421,11 +8439,17 @@ for (const button of els.waveChoices) {
   button.addEventListener('click', () => setWaveChoice(button.dataset.waveChoice));
 }
 
-els.loadoutButton?.addEventListener('click', () => openLoadout());
+els.loadoutButton?.addEventListener('click', () => openLoadout('waves', 'main'));
 els.loadoutBack?.addEventListener('click', () => closeLoadout());
 els.loadoutDeploy?.addEventListener('click', () => {
-  closeLoadout();
-  enterGame();
+  const destination = loadoutDestination;
+  closeLoadout({ restoreMenu: false });
+
+  if (destination === 'multiplayer') {
+    enterMultiplayer();
+  } else {
+    enterGame();
+  }
 });
 els.loadoutCards.forEach((card) => {
   card.addEventListener('click', () => {
@@ -8437,12 +8461,17 @@ refreshLoadoutUI();
 
 els.wavesButton.addEventListener('click', () => { refreshMapList(); showMenuView('waves'); });
 els.backFromMultiplayer?.addEventListener('click', () => showMenuView('main'));
-els.multiplayerConnect?.addEventListener('click', () => enterMultiplayer());
+els.multiplayerConnect?.addEventListener('click', () => {
+  openLoadout('multiplayer', 'multiplayer');
+});
 els.optionsButton.addEventListener('click', () => showMenuView('options'));
 els.backFromWaves.addEventListener('click', () => showMenuView('main'));
 els.backFromOptions.addEventListener('click', () => showMenuView('main'));
 els.mapList?.addEventListener('click', (event) => { const b=event.target.closest('.map-choice'); if(b) state.selectedMapId=b.dataset.mapId; });
-els.startMapButton?.addEventListener('click', () => { refreshMapList(); enterGame(); });
+els.startMapButton?.addEventListener('click', () => {
+  refreshMapList();
+  openLoadout('waves', 'waves');
+});
 els.editorButton?.addEventListener('click', () => { location.href=location.pathname+'?editor=WARFLEX_DEV'; });
 if(new URLSearchParams(location.search).get('editor')==='WARFLEX_DEV' && els.editorButton) els.editorButton.style.display='block';
 
@@ -8617,7 +8646,7 @@ function enterGame(fromEditorPlaytest = false) {
 window.WARFLEX_START_GAME = enterGame;
 if (startRequestedBeforeBoot) {
   startRequestedBeforeBoot = false;
-  enterGame();
+  openLoadout('waves', 'main');
 }
 els.resumeButton.addEventListener('click', () => {
   renderer.domElement.requestPointerLock?.();
