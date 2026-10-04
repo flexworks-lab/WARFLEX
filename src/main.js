@@ -3636,15 +3636,19 @@ function installImportedWeaponModel(target, sourceScene, {
   const size = bounds.getSize(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z, .001);
   model.scale.setScalar(scaleTarget / maxDim);
+  model.updateMatrixWorld(true);
+
+  // Keep the imported weapon comfortably inside the near clip plane.
+  target.userData.importedWeaponScale = model.scale.x;
 
   model.updateMatrixWorld(true);
   const fittedBounds = new THREE.Box3().setFromObject(model);
   const center = fittedBounds.getCenter(new THREE.Vector3());
   model.position.sub(center);
 
-  // The exported AK uses a Z-up/Blender armature conversion. Rotate the
-  // imported rig into the horizontal first-person weapon axis.
-  model.rotation.x += Math.PI * .5;
+  // The glTF already contains the exporter coordinate conversion on its
+  // Armature node. Do not rotate the whole rig a second time.
+  model.rotation.set(0, 0, 0);
 
   model.position.y -= .06;
   model.position.z -= .06;
