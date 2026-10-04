@@ -5755,6 +5755,10 @@ function setActiveWeapon(indexOrId, { resetAmmo = false } = {}) {
 
   activeWeaponDef = nextDef;
   state.weaponId = nextDef.id;
+  state.recoilShotIndex = 0;
+  state.recoilBurstTimer = 0;
+  state.weaponRecoilPitch = 0;
+  state.weaponRecoilYaw = 0;
 
   for (const model of weaponModels) {
     model.visible = false;
