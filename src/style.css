@@ -686,3 +686,155 @@ body {
   font-weight: 900;
   letter-spacing: .24em;
 }
+
+
+/* WARFLEX 2026 visual/menu pass */
+.gothic-screen {
+  justify-items: stretch !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+}
+
+.gothic-panel {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  min-height: 100dvh !important;
+  padding: 40px clamp(24px, 7vw, 112px) !important;
+  background:
+    linear-gradient(90deg, rgba(3,7,10,.52), rgba(3,7,10,.05) 55%, transparent 100%) !important;
+}
+
+.menu-view {
+  width: min(440px, 42vw) !important;
+  max-width: 440px !important;
+  margin: 0 !important;
+  text-align: left !important;
+  overflow: visible !important;
+}
+
+.gothic-eyebrow,
+.gothic-title {
+  text-align: left !important;
+}
+
+.gothic-eyebrow {
+  margin-bottom: 14px !important;
+  color: #8297a5 !important;
+}
+
+.gothic-title {
+  margin-bottom: 36px !important;
+  font-size: clamp(52px, 6.6vw, 88px) !important;
+  letter-spacing: .01em !important;
+}
+
+.menu-nav,
+.wave-list,
+.options-list {
+  align-items: flex-start !important;
+  text-align: left !important;
+}
+
+.menu-nav {
+  gap: 7px !important;
+}
+
+.menu-nav button,
+.back-button,
+.gothic-panel .deploy-button,
+.wave-choice {
+  position: relative;
+  padding-left: 0 !important;
+  text-align: left !important;
+  letter-spacing: .16em !important;
+  transition:
+    transform .18s ease,
+    color .18s ease,
+    opacity .18s ease !important;
+}
+
+.menu-nav button::before {
+  content: '';
+  position: absolute;
+  left: -19px;
+  top: 50%;
+  width: 7px;
+  height: 1px;
+  opacity: 0;
+  transform: translateY(-50%) scaleX(.2);
+  transform-origin: left;
+  background: #c9d8e1;
+  transition:
+    opacity .18s ease,
+    transform .18s ease !important;
+}
+
+.menu-nav button.menu-selected {
+  color: #fff !important;
+  transform: translateX(9px) !important;
+  text-shadow: 0 0 18px rgba(185,213,228,.16);
+}
+
+.menu-nav button.menu-selected::before {
+  opacity: .95;
+  transform: translateY(-50%) scaleX(1);
+}
+
+.menu-nav button:hover {
+  transform: translateX(9px) !important;
+}
+
+.menu-hint {
+  max-width: 390px;
+  margin-top: 26px !important;
+  text-align: left !important;
+}
+
+.wave-list {
+  width: min(420px, 100%);
+}
+
+.wave-choice {
+  align-items: flex-start !important;
+}
+
+.options-list {
+  margin-left: 0 !important;
+}
+
+.gun-viewport-canvas {
+  filter: saturate(1.08) contrast(1.04) brightness(1.02);
+}
+
+@media (max-width: 900px) {
+  .gothic-panel {
+    padding-left: 42px !important;
+    padding-right: 42px !important;
+  }
+
+  .menu-view {
+    width: min(430px, 50vw) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .gothic-panel {
+    align-items: flex-start !important;
+    padding-top: 12vh !important;
+    background:
+      linear-gradient(180deg, rgba(3,7,10,.74), rgba(3,7,10,.18) 72%, transparent 100%) !important;
+  }
+
+  .menu-view {
+    width: min(420px, 82vw) !important;
+  }
+
+  .gothic-title {
+    font-size: clamp(46px, 12vw, 76px) !important;
+  }
+
+  .gun-viewport-canvas {
+    opacity: .58;
+  }
+}
