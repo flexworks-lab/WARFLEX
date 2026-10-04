@@ -1200,7 +1200,7 @@ function addArena() {
         addSolid(
           [10.2 * scale, 2.8 * scale, 4.9 * scale],
           [x, 1.40 * scale, z],
-          buildingDark,
+          darkCover,
           rotation,
         );
 
