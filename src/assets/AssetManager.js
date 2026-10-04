@@ -42,17 +42,50 @@ export class AssetManager {
       return this.cache.get(url);
     }
 
-    const gltf = await this.gltfLoader.loadAsync(url);
-    this.prepare(gltf.scene);
+    if (this.loading.has(url)) {
+      return this.loading.get(url);
+    }
 
-    const asset = {
-      scene: gltf.scene,
-      animations: gltf.animations || [],
-      parser: gltf.parser,
-    };
+    const promise = (async () => {
+      const gltf = await this.gltfLoader.loadAsync(url);
 
-    this.cache.set(url, asset);
-    return asset;
+      if (!gltf?.scene) {
+        throw new Error('GLTF asset loaded without a scene: ' + url);
+      }
+
+      let meshCount = 0;
+      gltf.scene.visible = true;
+      gltf.scene.traverse((object) => {
+        object.visible = true;
+        if (object.isMesh) meshCount += 1;
+      });
+
+      if (!meshCount) {
+        throw new Error('GLTF asset contains no mesh geometry: ' + url);
+      }
+
+      gltf.scene.updateMatrixWorld(true);
+      this.prepare(gltf.scene);
+      gltf.scene.updateMatrixWorld(true);
+
+      const asset = {
+        scene: gltf.scene,
+        animations: gltf.animations || [],
+        parser: gltf.parser,
+        meshCount,
+      };
+
+      this.cache.set(url, asset);
+      return asset;
+    })();
+
+    this.loading.set(url, promise);
+
+    try {
+      return await promise;
+    } finally {
+      this.loading.delete(url);
+    }
   }
 
   async loadUSDZ(url) {
