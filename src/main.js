@@ -3594,7 +3594,9 @@ function createWeapon() {
   weapon.userData.flashMesh = flashMesh;
   weapon.userData.muzzle = weapon.getObjectByName('MuzzleDeviceMesh');
 
-  weapon.position.set(.39, -.48, -1.01);
+  // Imported rifles are centered around their model origin, so keep the
+  // first-person weapon safely in front of the camera instead of clipping it.
+  weapon.position.set(.39, -.48, -2.35);
   weapon.rotation.set(-.025, -.045, -.012);
 
   // Render the live first-person weapon through the main world camera so it
@@ -3640,6 +3642,7 @@ function installAK47Model(target, sourceScene, {
       node.castShadow = false;
       node.receiveShadow = false;
       node.frustumCulled = false;
+      node.renderOrder = 1000;
 
       const materials = Array.isArray(node.material)
         ? node.material
@@ -3651,6 +3654,9 @@ function installAK47Model(target, sourceScene, {
           next.side = THREE.DoubleSide;
           next.transparent = false;
           next.opacity = 1;
+          // First-person weapon should never be hidden by world geometry.
+          next.depthTest = false;
+          next.depthWrite = false;
           if ('color' in next && next.color) next.color.set(0xffffff);
         }
         return next;
@@ -3670,6 +3676,7 @@ function installAK47Model(target, sourceScene, {
   model.position.sub(center);
   model.position.y -= 0.06;
   model.position.z -= 0.06;
+  model.renderOrder = 1000;
 
   // The imported model replaces the procedural rifle body, so its own hands
   // are hidden when the old procedural first-person hands are retained.
