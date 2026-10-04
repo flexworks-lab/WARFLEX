@@ -964,6 +964,337 @@ function addArena() {
     );
   };
 
+  // =========================================================================
+  // CENTER: HEAVY ARMOR / CONTESTED GROUND
+  // =========================================================================
+  // The center should read as an active battlefield, not an empty arena.
+  // Tanks are deliberately modeled at several times the player's height.
+  const tankTrackMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x1a2023,
+      roughness: .86,
+      metalness: .20,
+    });
+
+  const tankHullMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x4c5a54,
+      roughness: .73,
+      metalness: .42,
+    });
+
+  const tankTrimMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x252d2f,
+      roughness: .66,
+      metalness: .50,
+    });
+
+  const tankGlassMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x172227,
+      roughness: .20,
+      metalness: .62,
+      emissive: 0x0b2d36,
+      emissiveIntensity: .6,
+    });
+
+  const addTank =
+    (x, z, rotation = 0, scale = 1.3, accent = 0x59665e) => {
+      const root = new THREE.Group();
+      root.position.set(x, .05, z);
+      root.rotation.y = rotation;
+      root.scale.setScalar(scale);
+      fallbackArenaRoot.add(root);
+
+      const hullMat =
+        tankHullMat.clone();
+      hullMat.color.setHex(accent);
+
+      addTrimBox(
+        root,
+        [7.6, 1.35, 3.45],
+        [0, 1.02, 0],
+        hullMat,
+      );
+
+      addTrimBox(
+        root,
+        [8.15, .72, .56],
+        [0, .55, -1.82],
+        tankTrackMat,
+      );
+
+      addTrimBox(
+        root,
+        [8.15, .72, .56],
+        [0, .55, 1.82],
+        tankTrackMat,
+      );
+
+      for (const zSide of [-1.82, 1.82]) {
+        for (let wheelX = -2.65; wheelX <= 2.65; wheelX += 1.32) {
+          const wheel =
+            new THREE.Mesh(
+              new THREE.CylinderGeometry(
+                .48,
+                .48,
+                .24,
+                18,
+              ),
+              tankTrimMat,
+            );
+
+          wheel.rotation.x = Math.PI / 2;
+          wheel.position.set(
+            wheelX,
+            .55,
+            zSide,
+          );
+          wheel.castShadow = true;
+          root.add(wheel);
+
+          const hub =
+            new THREE.Mesh(
+              new THREE.CylinderGeometry(
+                .17,
+                .17,
+                .27,
+                12,
+              ),
+              tankGlassMat,
+            );
+
+          hub.rotation.x = Math.PI / 2;
+          hub.position.copy(wheel.position);
+          root.add(hub);
+        }
+      }
+
+      addTrimBox(
+        root,
+        [3.35, .78, 2.55],
+        [.15, 1.95, 0],
+        hullMat,
+      );
+
+      const ring =
+        new THREE.Mesh(
+          new THREE.TorusGeometry(
+            1.08,
+            .10,
+            12,
+            32,
+          ),
+          tankTrimMat,
+        );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(
+        .15,
+        2.37,
+        0,
+      );
+      root.add(ring);
+
+      addTrimBox(
+        root,
+        [1.25, .22, .74],
+        [.05, 2.49, 0],
+        tankTrimMat,
+      );
+
+      addTrimBox(
+        root,
+        [.72, .28, .34],
+        [-.72, 2.52, -.63],
+        tankGlassMat,
+      );
+
+      addTrimBox(
+        root,
+        [.72, .28, .34],
+        [-.72, 2.52, .63],
+        tankGlassMat,
+      );
+
+      const barrel =
+        new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            .17,
+            .23,
+            5.25,
+            18,
+            2,
+          ),
+          tankTrimMat,
+        );
+
+      barrel.rotation.z = Math.PI / 2;
+      barrel.position.set(
+        2.78,
+        2.20,
+        0,
+      );
+      barrel.castShadow = true;
+      root.add(barrel);
+
+      const muzzle =
+        new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            .25,
+            .25,
+            .48,
+            18,
+          ),
+          tankTrimMat,
+        );
+
+      muzzle.rotation.z = Math.PI / 2;
+      muzzle.position.set(
+        5.40,
+        2.20,
+        0,
+      );
+      root.add(muzzle);
+
+      for (const xPos of [-2.5, -1.35, 2.2]) {
+        const hook =
+          new THREE.Mesh(
+            new THREE.TorusGeometry(
+              .18,
+              .045,
+              8,
+              16,
+            ),
+            tankTrimMat,
+          );
+
+        hook.rotation.x = Math.PI / 2;
+        hook.position.set(
+          xPos,
+          1.72,
+          1.74,
+        );
+        root.add(hook);
+      }
+
+      const hatch =
+        new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            .34,
+            .34,
+            .10,
+            18,
+          ),
+          tankTrimMat,
+        );
+
+      hatch.position.set(
+        -1.05,
+        2.55,
+        0,
+      );
+      root.add(hatch);
+
+      const collision =
+        addSolid(
+          [10.2 * scale, 2.8 * scale, 4.9 * scale],
+          [x, 1.40 * scale, z],
+          buildingDark,
+          rotation,
+        );
+
+      collision.visible = false;
+    };
+
+  addTank(
+    -18,
+    10,
+    .06,
+    1.30,
+    0x596860,
+  );
+
+  addTank(
+    22,
+    -10,
+    -.10,
+    1.38,
+    0x665d50,
+  );
+
+  addTank(
+    0,
+    37,
+    Math.PI,
+    1.16,
+    0x4f5f59,
+  );
+
+  // Layer the center with believable infantry cover and service clutter.
+  for (const [x, z, rotation] of [
+    [-9, 18, 0],
+    [9, 18, 0],
+    [-11, -18, Math.PI / 2],
+    [11, -18, Math.PI / 2],
+  ]) {
+    addCover(
+      5.2,
+      1.0,
+      .72,
+      x,
+      .50,
+      z,
+      darkCover,
+    );
+
+    const barrier =
+      fallbackArenaRoot.children.at(-1);
+
+    barrier.rotation.y = rotation;
+  }
+
+  for (const [x, z] of [
+    [-31, 8],
+    [31, -6],
+    [6, 24],
+    [-5, -25],
+  ]) {
+    addCover(
+      3.4,
+      1.15,
+      3.4,
+      x,
+      .58,
+      z,
+      concrete,
+    );
+  }
+
+  const centerCrateMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x5a4d3e,
+      roughness: .88,
+      metalness: .08,
+    });
+
+  for (const [x, z] of [
+    [28, 11],
+    [31, 14],
+    [25, 14],
+    [-27, -12],
+    [-30, -15],
+    [-27, -15],
+  ]) {
+    addTrimBox(
+      fallbackArenaRoot,
+      [1.45, 1.25, 1.45],
+      [x, .63, z],
+      centerCrateMat,
+      .08,
+    );
+  }
+
   // Deliberate lane markings on the main roads.
   for (
     let z = -56;
@@ -5831,14 +6162,21 @@ function frame() {
       .05,
     );
 
+  const hasPointerLock =
+    document.pointerLockElement ===
+    renderer.domElement;
+
+  if (state.active && !state.over) {
+    // Keep wave spawning alive even if pointer-lock briefly drops.
+    updateWave(dt);
+  }
+
   if (
     state.active &&
-    document.pointerLockElement ===
-      renderer.domElement
+    hasPointerLock
   ) {
     movePlayer(dt);
     updateEnemies(dt);
-    updateWave(dt);
     tickEffects(dt);
   } else {
     tickEffects(dt);
