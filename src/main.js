@@ -579,9 +579,9 @@ function createWeapon() {
   // True custom hard-surface mesh helpers. These are actual polygonal weapon
   // parts rather than stretched boxes, giving the rifle a real side silhouette.
   const dark = createMaterial(0x0a0d10, .90, .20);
-  const receiverMat = createMaterial(0x252d35, .82, .24);
-  const upperMat = createMaterial(0x313a43, .78, .25);
-  const polymer = createMaterial(0x161c21, .18, .46);
+  const receiverMat = createMaterial(0x252d35, .86, .21);
+  const upperMat = createMaterial(0x313a43, .82, .22);
+  const polymer = createMaterial(0x161c21, .20, .43);
   const polymerSoft = createMaterial(0x10151a, .08, .66);
   const metal = createMaterial(0x68747f, .88, .18);
   const metalDark = createMaterial(0x343d46, .84, .21);
@@ -614,54 +614,55 @@ function createWeapon() {
     return mesh;
   };
 
-  // Extruded 2D side-profile -> true custom polygon mesh.
-  // points are [z, y] in rifle side view; width is the physical x thickness.
+  // Real beveled hard-surface profile. The shape is built in the rifle's
+  // side plane, then extruded across its width with actual bevel geometry.
   const makeProfile = (
     points,
     width,
     material,
     name,
-    bevelOffset = 0,
+    bevelOffset = Math.min(.022, width * .12),
   ) => {
-    const n = points.length;
-    const vertices = [];
-    const half = width * .5;
+    const shape = new THREE.Shape();
 
-    for (let i = 0; i < n; i += 1) {
-      vertices.push(-half, points[i][1], points[i][0]);
-    }
+    shape.moveTo(
+      points[0][0],
+      points[0][1],
+    );
 
-    for (let i = 0; i < n; i += 1) {
-      vertices.push(half, points[i][1], points[i][0]);
-    }
-
-    const indices = [];
-
-    // Front/back caps. The profiles used here are convex or nearly convex;
-    // triangulating as fans keeps the geometry compact.
-    for (let i = 1; i < n - 1; i += 1) {
-      indices.push(0, i + 1, i);
-      indices.push(n, n + i, n + i + 1);
-    }
-
-    for (let i = 0; i < n; i += 1) {
-      const j = (i + 1) % n;
-      indices.push(
-        i,
-        j,
-        n + j,
-        i,
-        n + j,
-        n + i,
+    for (let i = 1; i < points.length; i += 1) {
+      shape.lineTo(
+        points[i][0],
+        points[i][1],
       );
     }
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute(vertices, 3),
+    shape.closePath();
+
+    const geometry =
+      new THREE.ExtrudeGeometry(
+        shape,
+        {
+          depth: width,
+          steps: 1,
+          curveSegments: 4,
+          bevelEnabled: true,
+          bevelThickness: bevelOffset,
+          bevelSize: bevelOffset,
+          bevelOffset: 0,
+          bevelSegments: 3,
+        },
+      );
+
+    // Shape X = rifle Z, Shape Y = rifle Y, extrusion = rifle X.
+    // Center the extrusion before rotating it into world orientation.
+    geometry.translate(
+      0,
+      0,
+      -width * .5,
     );
-    geometry.setIndex(indices);
+    geometry.rotateY(-Math.PI / 2);
+    geometry.computeVertexNormals();
 
     return addMesh(
       geometry,
@@ -685,8 +686,9 @@ function createWeapon() {
       radius,
       radius * .94,
       height,
-      segments,
-      1,
+      Math.max(32, segments),
+      2,
+      false,
     );
     return addMesh(
       geometry,
@@ -703,8 +705,19 @@ function createWeapon() {
     material,
     rotation = [0, 0, 0],
     name = '',
+    bevel = .008,
   ) => {
-    const geometry = new THREE.BoxGeometry(...size);
+    const geometry = new RoundedBoxGeometry(
+      size[0],
+      size[1],
+      size[2],
+      2,
+      Math.min(
+        bevel,
+        Math.min(...size) * .18,
+      ),
+    );
+
     return addMesh(
       geometry,
       position,
