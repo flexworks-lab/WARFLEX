@@ -5036,15 +5036,15 @@ function updateEnemies(dt) {
     enemy.group.position.x =
       THREE.MathUtils.clamp(
         enemy.group.position.x,
-        -51,
-        51,
+        -122,
+        122,
       );
 
     enemy.group.position.z =
       THREE.MathUtils.clamp(
         enemy.group.position.z,
-        -51,
-        51,
+        -68,
+        68,
       );
 
     const faceX =
