@@ -2198,6 +2198,10 @@ function updateRagdolls(dt) {
   }
 }
 
+function updateWave(dt) {
+  waveDirector?.update(dt);
+}
+
 function updateWeapon(dt) {
   const moving = keys.has('KeyW') || keys.has('KeyA') || keys.has('KeyS') || keys.has('KeyD');
   const sprinting = keys.has('ShiftLeft') || keys.has('ShiftRight');
