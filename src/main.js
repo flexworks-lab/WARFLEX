@@ -3945,7 +3945,7 @@ const fallbackPhysicsBodies =
   physicsWorld.syncArena(obstacles, {
     width: MAP_WIDTH - 8,
     depth: MAP_DEPTH - 8,
-    resolutionX: 64,
+    resolutionX: 72,
     resolutionZ: 40,
     sampleHeight: getSimpleTerrainHeight,
   });
