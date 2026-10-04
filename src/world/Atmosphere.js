@@ -127,37 +127,7 @@ export function configureAtmosphere(scene, renderer, camera) {
       null,
       scene,
       renderer,
+      camera,
     );
   }
-
-  return {
-    composer,
-    ssaoPass,
-
-    setFog({
-      density = 0.012,
-      color = 0x070a0e,
-    } = {}) {
-      scene.fog.density = density;
-      scene.fog.color.setHex(color);
-      scene.background.setHex(color);
-    },
-
-    resize(width, height) {
-      composer.setSize(
-        width,
-        height,
-      );
-
-      ssaoPass.setSize(
-        width,
-        height,
-      );
-    },
-
-    dispose() {
-      composer.dispose();
-      ssaoPass.dispose();
-    },
-  };
 }
