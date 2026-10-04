@@ -7,8 +7,9 @@ export class NavMeshService {
     assetManager,
     zoneId = DEFAULT_ZONE,
     obstacles = [],
-    fallbackBounds = 54,
-    fallbackCellSize = 1.5,
+    fallbackHalfWidth = 128,
+    fallbackHalfDepth = 73,
+    fallbackCellSize = 2.5,
   }) {
     this.assetManager = assetManager;
     this.zoneId = zoneId;
@@ -17,7 +18,8 @@ export class NavMeshService {
     this.navRoot = null;
 
     this.obstacles = obstacles;
-    this.fallbackBounds = fallbackBounds;
+    this.fallbackHalfWidth = fallbackHalfWidth;
+    this.fallbackHalfDepth = fallbackHalfDepth;
     this.fallbackCellSize = fallbackCellSize;
     this.fallbackReady = false;
     this.fallbackBoundsList = [];
@@ -140,14 +142,16 @@ export class NavMeshService {
 
     this.fallbackSignature = signature;
 
-    const min = -this.fallbackBounds;
-    const max = this.fallbackBounds;
+    const minX = -this.fallbackHalfWidth;
+    const maxX = this.fallbackHalfWidth;
+    const minZ = -this.fallbackHalfDepth;
+    const maxZ = this.fallbackHalfDepth;
     const cell = this.fallbackCellSize;
 
     this.fallbackWidth =
-      Math.ceil((max - min) / cell) + 1;
+      Math.ceil((maxX - minX) / cell) + 1;
     this.fallbackHeight =
-      this.fallbackWidth;
+      Math.ceil((maxZ - minZ) / cell) + 1;
 
     this.fallbackBlocked =
       new Uint8Array(
@@ -172,10 +176,10 @@ export class NavMeshService {
       box.expandByScalar(.95);
 
       if (
-        box.max.x < min ||
-        box.min.x > max ||
-        box.max.z < min ||
-        box.min.z > max
+        box.max.x < minX ||
+        box.min.x > maxX ||
+        box.max.z < minZ ||
+        box.min.z > maxZ
       ) {
         continue;
       }
@@ -217,20 +221,19 @@ export class NavMeshService {
   }
 
   worldToCell(position) {
-    const min = -this.fallbackBounds;
     const cell = this.fallbackCellSize;
 
     return {
       x: THREE.MathUtils.clamp(
         Math.round(
-          (position.x - min) / cell,
+          (position.x + this.fallbackHalfWidth) / cell,
         ),
         0,
         this.fallbackWidth - 1,
       ),
       z: THREE.MathUtils.clamp(
         Math.round(
-          (position.z - min) / cell,
+          (position.z + this.fallbackHalfDepth) / cell,
         ),
         0,
         this.fallbackHeight - 1,
@@ -239,13 +242,12 @@ export class NavMeshService {
   }
 
   cellToWorld(x, z) {
-    const min = -this.fallbackBounds;
     const cell = this.fallbackCellSize;
 
     return new THREE.Vector3(
-      min + x * cell,
+      -this.fallbackHalfWidth + x * cell,
       0,
-      min + z * cell,
+      -this.fallbackHalfDepth + z * cell,
     );
   }
 
