@@ -661,7 +661,7 @@ function addArena() {
 
   const MAP_WIDTH = 260;
   const MAP_DEPTH = 150;
-  const HALF_W = MAP_WIDTH * 0.5;
+  // Human-scale reference: player eye ~= 1.65m, full body ~= 1.8m.\n  // Major architecture, cover, doors and props are authored around that scale.\n  const HALF_W = MAP_WIDTH * 0.5;
   const HALF_D = MAP_DEPTH * 0.5;
 
   const mat = (color, roughness = 0.78, metalness = 0.08) =>
@@ -1013,9 +1013,9 @@ function addArena() {
       ) {
         if (isEntrance && Math.abs(wx) < 2.6) continue;
 
-        box(root, [1.45, height * 0.40, 0.08], [wx, height * 0.58, zSide + side * 0.235], darkGlass);
+        box(root, [1.45, Math.min(0.95, height * 0.24), 0.08], [wx, Math.min(1.72, height * 0.46), zSide + side * 0.235], darkGlass);
         box(root, [1.58, 0.08, 0.12], [wx, height * 0.40, zSide + side * 0.26], trim);
-        box(root, [1.58, 0.08, 0.12], [wx, height * 0.78, zSide + side * 0.26], trim);
+        box(root, [1.58, 0.08, 0.12], [wx, Math.min(2.35, height * 0.68), zSide + side * 0.26], trim);
       }
     };
 
@@ -1047,22 +1047,22 @@ function addArena() {
     box(root, [0.28, height * 0.86, 0.42], [-2.18, height * 0.46, doorZ], frame);
     box(root, [0.28, height * 0.86, 0.42], [2.18, height * 0.46, doorZ], frame);
     box(root, [4.25, 0.30, 0.42], [0, height * 0.92, doorZ], frame);
-    box(root, [3.56, height * 0.68, 0.18], [0, height * 0.43, doorZ + doorSign * 0.23], doorMat);
+    box(root, [3.56, Math.min(2.45, height * 0.58), 0.18], [0, Math.min(1.28, height * 0.34), doorZ + doorSign * 0.23], doorMat);
 
     for (let i = -2; i <= 2; i += 1) {
-      box(root, [0.05, height * 0.63, 0.22], [i * 0.68, height * 0.45, doorZ + doorSign * 0.34], steelDark);
+      box(root, [0.05, height * 0.63, 0.22], [i * 0.68, Math.min(1.08, height * 0.34), doorZ + doorSign * 0.34], steelDark);
     }
 
-    mark(root, [3.1, 0.12, 0.09], [0, 0.84 * height, doorZ + doorSign * 0.36], accent);
+    mark(root, [3.1, 0.12, 0.09], [0, Math.min(2.85, height * 0.86), doorZ + doorSign * 0.36], accent);
 
     for (const [hx, hz, size] of [
       [-width * 0.28, -depth * 0.23, 1.3],
       [width * 0.28, depth * 0.20, 1.0],
     ]) {
-      box(root, [size, 0.56, size * 0.78], [hx, height + 0.56, hz], steelDark, 0, 0.04);
+      box(root, [size, 0.56, size * 0.78], [hx, height + 0.46, hz], steelDark, 0, 0.04);
 
       for (let sy = -0.18; sy <= 0.18; sy += 0.12) {
-        box(root, [size * 0.68, 0.025, size * 0.44], [hx, height + 0.58 + sy, hz + size * 0.40], black);
+        box(root, [size * 0.68, 0.025, size * 0.44], [hx, height + 0.48 + sy, hz + size * 0.40], black);
       }
     }
 
@@ -1112,7 +1112,7 @@ function addArena() {
     z: 24,
     width: 28,
     depth: 20,
-    height: 7.0,
+    height: 4.7,
     accent: 0x3e6572,
     roof: 0x1f292d,
     label: 'COMMAND',
@@ -1134,7 +1134,7 @@ function addArena() {
     z: 24,
     width: 31,
     depth: 22,
-    height: 7.2,
+    height: 5.8,
     accent: 0x8c603b,
     roof: 0x262c2e,
     label: 'LOGISTICS',
@@ -1145,7 +1145,7 @@ function addArena() {
     z: 42,
     width: 22,
     depth: 15,
-    height: 6.0,
+    height: 5.0,
     accent: 0x7a4b3f,
     roof: 0x252d30,
     label: 'WORKSHOP',
@@ -1156,7 +1156,7 @@ function addArena() {
     z: 45,
     width: 25,
     depth: 16,
-    height: 6.5,
+    height: 5.3,
     accent: 0x456578,
     roof: 0x222b30,
     label: 'ADMIN',
@@ -1167,7 +1167,7 @@ function addArena() {
     z: -12,
     width: 26,
     depth: 20,
-    height: 6.8,
+    height: 5.6,
     accent: 0x6b5945,
     roof: 0x252b2e,
     label: 'MOTOR_POOL',
@@ -1281,11 +1281,11 @@ function addArena() {
     const woodMat = mat(wood, 0.88, 0.06);
     const darkWood = mat(0x241f1a, 0.86, 0.04);
 
-    box(root, [1.5, 1.15, 1.5], [0, 0, 0], woodMat, 0, 0.035);
+    box(root, [1.25, 0.95, 1.25], [0, 0, 0], woodMat, 0, 0.035);
 
     for (const side of [-1, 1]) {
       for (const yy of [-0.37, 0, 0.37]) {
-        box(root, [0.08, 0.075, 1.30], [side * 0.72, yy, 0], darkWood);
+        box(root, [0.08, 0.075, 1.30], [side * 0.60, yy, 0], darkWood);
       }
     }
 
@@ -1352,15 +1352,15 @@ function addArena() {
     root.rotation.y = rotation;
     fallbackArenaRoot.add(root);
 
-    box(root, [length, 1.05, 0.60], [0, 0.54, 0], concreteDark, 0, 0.04);
+    box(root, [length, 0.92, 0.60], [0, 0.54, 0], concreteDark, 0, 0.04);
 
     for (
       let px = -length * 0.28;
       px <= length * 0.28;
       px += length * 0.28
     ) {
-      box(root, [0.15, 1.24, 0.70], [px, 0.60, 0], steelDark);
-      cyl(root, 0.07, 0.34, [px, 1.20, 0], steelDark, [0, 0, Math.PI / 2], 12);
+      box(root, [0.15, 1.24, 0.70], [px, 0.51, 0], steelDark);
+      cyl(root, 0.07, 0.34, [px, 1.02, 0], steelDark, [0, 0, Math.PI / 2], 12);
     }
 
     mark(root, [length * 0.64, 0.09, 0.03], [0, 0.60, -0.31], 0xc59d3d);
