@@ -257,6 +257,11 @@ export class Multiplayer {
     }
   }
 
+  sendRespawn(){
+    if(!this.connected) return;
+    this.socket.send(JSON.stringify({type:'respawn'}));
+  }
+
   sendState(now,yaw,health){
     if(!this.connected || now-this.lastSend<50) return;
     this.lastSend=now;
