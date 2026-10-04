@@ -670,10 +670,8 @@ function addArena() {
 
   fallbackArenaRoot.clear();
 
-  const MAP_WIDTH = 260;
-  const MAP_DEPTH = 150;
-  // Human-scale reference: player eye ~= 1.65m, full body ~= 1.8m.\n  // Major architecture, cover, doors and props are authored around that scale.\n  const HALF_W = MAP_WIDTH * 0.5;
-  const HALF_D = MAP_DEPTH * 0.5;
+  // Human-scale reference: player eye ~= 1.65m, full body ~= 1.8m.
+  // Major architecture, cover, doors and props are authored around that scale.
 
   const mat = (color, roughness = 0.78, metalness = 0.08) =>
     new THREE.MeshStandardMaterial({ color, roughness, metalness });
@@ -2215,7 +2213,17 @@ const mapEditor = new MapEditor({
   fallbackRoot: fallbackArenaRoot,
   obstacles,
   onPlaytest: () => {
-    mapEditor.close();
+    // Switch from the editor to a playable custom-map scene without
+    // restoring the built-in fallback obstacles.
+    mapEditor.enabled = false;
+    mapEditor.keys.clear();
+    mapEditor.gizmo.visible = false;
+    mapEditor.transformControls.detach();
+    mapEditor.grid.visible = false;
+    mapEditor.destroyUI();
+    document.body.classList.remove('warfex-editor-active');
+
+    obstacles.splice(0, fallbackObstacleCount);
     editorMapRoot.visible = true;
     fallbackArenaRoot.visible = false;
     window.WARFLEX_START_GAME?.();
