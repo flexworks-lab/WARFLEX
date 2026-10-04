@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { PhysicsWorld } from './physics/PhysicsWorld.js?v=physics-ground-20261003';
 import { RagdollController } from './physics/RagdollController.js?v=modulefix-20261004';
@@ -3604,6 +3605,7 @@ const menuGunPairs = [];
 function installImportedWeaponModel(target, sourceScene, {
   keepHands = true,
   scaleTarget = 3.05,
+  animations = [],
 } = {}) {
   const keepNames = new Set([
     'WeaponLeftHand',
@@ -3626,7 +3628,7 @@ function installImportedWeaponModel(target, sourceScene, {
     target.remove(child);
   }
 
-  const model = sourceScene.clone(true);
+  const model = SkeletonUtils.clone(sourceScene);
   model.name = 'ImportedAk47Model';
 
   const bounds = new THREE.Box3().setFromObject(model);
@@ -3720,6 +3722,23 @@ function installImportedWeaponModel(target, sourceScene, {
   model.add(muzzleAnchor);
   target.add(model);
   target.userData.importedWeaponModel = model;
+
+  if (Array.isArray(target.userData.importedWeaponActions)) {
+    target.userData.importedWeaponActions.forEach((action) => action.stop());
+  }
+
+  target.userData.importedWeaponActions = [];
+  if (Array.isArray(target.userData.importedWeaponAnimations) &&
+      target.userData.importedWeaponAnimations.length) {
+    const mixer = new THREE.AnimationMixer(model);
+    target.userData.importedWeaponMixer = mixer;
+    for (const clip of target.userData.importedWeaponAnimations) {
+      const action = mixer.clipAction(clip);
+      action.clampWhenFinished = false;
+      target.userData.importedWeaponActions.push(action);
+    }
+  }
+
   target.userData.muzzle = muzzleAnchor;
 
   return model;
@@ -3737,14 +3756,14 @@ window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
     installImportedWeaponModel(
       weapon,
       asset.scene,
-      { keepHands: true, scaleTarget: 3.05 },
+      { keepHands: true, scaleTarget: 3.05, animations: asset.animations },
     );
 
     for (const pair of menuGunPairs) {
       installImportedWeaponModel(
         pair.hero,
         asset.scene,
-        { keepHands: false, scaleTarget: 3.05 },
+        { keepHands: false, scaleTarget: 3.05, animations: asset.animations },
       );
       installImportedWeaponModel(
         pair.secondary,
@@ -6890,6 +6909,46 @@ function updateWave(dt) {
   waveDirector?.update(dt);
 }
 
+function updateImportedWeaponAnimations(dt) {
+  const mixer = weapon.userData.importedWeaponMixer;
+  const actions = weapon.userData.importedWeaponActions;
+  if (!mixer || !actions?.length) return;
+
+  let desired = null;
+  if (state.reloadTimer > 0) {
+    desired = actions.find((a) => /reload/i.test(a._clip?.name || '')) || null;
+  } else if (state.sprintBlend > .5) {
+    desired = actions.find((a) => /run cycle/i.test(a._clip?.name || '')) || null;
+  } else if (movingForImportedAnimation()) {
+    desired = actions.find((a) => /walk/i.test(a._clip?.name || '')) || null;
+  } else {
+    desired =
+      actions.find((a) => /idle/i.test(a._clip?.name || '')) ||
+      actions.find((a) => /draw/i.test(a._clip?.name || '')) ||
+      null;
+  }
+
+  for (const action of actions) {
+    const shouldPlay = action === desired;
+    if (shouldPlay) {
+      if (!action.isRunning()) action.reset().play();
+    } else if (action.isRunning()) {
+      action.fadeOut(.08);
+    }
+  }
+
+  mixer.update(dt);
+}
+
+function movingForImportedAnimation() {
+  return (
+    keys.has('KeyW') ||
+    keys.has('KeyA') ||
+    keys.has('KeyS') ||
+    keys.has('KeyD')
+  );
+}
+
 function updateWeapon(dt) {
   if (multiplayerDeathActive) {
     weapon.visible = false;
@@ -6953,6 +7012,8 @@ function updateWeapon(dt) {
     0,
     state.muzzleFlash - dt,
   );
+
+  updateImportedWeaponAnimations(dt);
 
   const targetAim =
     state.aiming && state.active && !state.over
