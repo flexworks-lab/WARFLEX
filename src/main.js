@@ -3,14 +3,14 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { PhysicsWorld } from './physics/PhysicsWorld.js?v=modulefix-20261004';
 import { RagdollController } from './physics/RagdollController.js?v=modulefix-20261004';
 import { WaveDirector } from './systems/WaveDirector.js?v=modulefix-20261004';
-import { SteeringAgent } from './systems/SteeringAgent.js?v=wallavoid-20261003';
+import { SteeringAgent } from './systems/SteeringAgent.js?v=wide-map-20261003';
 import { AssetManager } from './assets/AssetManager.js?v=modulefix-20261004';
 import { MapLoader } from './world/MapLoader.js?v=modulefix-20261004';
 import { PropInstancer } from './world/PropInstancer.js?v=modulefix-20261004';
 import { applyBakedLightmap } from './world/BakedLighting.js?v=modulefix-20261004';
 import { configureAtmosphere } from './world/Atmosphere.js?v=brightai-20261003';
-import { NavMeshService } from './ai/NavMeshService.js?v=astar-20261003';
-import { NavMeshAgent } from './ai/NavMeshAgent.js?v=astar-20261003';
+import { NavMeshService } from './ai/NavMeshService.js?v=wide-map-20261003';
+import { NavMeshAgent } from './ai/NavMeshAgent.js?v=wide-map-20261003';
 
 const CONFIG = {
   maxHealth: 100,
@@ -79,7 +79,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x070a0e);
 scene.fog = new THREE.Fog(0x070a0e, 28, 110);
 
-const camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.05, 180);
+const camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.05, 260);
 camera.rotation.order = 'YXZ';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -173,11 +173,11 @@ sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.bias = -0.0005;
 sun.shadow.normalBias = 0.025;
 sun.shadow.camera.near = 1;
-sun.shadow.camera.far = 180;
-sun.shadow.camera.left = -75;
-sun.shadow.camera.right = 75;
-sun.shadow.camera.top = 75;
-sun.shadow.camera.bottom = -75;
+sun.shadow.camera.far = 250;
+sun.shadow.camera.left = -140;
+sun.shadow.camera.right = 140;
+sun.shadow.camera.top = 85;
+sun.shadow.camera.bottom = -85;
 scene.add(sun);
 
 const daylightFill = new THREE.DirectionalLight(
@@ -2096,10 +2096,10 @@ addArena();
 
 const fallbackObstacleCount = obstacles.length;
 
-const arenaGrid = new THREE.GridHelper(108, 54, 0x33404b, 0x1b242d);
+const arenaGrid = new THREE.GridHelper(258, 86, 0x33404b, 0x1b242d);
 arenaGrid.position.y = 0.015;
 arenaGrid.material.transparent = true;
-arenaGrid.material.opacity = 0.38;
+arenaGrid.material.opacity = 0.06;
 scene.add(arenaGrid);
 
 const physicsWorld = new PhysicsWorld({
@@ -2129,8 +2129,9 @@ const propInstancer = new PropInstancer(scene);
 const navMeshService = new NavMeshService({
   assetManager,
   obstacles,
-  fallbackBounds: 54,
-  fallbackCellSize: 1.5,
+  fallbackHalfWidth: 128,
+  fallbackHalfDepth: 73,
+  fallbackCellSize: 2.5,
 });
 
 let environmentTexture = null;
@@ -3625,7 +3626,7 @@ function resetGame(spawnImmediately = true) {
     comboTimer: 0,
   });
 
-  player.position.set(0, 1.65, 18);
+  player.position.set(0, 1.65, 56);
   camera.position.set(0, 0, 0);
   camera.rotation.set(0, 0, 0);
   camera.fov = CONFIG.defaultFov;
@@ -3650,14 +3651,14 @@ function getSpawnPoint(index) {
   // Put the first wave in a clear forward arc so enemies are immediately
   // visible after spawning instead of appearing mostly behind the player.
   const forwardArc = [
-    new THREE.Vector3(-12, 0, 1),
-    new THREE.Vector3(-6, 0, -7),
-    new THREE.Vector3(0, 0, -11),
-    new THREE.Vector3(6, 0, -7),
-    new THREE.Vector3(12, 0, 1),
-    new THREE.Vector3(-17, 0, -14),
-    new THREE.Vector3(17, 0, -14),
-    new THREE.Vector3(0, 0, -22),
+    new THREE.Vector3(-64, 0, -61),
+    new THREE.Vector3(-34, 0, -64),
+    new THREE.Vector3(0, 0, -64),
+    new THREE.Vector3(34, 0, -64),
+    new THREE.Vector3(64, 0, -61),
+    new THREE.Vector3(-96, 0, -48),
+    new THREE.Vector3(96, 0, -48),
+    new THREE.Vector3(0, 0, -57),
   ];
 
   const p = forwardArc[index % forwardArc.length].clone();
@@ -5569,14 +5570,14 @@ function showMenuView(view) {
 let directorWaveInitialized = false;
 
 const waveDirectorSpawnPoints = [
-  new THREE.Vector3(-12, 0, 1),
-  new THREE.Vector3(-6, 0, -7),
-  new THREE.Vector3(0, 0, -11),
-  new THREE.Vector3(6, 0, -7),
-  new THREE.Vector3(12, 0, 1),
-  new THREE.Vector3(-17, 0, -14),
-  new THREE.Vector3(17, 0, -14),
-  new THREE.Vector3(0, 0, -22),
+  new THREE.Vector3(-64, 0, -61),
+  new THREE.Vector3(-34, 0, -64),
+  new THREE.Vector3(0, 0, -64),
+  new THREE.Vector3(34, 0, -64),
+  new THREE.Vector3(64, 0, -61),
+  new THREE.Vector3(-96, 0, -48),
+  new THREE.Vector3(96, 0, -48),
+  new THREE.Vector3(0, 0, -57),
 ];
 
 function getWaveSpawnPoints() {
@@ -5694,7 +5695,7 @@ function enterGame() {
       combo: 0,
       comboTimer: 0,
     });
-    player.position.set(0, 1.65, 18);
+    player.position.set(0, 1.65, 56);
     camera.position.set(0, 0, 0);
     camera.rotation.set(0, 0, 0);
     camera.fov = CONFIG.defaultFov;
