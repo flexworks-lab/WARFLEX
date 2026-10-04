@@ -92,6 +92,45 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 renderer.domElement.style.display = 'none';
 
+const gunViewportScene = new THREE.Scene();
+const gunViewportCamera = new THREE.PerspectiveCamera(
+  78,
+  innerWidth / innerHeight,
+  0.01,
+  50,
+);
+gunViewportCamera.position.set(0, 0, 0);
+
+const gunViewportRenderer = new THREE.WebGLRenderer({
+  antialias: true,
+  alpha: true,
+  powerPreference: 'high-performance',
+});
+gunViewportRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+gunViewportRenderer.setSize(innerWidth, innerHeight);
+gunViewportRenderer.outputColorSpace = THREE.SRGBColorSpace;
+gunViewportRenderer.toneMapping = THREE.AgXToneMapping;
+gunViewportRenderer.toneMappingExposure = 1.1;
+gunViewportRenderer.setClearColor(0x000000, 0);
+gunViewportRenderer.domElement.className = 'gun-viewport-canvas';
+Object.assign(gunViewportRenderer.domElement.style, {
+  position: 'fixed',
+  inset: '0',
+  width: '100vw',
+  height: '100vh',
+  zIndex: '5',
+  pointerEvents: 'none',
+  display: 'none',
+});
+document.body.appendChild(gunViewportRenderer.domElement);
+
+gunViewportScene.add(
+  new THREE.HemisphereLight(0xdbe9ff, 0x11151a, 1.8),
+);
+const gunKeyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+gunKeyLight.position.set(2.5, 4.5, 2.5);
+gunViewportScene.add(gunKeyLight);
+
 const atmosphere = configureAtmosphere(
   scene,
   renderer,
@@ -691,7 +730,7 @@ function createWeapon() {
   weapon.userData.muzzle = weapon.getObjectByName('MuzzleDevice');
   weapon.position.set(.43, -.48, -1.03);
   weapon.rotation.set(-.03, -.04, -.015);
-  camera.add(weapon);
+  gunViewportScene.add(weapon);
   scene.add(camera);
 
   return weapon;
@@ -699,6 +738,23 @@ function createWeapon() {
 
 const weapon = createWeapon();
 weapon.visible = false;
+
+const worldWeaponAnchor = new THREE.Group();
+const worldMuzzleAnchor = new THREE.Object3D();
+worldWeaponAnchor.add(worldMuzzleAnchor);
+camera.add(worldWeaponAnchor);
+
+const syncWorldWeaponAnchor = () => {
+  worldWeaponAnchor.position.copy(weapon.position);
+  worldWeaponAnchor.quaternion.copy(weapon.quaternion);
+  worldWeaponAnchor.scale.copy(weapon.scale);
+  worldMuzzleAnchor.position.copy(
+    weapon.userData.muzzle?.position ||
+    new THREE.Vector3(0, .04, -2.42),
+  );
+};
+
+syncWorldWeaponAnchor();
 
 const worldHitMarkers = [];
 
@@ -1582,7 +1638,7 @@ function spawnBurst(position, color, count = 12) {
 }
 function spawnMuzzleVfx() {
   const muzzleWorld = new THREE.Vector3();
-  weapon.userData.muzzle.getWorldPosition(muzzleWorld);
+  worldMuzzleAnchor.getWorldPosition(muzzleWorld);
   spawnBurst(muzzleWorld, 0xffd36b, 7);
 
   for (let i = 0; i < 2; i += 1) {
@@ -2492,6 +2548,8 @@ function updateWeapon(dt) {
 
   const visible = state.active && !state.over;
   weapon.visible = visible;
+  gunViewportRenderer.domElement.style.display = visible ? 'block' : 'none';
+  syncWorldWeaponAnchor();
 
   const flashPower = state.muzzleFlash > 0 ? 18 : 0;
   weapon.userData.flash.intensity = flashPower;
@@ -2620,6 +2678,13 @@ function frame() {
   }
 
   atmosphere.composer.render(dt);
+
+  if (state.active && !state.over) {
+    gunViewportRenderer.render(
+      gunViewportScene,
+      gunViewportCamera,
+    );
+  }
 }
 
 function setWaveChoice(value) {
@@ -2851,6 +2916,9 @@ window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  gunViewportRenderer.setSize(innerWidth, innerHeight);
+  gunViewportCamera.aspect = innerWidth / innerHeight;
+  gunViewportCamera.updateProjectionMatrix();
   atmosphere.resize(innerWidth, innerHeight);
 });
 
