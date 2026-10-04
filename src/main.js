@@ -4561,7 +4561,13 @@ function resetGame(spawnImmediately = true) {
     comboTimer: 0,
   });
 
-  player.position.set(18, 1.65, 58);
+  const customPlayerSpawn = getActiveMapSpawn('player');
+  if (customPlayerSpawn) {
+    player.position.copy(customPlayerSpawn);
+    player.position.y += 1.65;
+  } else {
+    player.position.set(18, 1.65, 58);
+  }
   camera.position.set(0, 0, 0);
 
 if (mapEditor.enabled) {
@@ -4585,6 +4591,32 @@ if (mapEditor.enabled) {
   if (spawnImmediately && waveDirector) {
     waveDirector.start();
   }
+}
+
+function getActiveMapSpawn(type) {
+  if (!editorMapRoot.visible) return null;
+  let found = null;
+  editorMapRoot.updateMatrixWorld(true);
+  editorMapRoot.traverse((o) => {
+    if (found || !o.userData?.editorSpec || o.userData.editorSpec.spawnType !== type) return;
+    found = new THREE.Vector3();
+    o.getWorldPosition(found);
+  });
+  return found;
+}
+
+function getActiveEnemySpawns() {
+  if (!editorMapRoot.visible) return [];
+  const points = [];
+  editorMapRoot.updateMatrixWorld(true);
+  editorMapRoot.traverse((o) => {
+    if (o.userData?.editorSpec?.spawnType !== 'enemy') return;
+    const p = new THREE.Vector3();
+    o.getWorldPosition(p);
+    p.y = 0;
+    points.push(p);
+  });
+  return points;
 }
 
 function getSpawnPoint(index) {
@@ -6624,20 +6656,13 @@ const waveDirectorSpawnPoints = [
 ];
 
 function getWaveSpawnPoints() {
-  return waveDirectorSpawnPoints.map(
-    point => {
-      const next = point.clone();
-
-      if (
-        next.distanceTo(player.position) <
-        12
-      ) {
-        next.z -= 8;
-      }
-
-      return next;
-    },
-  );
+  const custom = getActiveEnemySpawns();
+  const source = custom.length ? custom : waveDirectorSpawnPoints;
+  return source.map((point) => {
+    const next = point.clone();
+    if (next.distanceTo(player.position) < 12) next.z -= 8;
+    return next;
+  });
 }
 
 waveDirector = new WaveDirector({
