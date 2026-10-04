@@ -1310,6 +1310,119 @@ function addArena() {
     label: 'MOTOR_POOL',
   });
 
+  // -----------------------------------------------------------------------
+  // LARGE PLAYER-SCALE HANGARS
+  // These are intentionally huge from the outside, but all entrances,
+  // stairs, rails, lights, windows and cover are kept at believable player
+  // scale so the structures do not feel like giant toy buildings.
+  // -----------------------------------------------------------------------
+  const addLargeHangar = ({ x, z, width, depth, height, accent, label, rotation = 0 }) => {
+    const root = new THREE.Group();
+    root.position.set(x, 0, z);
+    root.rotation.y = rotation;
+    fallbackArenaRoot.add(root);
+
+    const wall = mat(accent, 0.78, 0.24);
+    const roof = mat(0x20272a, 0.62, 0.54);
+    const frame = mat(0x3b464b, 0.56, 0.62);
+    const dark = mat(0x101619, 0.72, 0.72);
+    const door = mat(0x252d30, 0.64, 0.58);
+    const glassPanel = glass.clone();
+
+    box(root, [width + 1.4, 0.35, depth + 1.4], [0, 0.18, 0], concreteEdge, 0, 0.03);
+    box(root, [width, 0.42, depth], [0, height + 0.20, 0], roof, 0, 0.04);
+
+    // Main wall slabs.
+    box(root, [width, height, 0.48], [0, height * 0.5, depth * 0.5], wall);
+    box(root, [width, height, 0.48], [0, height * 0.5, -depth * 0.5], wall);
+    box(root, [0.48, height, depth], [-width * 0.5, height * 0.5, 0], wall);
+    box(root, [0.48, height, depth], [width * 0.5, height * 0.5, 0], wall);
+
+    // Structural columns are kept narrow enough to read as real construction.
+    for (let xx = -width * 0.46; xx <= width * 0.46; xx += 5.5) {
+      box(root, [0.34, height, 0.34], [xx, height * 0.5, depth * 0.5 + 0.28], frame);
+      box(root, [0.34, height, 0.34], [xx, height * 0.5, -depth * 0.5 - 0.28], frame);
+    }
+
+    // Huge vehicle-sized bay door, with a human-scale personnel door beside it.
+    const bayWidth = Math.min(12, width * 0.38);
+    const bayHeight = Math.min(5.2, height * 0.55);
+    const frontZ = -depth * 0.5 - 0.26;
+    box(root, [bayWidth + 0.7, bayHeight + 0.7, 0.28], [0, bayHeight * 0.5, frontZ], frame, 0, 0.02);
+    box(root, [bayWidth, bayHeight, 0.18], [0, bayHeight * 0.5, frontZ - 0.16], door);
+    for (let yy = 0.45; yy < bayHeight - 0.15; yy += 0.72) {
+      box(root, [bayWidth * 0.94, 0.055, 0.035], [0, yy, frontZ - 0.27], frame);
+    }
+
+    const personnelX = bayWidth * 0.5 + 2.0;
+    box(root, [1.15, 2.45, 0.28], [personnelX, 1.225, frontZ - 0.05], dark, 0, 0.02);
+    box(root, [1.45, 2.75, 0.34], [personnelX, 1.38, frontZ + 0.04], frame, 0, 0.02);
+    addBolt(root, [personnelX - 0.38, 1.23, frontZ - 0.20], 0.7);
+    addBolt(root, [personnelX + 0.38, 1.23, frontZ - 0.20], 0.7);
+
+    // Human-scale windows: repeated 1.4m-wide panels instead of giant walls of glass.
+    for (let xx = -width * 0.40; xx <= width * 0.40; xx += 3.2) {
+      if (Math.abs(xx) < bayWidth * 0.5 + 2.5) continue;
+      box(root, [1.45, 1.05, 0.09], [xx, 3.0, frontZ + 0.12], glassPanel);
+      box(root, [1.58, 0.07, 0.14], [xx, 2.42, frontZ + 0.15], frame);
+      box(root, [1.58, 0.07, 0.14], [xx, 3.58, frontZ + 0.15], frame);
+    }
+
+    // Side windows and ventilation panels.
+    for (const side of [-1, 1]) {
+      for (let zz = -depth * 0.34; zz <= depth * 0.34; zz += 4.0) {
+        box(root, [0.09, 1.15, 1.55], [side * (width * 0.5 + 0.10), 3.1, zz], glassPanel);
+        box(root, [0.13, 1.30, 0.10], [side * (width * 0.5 + 0.16), 3.1, zz - 0.82], frame);
+        box(root, [0.13, 1.30, 0.10], [side * (width * 0.5 + 0.16), 3.1, zz + 0.82], frame);
+      }
+    }
+
+    // Roof trusses and service lights make the scale readable from the ground.
+    for (let zz = -depth * 0.42; zz <= depth * 0.42; zz += 4.5) {
+      box(root, [width * 0.90, 0.16, 0.18], [0, height - 0.18, zz], frame);
+    }
+    for (let zz = -depth * 0.38; zz <= depth * 0.38; zz += 4.5) {
+      cyl(root, 0.09, 0.32, [0, height - 0.46, zz], warmGlass, [0, 0, 0], 12);
+    }
+
+    // Small stairs beside the personnel door reinforce the player reference scale.
+    for (let step = 0; step < 3; step += 1) {
+      box(root, [1.35, 0.16, 0.38], [personnelX, 0.08 + step * 0.16, frontZ - 0.42 - step * 0.30], concreteDark);
+    }
+    box(root, [0.06, 0.95, 0.06], [personnelX - 0.72, 0.55, frontZ - 0.78], steel);
+    box(root, [0.06, 0.95, 0.06], [personnelX + 0.72, 0.55, frontZ - 0.78], steel);
+    box(root, [1.45, 0.06, 0.06], [personnelX, 0.98, frontZ - 0.78], steel);
+
+    // Collision matches the physical wall footprint; the bay opening remains usable.
+    addCollision([width, height, 0.55], [x, height * 0.5, z + depth * 0.5], label + '_N');
+    addCollision([width * 0.5 - bayWidth * 0.5, height, 0.55], [x - (width * 0.25 + bayWidth * 0.25), height * 0.5, z - depth * 0.5], label + '_S_left');
+    addCollision([width * 0.5 - bayWidth * 0.5, height, 0.55], [x + (width * 0.25 + bayWidth * 0.25), height * 0.5, z - depth * 0.5], label + '_S_right');
+    addCollision([0.55, height, depth], [x - width * 0.5, height * 0.5, z], label + '_W');
+    addCollision([0.55, height, depth], [x + width * 0.5, height * 0.5, z], label + '_E');
+
+    return root;
+  };
+
+  addLargeHangar({
+    x: -25,
+    z: -38,
+    width: 52,
+    depth: 30,
+    height: 10.5,
+    accent: 0x4a5659,
+    label: 'MAIN_HANGAR',
+  });
+
+  addLargeHangar({
+    x: 74,
+    z: -39,
+    width: 42,
+    depth: 26,
+    height: 9.0,
+    accent: 0x59614e,
+    label: 'VEHICLE_HANGAR',
+  });
+
   box(fallbackArenaRoot, [36, 0.08, 27], [19, 0.05, 53], concreteDark);
   box(fallbackArenaRoot, [44, 0.08, 23], [88, 0.05, 8], concreteDark);
 
