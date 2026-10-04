@@ -119,6 +119,75 @@
       }
     }
   </script>
+  <script>
+    (() => {
+      const $ = (selector) => document.querySelector(selector);
+      const start = $('#start-screen');
+      const main = $('#menu-main');
+      const waves = $('#wave-menu');
+      const options = $('#options-menu');
+      const wavesButton = $('#waves-button');
+      const optionsButton = $('#options-button');
+      const backWaves = $('#back-from-waves');
+      const backOptions = $('#back-from-options');
+      const startButton = $('#start-button');
+      const waveChoices = document.querySelectorAll('[data-wave-choice]');
+
+      if (!start || !main || !waves || !options) return;
+
+      const show = (view) => {
+        main.classList.toggle('hidden', view !== 'main');
+        waves.classList.toggle('hidden', view !== 'waves');
+        options.classList.toggle('hidden', view !== 'options');
+      };
+
+      wavesButton?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('waves');
+      });
+
+      optionsButton?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('options');
+      });
+
+      backWaves?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('main');
+      });
+
+      backOptions?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('main');
+      });
+
+      waveChoices.forEach((button) => {
+        button.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          waveChoices.forEach((choice) => choice.classList.remove('active'));
+          button.classList.add('active');
+          window.__WARFLEX_SELECTED_WAVE =
+            button.dataset.waveChoice === 'endless'
+              ? 'endless'
+              : Number(button.dataset.waveChoice);
+        });
+      });
+
+      startButton?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        window.__WARFLEX_START_REQUESTED = true;
+        window.dispatchEvent(new Event('warfex-start-request'));
+      });
+
+      show('main');
+    })();
+  </script>
   <script type="module" src="./src/main.js?v=__WARFLEX_BUILD__"></script>
 </body>
 </html>
