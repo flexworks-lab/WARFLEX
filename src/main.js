@@ -3991,6 +3991,11 @@ addVariantCylinder(
 );
 weaponModels.push(smgModel);
 
+let loadoutOpen = false;
+let selectedLoadoutIndex = 0;
+let loadoutPreviewRoot = null;
+const loadoutPreviewModels = [];
+
 loadoutPreviewRoot = new THREE.Group();
 loadoutPreviewRoot.name = 'WARFLEX_LOADOUT_PREVIEW';
 loadoutPreviewRoot.visible = false;
@@ -4254,10 +4259,6 @@ const weaponAmmoState = new Map(
 );
 
 const menuGunPairs = [];
-let loadoutOpen = false;
-let selectedLoadoutIndex = 0;
-let loadoutPreviewRoot = null;
-const loadoutPreviewModels = [];
 
 function installAK47Model(target, sourceScene, {
   keepProceduralHands = true,
