@@ -1400,16 +1400,6 @@ function addArena() {
       return n - Math.floor(n);
     };
 
-    const grassMat = new THREE.MeshStandardMaterial({
-      color: 0x5f963f,
-      roughness: .98,
-      metalness: 0,
-    });
-    const grassDarkMat = new THREE.MeshStandardMaterial({
-      color: 0x355f31,
-      roughness: 1,
-      metalness: 0,
-    });
     const dirtMat = mat(0x5c4935, .98, .01);
     const stoneMat = mat(0x56615d, .92, .04);
     const steelMat = mat(0x4a575d, .58, .70);
@@ -1444,103 +1434,8 @@ function addArena() {
       [82, 31, 10, 2.2, -0.48],
       [70, -48, 16, 2.9, 0.12],
     ]) {
-      addPatch(
-        patch[0],
-        patch[1],
-        patch[2],
-        patch[3],
-        dirtMat,
-        patch[4],
-      );
+      addPatch(patch[0], patch[1], patch[2], patch[3], dirtMat, patch[4]);
     }
-
-    // Instanced grass: thousands of blades with varied scale/rotation,
-    // but no per-blade shadows, keeping the GPU load controlled.
-    const grassGeometry = new THREE.ConeGeometry(.045, .52, 5, 1);
-    grassGeometry.translate(0, .26, 0);
-
-    const grass = new THREE.InstancedMesh(
-      grassGeometry,
-      grassMat,
-      3200,
-    );
-    grass.name = 'WARFLEX_ProceduralGrass';
-    grass.castShadow = false;
-    grass.receiveShadow = true;
-    grass.frustumCulled = true;
-
-    const grassDummy = new THREE.Object3D();
-
-    for (let i = 0; i < grass.count; i += 1) {
-      const seed = i + 41.7;
-      const x =
-        (seeded(seed) * 2 - 1) *
-        (HALF_W - 5);
-      const z =
-        (seeded(seed + 8.2) * 2 - 1) *
-        (HALF_D - 5);
-
-      if (Math.hypot(x - 18, z - 54) < 8) {
-        i -= 1;
-        continue;
-      }
-
-      const y = getSimpleTerrainHeight(x, z);
-      const scale = .55 + seeded(seed + 17.8) * 1.15;
-
-      grassDummy.position.set(x, y, z);
-      grassDummy.rotation.y =
-        seeded(seed + 27.4) * Math.PI * 2;
-      grassDummy.scale.set(
-        .55 + seeded(seed + 31.1) * .65,
-        scale,
-        .55 + seeded(seed + 39.2) * .65,
-      );
-      grassDummy.updateMatrix();
-      grass.setMatrixAt(i, grassDummy.matrix);
-    }
-
-    grass.instanceMatrix.needsUpdate = true;
-    grass.computeBoundingSphere();
-    fallbackArenaRoot.add(grass);
-
-    // Taller accent tufts around edges and worn areas.
-    const tuftGeometry = new THREE.ConeGeometry(.07, .86, 5, 1);
-    tuftGeometry.translate(0, .43, 0);
-
-    const tufts = new THREE.InstancedMesh(
-      tuftGeometry,
-      grassDarkMat,
-      650,
-    );
-    tufts.name = 'WARFLEX_TallGrassTufts';
-    tufts.castShadow = false;
-    tufts.receiveShadow = true;
-    tufts.frustumCulled = true;
-
-    for (let i = 0; i < tufts.count; i += 1) {
-      const seed = i + 801.3;
-      const angle = seeded(seed) * Math.PI * 2;
-      const radius = 24 + seeded(seed + 3.6) * 96;
-      const x = Math.cos(angle) * radius;
-      const z = Math.sin(angle) * radius * .56;
-      const y = getSimpleTerrainHeight(x, z);
-
-      grassDummy.position.set(x, y, z);
-      grassDummy.rotation.y =
-        seeded(seed + 7.4) * Math.PI * 2;
-      grassDummy.scale.set(
-        .75 + seeded(seed + 9.4) * .6,
-        .75 + seeded(seed + 12.4) * .95,
-        .75 + seeded(seed + 15.4) * .6,
-      );
-      grassDummy.updateMatrix();
-      tufts.setMatrixAt(i, grassDummy.matrix);
-    }
-
-    tufts.instanceMatrix.needsUpdate = true;
-    tufts.computeBoundingSphere();
-    fallbackArenaRoot.add(tufts);
 
     // Real rock silhouettes break the terrain at long distance.
     const rockGeometry = new THREE.DodecahedronGeometry(.72, 1);
