@@ -40,6 +40,79 @@ const CONFIG = {
   ragdollLife: 5.5,
 };
 
+const WEAPON_DEFS = [
+  {
+    id: 'rifle',
+    label: 'RIFLE',
+    display: 'MK-01 // RIFLE',
+    magSize: 30,
+    reserve: 120,
+    fireInterval: .105,
+    reloadTime: 1.35,
+    damage: 34,
+    headshotDamage: 70,
+    spread: .24,
+    recoil: .020,
+    kick: 1.15,
+  },
+  {
+    id: 'shotgun',
+    label: 'SHOTGUN',
+    display: 'SG-12 // SHOTGUN',
+    magSize: 8,
+    reserve: 40,
+    fireInterval: .62,
+    reloadTime: 1.65,
+    damage: 58,
+    headshotDamage: 92,
+    spread: 3.2,
+    recoil: .055,
+    kick: 1.8,
+  },
+  {
+    id: 'sniper',
+    label: 'SNIPER',
+    display: 'SR-07 // SNIPER RIFLE',
+    magSize: 5,
+    reserve: 25,
+    fireInterval: .92,
+    reloadTime: 1.9,
+    damage: 96,
+    headshotDamage: 145,
+    spread: .08,
+    recoil: .07,
+    kick: 2.2,
+  },
+  {
+    id: 'pistol',
+    label: 'PISTOL',
+    display: 'PX-9 // PISTOL',
+    magSize: 12,
+    reserve: 72,
+    fireInterval: .22,
+    reloadTime: 1.05,
+    damage: 30,
+    headshotDamage: 62,
+    spread: .38,
+    recoil: .014,
+    kick: .7,
+  },
+  {
+    id: 'smg',
+    label: 'SMG',
+    display: 'SM-5 // SMG',
+    magSize: 32,
+    reserve: 128,
+    fireInterval: .072,
+    reloadTime: 1.2,
+    damage: 22,
+    headshotDamage: 48,
+    spread: .62,
+    recoil: .012,
+    kick: .82,
+  },
+];
+
 const els = {
   hud: document.querySelector('#hud'),
   start: document.querySelector('#start-screen'),
@@ -87,6 +160,12 @@ const els = {
   multiplayerUsername: document.querySelector('#multiplayer-username'),
   multiplayerConnect: document.querySelector('#multiplayer-connect'),
   backFromMultiplayer: document.querySelector('#back-from-multiplayer'),
+  playerNameGate: document.querySelector('#player-name-gate'),
+  playerNameInput: document.querySelector('#player-name-input'),
+  playerNameConfirm: document.querySelector('#player-name-confirm'),
+  playerNameError: document.querySelector('#player-name-error'),
+  weaponSelector: document.querySelector('#weapon-selector'),
+  weaponSlots: [...document.querySelectorAll('[data-weapon-slot]')],
 };
 
 const scene = new THREE.Scene();
@@ -383,6 +462,7 @@ const state = {
   combo: 0,
   comboTimer: 0,
   gameMode: 'waves',
+  weaponId: 'rifle',
 };
 
 const player = {
