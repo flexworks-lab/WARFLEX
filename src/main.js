@@ -4574,8 +4574,6 @@ function closeLoadout({ restoreMenu = true } = {}) {
   }
 }
 
-weaponModels.push(smgModel);
-
 let activeWeaponDef = WEAPON_DEFS[0];
 function getCurrentWeaponDef() {
   return activeWeaponDef || WEAPON_DEFS[0];
