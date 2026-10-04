@@ -4110,6 +4110,7 @@ function addStandaloneHands(model, variant = 'standard') {
     hand.name = name;
     hand.position.set(...position);
     hand.rotation.set(...rotation);
+    hand.userData.baseRotation = hand.rotation.clone();
     model.add(hand);
 
     const palm = new THREE.Mesh(
@@ -4173,6 +4174,7 @@ function addStandaloneHands(model, variant = 'standard') {
       variant === 'pistol' ? .18 : .16,
     );
     arm.rotation.z = -side * .17;
+    arm.userData.baseRotation = arm.rotation.clone();
     model.add(arm);
 
     const upper = new THREE.Mesh(
@@ -8333,37 +8335,83 @@ function updateEnemies(dt) {
 
     const movementVelocity =
       enemy.navAgent?.velocity ||
-      enemy.steering?.velocity;
+      enemy.steering?.velocity ||
+      new THREE.Vector3();
 
     const moving =
-      movementVelocity?.lengthSq() >
+      movementVelocity.lengthSq() >
       .05;
 
-    const moveAmount =
+    const moveSpeed =
+      movementVelocity.length();
+
+    const speedRatio =
+      THREE.MathUtils.clamp(
+        moveSpeed /
+          Math.max(enemy.speed, .01),
+        0,
+        1.35,
+      );
+
+    const facingForward =
+      new THREE.Vector3(0, 0, -1)
+        .applyQuaternion(enemy.group.quaternion);
+    const facingSide =
+      new THREE.Vector3(1, 0, 0)
+        .applyQuaternion(enemy.group.quaternion);
+
+    const forwardMotion =
+      movementVelocity.dot(facingForward);
+    const sideMotion =
+      movementVelocity.dot(facingSide);
+
+    const meleeMode =
+      enemy.ai?.combatMode === 'melee';
+
+    const aimPulse =
+      Math.sin(
+        enemy.animTime * 2.2 +
+        enemy.phase,
+      );
+
+    const strideScale =
       enemy.role === 'rusher'
-        ? 1
-        : .48;
+        ? 1.0
+        : .72;
 
-    const stride =
-      Math.sin(enemy.animTime) *
-      moveAmount *
-      (moving ? 1 : .2);
+    const gait =
+      moving
+        ? Math.sin(enemy.animTime)
+        : Math.sin(
+            enemy.animTime * .55,
+          ) * .15;
 
-    const counterStride =
+    const counterGait =
       Math.sin(
         enemy.animTime + Math.PI,
       ) *
-      moveAmount *
-      (moving ? 1 : .2);
+      strideScale *
+      speedRatio;
+
+    const stride =
+      gait *
+      strideScale *
+      speedRatio;
 
     const bounce =
       Math.abs(
-        Math.sin(enemy.animTime * .5),
+        Math.sin(
+          enemy.animTime * .5,
+        ),
       ) *
       (
-        enemy.role === 'rusher'
-          ? .035
-          : .015
+        .018 +
+        .028 * speedRatio +
+        .012 *
+        Math.min(
+          Math.abs(sideMotion),
+          1.5,
+        )
       );
 
     const breath =
@@ -8373,54 +8421,143 @@ function updateEnemies(dt) {
       ) * .018;
 
     const isAiming =
-      enemy.role !== 'rusher';
+      enemy.role !== 'rusher' &&
+      !meleeMode;
 
     parts.leftLeg.rotation.x =
       -stride *
-      (enemy.role === 'rusher' ? .72 : .28);
+      (
+        enemy.role === 'rusher'
+          ? .88
+          : .46
+      );
 
     parts.rightLeg.rotation.x =
-      -counterStride *
-      (enemy.role === 'rusher' ? .72 : .28);
+      -counterGait *
+      (
+        enemy.role === 'rusher'
+          ? .88
+          : .46
+      );
 
     parts.leftKnee.rotation.x =
       Math.max(0, stride) *
-      (enemy.role === 'rusher' ? .34 : .12);
+      (
+        enemy.role === 'rusher'
+          ? .42
+          : .19
+      );
 
     parts.rightKnee.rotation.x =
-      Math.max(0, counterStride) *
-      (enemy.role === 'rusher' ? .34 : .12);
+      Math.max(0, counterGait) *
+      (
+        enemy.role === 'rusher'
+          ? .42
+          : .19
+      );
 
-    if (isAiming) {
+    if (meleeMode) {
+      const swing =
+        Math.sin(
+          enemy.animTime * 4.6 +
+          enemy.phase,
+        ) * .50;
+
+      parts.leftArm.rotation.x =
+        -.18 -
+        swing * .72 +
+        breath;
+
+      parts.rightArm.rotation.x =
+        -.18 +
+        swing * .72 -
+        breath;
+
+      parts.leftArm.rotation.z =
+        .20 +
+        swing * .18;
+
+      parts.rightArm.rotation.z =
+        -.20 -
+        swing * .18;
+
+      parts.upperBody.rotation.x =
+        -.10 +
+        Math.max(0, swing) * -.10 +
+        breath * .35;
+
+      parts.upperBody.rotation.y =
+        swing * .055;
+    } else if (isAiming) {
       parts.leftArm.rotation.x =
         -.34 +
-        counterStride * .08 +
-        breath;
+        counterGait * .12 +
+        breath +
+        forwardMotion * -.010;
 
       parts.rightArm.rotation.x =
         -.30 +
-        stride * .08 -
-        breath;
+        stride * .12 -
+        breath -
+        forwardMotion * -.010;
 
-      parts.leftArm.rotation.z = .08;
-      parts.rightArm.rotation.z = -.08;
+      parts.leftArm.rotation.z =
+        .08 +
+        sideMotion * .016;
+
+      parts.rightArm.rotation.z =
+        -.08 +
+        sideMotion * .016;
+
+      parts.upperBody.rotation.x =
+        -.035 +
+        breath * .35 -
+        forwardMotion * .010;
+
+      parts.upperBody.rotation.y =
+        THREE.MathUtils.clamp(
+          sideMotion * -.018,
+          -.12,
+          .12,
+        );
     } else {
       parts.leftArm.rotation.x =
-        -.08 + stride * .42;
+        -.08 +
+        stride * .48 +
+        breath;
 
       parts.rightArm.rotation.x =
-        -.10 + counterStride * .42;
+        -.10 +
+        counterGait * .48 -
+        breath;
 
-      parts.leftArm.rotation.z = .10;
-      parts.rightArm.rotation.z = -.10;
+      parts.leftArm.rotation.z =
+        .10 +
+        sideMotion * .022;
+
+      parts.rightArm.rotation.z =
+        -.10 +
+        sideMotion * .022;
+
+      parts.upperBody.rotation.x =
+        -.065 -
+        forwardMotion * .014 +
+        breath * .25;
+
+      parts.upperBody.rotation.y =
+        THREE.MathUtils.clamp(
+          sideMotion * -.022,
+          -.15,
+          .15,
+        );
     }
 
-    parts.upperBody.rotation.x =
-      isAiming
-        ? -.035 + breath * .35
-        : -.065 + breath * .25;
-
     parts.upperBody.rotation.z =
+      THREE.MathUtils.clamp(
+        -sideMotion * .030,
+        -.18,
+        .18,
+      ) +
       Math.sin(
         enemy.animTime * .5 +
         enemy.phase,
@@ -8428,6 +8565,13 @@ function updateEnemies(dt) {
 
     parts.hips.position.y =
       1.42 + bounce;
+
+    parts.hips.rotation.z =
+      THREE.MathUtils.clamp(
+        sideMotion * -.020,
+        -.12,
+        .12,
+      );
 
     if (parts.head?.isObject3D) {
       parts.head.rotation.x =
@@ -8441,18 +8585,40 @@ function updateEnemies(dt) {
           enemy.animTime * .27 +
           enemy.phase,
         ) * .07;
+
+      if (meleeMode) {
+        parts.head.rotation.y +=
+          Math.sin(
+            enemy.animTime * 2.8 +
+            enemy.phase,
+          ) * .09;
+      }
     }
 
     parts.rifle.rotation.x =
-      .02 -
-      enemy.shootRecoil * .16 +
-      breath * .2;
+      meleeMode
+        ? -.08 +
+          aimPulse * .16
+        : .02 -
+          enemy.shootRecoil * .16 +
+          breath * .2;
+
+    parts.rifle.rotation.y =
+      meleeMode
+        ? aimPulse * .08
+        : Math.sin(
+            enemy.animTime * .33 +
+            enemy.phase,
+          ) * .012;
 
     parts.rifle.rotation.z =
-      -.08 +
-      Math.sin(
-        enemy.animTime * .55,
-      ) * .01;
+      meleeMode
+        ? -.08 +
+          aimPulse * .13
+        : -.08 +
+          Math.sin(
+            enemy.animTime * .55,
+          ) * .01;
 
     enemy.walkTime +=
       dt *
@@ -8603,6 +8769,136 @@ function updateWeapon(dt) {
   const bobY =
     Math.sin(t * 1.75) * .0055 +
     Math.abs(Math.cos(t * bobSpeed)) * bobAmount;
+
+  // Procedural full-arm locomotion: the mesh arms follow the same gait,
+  // sprinting, aiming, recoil and reload rhythms as the weapon root.
+  const firstPersonModel =
+    weapon.userData.activeModel;
+
+  if (firstPersonModel) {
+    const leftArm =
+      firstPersonModel.getObjectByName('WeaponLeftArm');
+    const rightArm =
+      firstPersonModel.getObjectByName('WeaponRightArm');
+    const leftHand =
+      firstPersonModel.getObjectByName('WeaponLeftHand');
+    const rightHand =
+      firstPersonModel.getObjectByName('WeaponRightHand');
+
+    const stepWave =
+      Math.sin(
+        t * bobSpeed,
+      );
+    const counterStep =
+      Math.sin(
+        t * bobSpeed + Math.PI,
+      );
+    const handSwing =
+      moving && state.onGround
+        ? (0.035 + .10 * state.sprintBlend)
+        : .012;
+
+    if (leftArm?.userData.baseRotation) {
+      const base = leftArm.userData.baseRotation;
+      leftArm.rotation.x =
+        base.x +
+        counterStep * handSwing -
+        state.weaponKick * .20;
+      leftArm.rotation.z =
+        base.z +
+        state.weaponSwayX * -.45 +
+        state.sprintBlend * .10;
+      leftArm.rotation.y =
+        base.y +
+        state.weaponRecoilYaw * -.16;
+    }
+
+    if (rightArm?.userData.baseRotation) {
+      const base = rightArm.userData.baseRotation;
+      rightArm.rotation.x =
+        base.x +
+        stepWave * handSwing +
+        state.weaponKick * .24;
+      rightArm.rotation.z =
+        base.z +
+        state.weaponSwayX * -.35 -
+        state.sprintBlend * .09;
+      rightArm.rotation.y =
+        base.y +
+        state.weaponRecoilYaw * .14;
+    }
+
+    const handBob =
+      Math.sin(t * bobSpeed * .5) *
+      (0.012 + .035 * state.sprintBlend);
+
+    if (leftHand?.userData.baseRotation) {
+      const base = leftHand.userData.baseRotation;
+      leftHand.rotation.x =
+        base.x +
+        handBob -
+        state.weaponKick * .10;
+      leftHand.rotation.z =
+        base.z +
+        state.weaponSwayX * -.22;
+    }
+
+    if (rightHand?.userData.baseRotation) {
+      const base = rightHand.userData.baseRotation;
+      rightHand.rotation.x =
+        base.x -
+        handBob +
+        state.weaponKick * .13;
+      rightHand.rotation.z =
+        base.z +
+        state.weaponSwayX * -.18;
+    }
+
+    if (state.reloadTimer > 0) {
+      const reloadProgress =
+        1 -
+        state.reloadTimer /
+        getCurrentWeaponDef().reloadTime;
+      const reloadWave =
+        Math.sin(
+          reloadProgress * Math.PI,
+        );
+
+      if (leftArm) {
+        leftArm.rotation.x -=
+          reloadWave * .62;
+        leftArm.rotation.z +=
+          reloadWave * .18;
+      }
+
+      if (rightArm) {
+        rightArm.rotation.x +=
+          reloadWave * .34;
+        rightArm.rotation.z -=
+          reloadWave * .12;
+      }
+    }
+
+    if (state.aimBlend > .02) {
+      if (leftArm) {
+        leftArm.rotation.x =
+          THREE.MathUtils.lerp(
+            leftArm.rotation.x,
+            leftArm.userData.baseRotation?.x || 0,
+            state.aimBlend * .55,
+          );
+      }
+
+      if (rightArm) {
+        rightArm.rotation.x =
+          THREE.MathUtils.lerp(
+            rightArm.rotation.x,
+            rightArm.userData.baseRotation?.x || 0,
+            state.aimBlend * .55,
+          );
+      }
+    }
+  }
 
   state.weaponSwayX = THREE.MathUtils.damp(
     state.weaponSwayX,
