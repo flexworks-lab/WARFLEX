@@ -3758,6 +3758,7 @@ function tickEffects(dt) {
   // and reliably settle on the arena floor.
   for (let i = shellCasings.length - 1; i >= 0; i -= 1) {
     const shell = shellCasings[i];
+    shell.life -= dt;
 
     if (!shell.resting) {
       shell.velocity.y -= 24 * dt;
@@ -3801,6 +3802,11 @@ function tickEffects(dt) {
       shell.angularVelocity.multiplyScalar(
         Math.exp(-8 * dt),
       );
+    }
+
+    if (shell.life <= 0) {
+      scene.remove(shell.mesh);
+      shellCasings.splice(i, 1);
     }
   }
 
