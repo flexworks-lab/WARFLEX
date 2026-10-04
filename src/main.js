@@ -2234,7 +2234,7 @@ const mapEditor = new MapEditor({
     obstacles.splice(0, fallbackObstacleCount);
     editorMapRoot.visible = true;
     fallbackArenaRoot.visible = false;
-    window.WARFLEX_START_GAME?.();
+    enterGame(true);
   },
 });
 
@@ -6729,8 +6729,10 @@ showMenuView('main');
 refreshMapList();
 updateMenuSelection(0, false);
 
-function enterGame() {
-  activateSelectedMap();
+function enterGame(fromEditorPlaytest = false) {
+  if (!fromEditorPlaytest) {
+    activateSelectedMap();
+  }
   // Put the UI into gameplay state first. Optional systems must not be able
   // to prevent the player from entering the arena.
   renderer.domElement.style.display = 'block';
