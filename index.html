@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="A fast browser FPS shooter built with Three.js." />
   <title>PROJECT STRIKE</title>
-  <link rel="stylesheet" href="./src/style.css?v=wide-war-20261003" />
+  <link rel="stylesheet" href="./src/style.css?v=ui-20261004-loadout" />
 </head>
 <body>
   <div id="damage-overlay" aria-hidden="true"></div>
@@ -51,17 +51,28 @@
       <div><span>KILLS</span><strong id="kills">0</strong></div>
       <div><span>SCORE</span><strong id="score">0</strong></div>
     </div>
+    <div class="bodycam-overlay" aria-hidden="true">
+      <div class="bodycam-corner bodycam-corner-top">
+        <span class="bodycam-rec"><i></i>REC</span>
+        <span>CAM 01 // LIVE</span>
+      </div>
+      <div class="bodycam-corner bodycam-corner-bottom">
+        <span>WARFLEX // FIELD BODYCAM</span>
+        <span>SYS 01.04</span>
+      </div>
+      <div class="bodycam-center-mark">+</div>
+    </div>
   </div>
 
   <div id="player-name-gate" class="screen player-name-gate">
     <div class="panel player-name-panel">
       <p class="eyebrow">WARFLEX // PLAYER SETUP</p>
       <h2>SET PLAYER NAME</h2>
-      <p class="player-name-copy">Choose your permanent in-game name. This name is locked to this browser after you confirm it.</p>
-      <label for="player-name-input">PLAYER NAME</label>
+      <p class="player-name-copy">ENTER YOUR CALLSIGN.</p>
+      <label for="player-name-input">CALLSIGN</label>
       <input id="player-name-input" type="text" maxlength="16" minlength="3" autocomplete="nickname" spellcheck="false" placeholder="PLAYER" />
       <p id="player-name-error" class="player-name-error" aria-live="polite"></p>
-      <button id="player-name-confirm" type="button">LOCK PLAYER NAME</button>
+      <button id="player-name-confirm" type="button">ENTER</button>
     </div>
   </div>
 
@@ -72,6 +83,7 @@
         <h1 class="gothic-title">PROJECT <span>STRIKE</span></h1>
         <div class="menu-nav" aria-label="Main menu">
           <button id="start-button" type="button">START</button>
+          <button id="loadout-button" type="button">LOADOUT</button>
           <button id="waves-button" type="button">WAVES</button>
           <button id="multiplayer-button" type="button">MULTIPLAYER</button>
           <button id="options-button" type="button">OPTIONS</button>
@@ -130,6 +142,67 @@
 
       <span id="selected-wave-label" class="hidden" aria-hidden="true">WAVE 1</span>
     </div>
+  </div>
+
+  <div id="loadout-screen" class="loadout-screen hidden" aria-label="Loadout selection">
+    <div class="loadout-grid-lines" aria-hidden="true"></div>
+    <div class="loadout-scanline" aria-hidden="true"></div>
+
+    <header class="loadout-header">
+      <div>
+        <p class="eyebrow">WARFLEX // ARMORY SYSTEM</p>
+        <h2>LOADOUT</h2>
+      </div>
+      <div class="loadout-header-status">
+        <span>ARMORY ONLINE</span>
+        <strong>5 WEAPONS READY</strong>
+      </div>
+      <button id="loadout-back" class="loadout-close" type="button">ESC // BACK</button>
+    </header>
+
+    <section class="loadout-stage">
+      <div class="loadout-sidecopy">
+        <span class="loadout-kicker">CURRENT PACKAGE</span>
+        <strong id="loadout-current-name">MK-01 // RIFLE</strong>
+        <span id="loadout-current-role">GENERAL PURPOSE</span>
+        <p id="loadout-current-copy">Balanced automatic rifle built for aggressive mid-range control.</p>
+
+        <div class="loadout-metrics">
+          <div><span>POWER</span><b id="loadout-power">82</b></div>
+          <div><span>CONTROL</span><b id="loadout-control">76</b></div>
+          <div><span>MAG</span><b id="loadout-mag">30</b></div>
+        </div>
+      </div>
+
+      <div class="loadout-weapon-readout">
+        <span>WEAPON CLASS // <b id="loadout-class">RIFLE</b></span>
+        <span>PRIMARY SLOT <b>01</b></span>
+      </div>
+
+      <div class="loadout-card-rail" id="loadout-cards" role="tablist" aria-label="Weapons">
+        <button type="button" class="loadout-card active" data-loadout-slot="0" role="tab">
+          <span class="loadout-slot">01</span><strong>RIFLE</strong><small>MK-01</small>
+        </button>
+        <button type="button" class="loadout-card" data-loadout-slot="1" role="tab">
+          <span class="loadout-slot">02</span><strong>SHOTGUN</strong><small>SG-12</small>
+        </button>
+        <button type="button" class="loadout-card" data-loadout-slot="2" role="tab">
+          <span class="loadout-slot">03</span><strong>SNIPER</strong><small>SR-07</small>
+        </button>
+        <button type="button" class="loadout-card" data-loadout-slot="3" role="tab">
+          <span class="loadout-slot">04</span><strong>PISTOL</strong><small>PX-9</small>
+        </button>
+        <button type="button" class="loadout-card" data-loadout-slot="4" role="tab">
+          <span class="loadout-slot">05</span><strong>SMG</strong><small>SM-5</small>
+        </button>
+      </div>
+
+      <div class="loadout-footerbar">
+        <div><span>SELECT</span><b>1—5 / CLICK</b></div>
+        <div><span>DEPLOYMENT</span><b id="loadout-ready-label">RIFLE READY</b></div>
+        <button id="loadout-deploy" class="loadout-deploy" type="button">DEPLOY WITH LOADOUT</button>
+      </div>
+    </section>
   </div>
 
   <div id="pause-screen" class="screen pause-screen hidden">
