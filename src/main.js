@@ -837,8 +837,8 @@ function getGroundHeightAt(x, z) {
 function createSimpleSlopeTerrain() {
   const width = MAP_WIDTH - 8;
   const depth = MAP_DEPTH - 8;
-  const nx = 96;
-  const nz = 56;
+  const nx = 256;
+  const nz = 160;
   const positions = [];
   const colors = [];
   const indices = [];
@@ -901,11 +901,48 @@ function createSimpleSlopeTerrain() {
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
 
+  const textureCanvas = document.createElement('canvas');
+  textureCanvas.width = 512;
+  textureCanvas.height = 512;
+  const textureCtx = textureCanvas.getContext('2d');
+  textureCtx.fillStyle = '#d5dfc8';
+  textureCtx.fillRect(0, 0, 512, 512);
+
+  for (let i = 0; i < 5200; i += 1) {
+    const px = (Math.sin(i * 12.9898) * 43758.5453) % 1 * 512;
+    const py = (Math.sin(i * 78.233) * 24634.6345) % 1 * 512;
+    const size = 1 + (Math.abs(Math.sin(i * 4.113)) * 3.5);
+    textureCtx.fillStyle = i % 11 === 0
+      ? 'rgba(78,83,58,.16)'
+      : 'rgba(255,255,255,.10)';
+    textureCtx.fillRect(Math.abs(px), Math.abs(py), size, size);
+  }
+
+  textureCtx.strokeStyle = 'rgba(74,65,46,.10)';
+  textureCtx.lineWidth = 2;
+  for (let i = 0; i < 45; i += 1) {
+    const x = (i * 97) % 512;
+    textureCtx.beginPath();
+    textureCtx.moveTo(x, 0);
+    textureCtx.lineTo(x + 80, 512);
+    textureCtx.stroke();
+  }
+
+  const terrainTexture = new THREE.CanvasTexture(textureCanvas);
+  terrainTexture.colorSpace = THREE.SRGBColorSpace;
+  terrainTexture.wrapS = THREE.RepeatWrapping;
+  terrainTexture.wrapT = THREE.RepeatWrapping;
+  terrainTexture.repeat.set(7, 5);
+  terrainTexture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
+
   const material = new THREE.MeshStandardMaterial({
     color: 0xffffff,
+    map: terrainTexture,
     vertexColors: true,
     roughness: .98,
-    metalness: .02,
+    metalness: .01,
+    bumpMap: terrainTexture,
+    bumpScale: .055,
   });
 
   simpleTerrainMesh = new THREE.Mesh(geometry, material);
