@@ -26,6 +26,7 @@ export class MapLoader {
     );
 
     this.loaded = false;
+    this.physicsBodies = [];
   }
 
   isCollisionMesh(object) {
@@ -91,6 +92,11 @@ export class MapLoader {
 
         physicsBody.userData.source =
           object;
+        this.physicsBodies.push(
+          physicsBody,
+        );
+
+        this.obstacles.push(object);
 
         return;
       }
@@ -112,8 +118,18 @@ export class MapLoader {
   unload() {
     if (!this.mapRoot) return;
 
-    this.mapRoot.traverse((object) => {
-      if (!object.isMesh) return;
+    for (const body of this.physicsBodies) {
+      this.physicsWorld.world.removeBody(body);
+    }
+
+    this.physicsBodies.length = 0;
+
+    for (const root of [
+      this.visualRoot,
+      this.collisionRoot,
+    ]) {
+      root.traverse((object) => {
+        if (!object.isMesh) return;
       object.geometry?.dispose();
 
       const materials =
@@ -124,7 +140,8 @@ export class MapLoader {
       for (const material of materials) {
         material?.dispose?.();
       }
-    });
+      });
+    }
 
     if (this.mapRoot.parent) {
       this.mapRoot.parent.remove(
