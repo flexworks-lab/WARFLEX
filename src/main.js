@@ -6913,6 +6913,7 @@ function showMenuView(view) {
   els.mainMenu.classList.toggle('hidden', view !== 'main');
   els.waveMenu.classList.toggle('hidden', view !== 'waves');
   els.optionsMenu.classList.toggle('hidden', view !== 'options');
+  els.multiplayerMenu?.classList.toggle('hidden', view !== 'multiplayer');
 }
 
 const menuNavButtons = [
