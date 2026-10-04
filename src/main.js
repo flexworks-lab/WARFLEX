@@ -6891,6 +6891,13 @@ function shoot() {
       }
 
       enemy.hurtFlash = .08;
+      if (enemy.ai) {
+        enemy.ai.suppressedTimer = Math.max(
+          enemy.ai.suppressedTimer,
+          .9,
+        );
+        enemy.ai.lastKnownPlayer.copy(player.position);
+      }
 
       hitPoint =
         enemyHit.point;
@@ -7232,6 +7239,173 @@ function enemyShoot(enemy) {
   return true;
 }
 
+function findEnemyCoverPoint(enemy) {
+  let best = null;
+  let bestScore = Infinity;
+
+  const dirs = [
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(0, 0, -1),
+  ];
+
+  for (const obstacle of obstacles) {
+    const p = obstacle?.geometry?.parameters;
+    if (!p || !Number.isFinite(p.width) || !Number.isFinite(p.depth)) continue;
+
+    const hx = p.width * .5;
+    const hz = p.depth * .5;
+
+    for (const dir of dirs) {
+      const candidate = obstacle.position.clone().add(
+        new THREE.Vector3(
+          dir.x * (hx + enemy.radius + 1.15),
+          0,
+          dir.z * (hz + enemy.radius + 1.15),
+        ),
+      );
+
+      if (
+        candidate.x < -HALF_W + 5 ||
+        candidate.x > HALF_W - 5 ||
+        candidate.z < -HALF_D + 5 ||
+        candidate.z > HALF_D - 5 ||
+        pointInsideObstacle(candidate)
+      ) continue;
+
+      const toPlayer = player.position.clone().sub(candidate);
+      toPlayer.y = 0;
+      const playerDistance = toPlayer.length();
+      if (playerDistance < 8 || playerDistance > 48 || playerDistance < .001) continue;
+
+      toPlayer.normalize();
+      raycaster.set(
+        candidate.clone().add(new THREE.Vector3(0, .95, 0)),
+        toPlayer,
+      );
+      raycaster.far = playerDistance;
+
+      const blocker = raycaster.intersectObjects(obstacles, false)[0];
+      if (!blocker || blocker.distance > playerDistance - .65) continue;
+
+      const desiredRange = enemy.role === 'heavy' ? 29 : 24;
+      const score =
+        candidate.distanceTo(enemy.group.position) * .55 +
+        Math.abs(playerDistance - desiredRange) * .16 -
+        (enemy.ai.coverPoint?.distanceTo(candidate) < 1.5 ? 1.5 : 0);
+
+      if (score < bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+  }
+
+  return best;
+}
+
+function updateEnemyTactics(enemy, slot, dt, toPlayer) {
+  const ai = enemy.ai;
+  if (!ai) return;
+
+  ai.decisionTimer -= dt;
+  ai.sightTimer -= dt;
+  ai.suppressedTimer = Math.max(0, ai.suppressedTimer - dt);
+
+  if (ai.sightTimer <= 0) {
+    const sight = enemyHasLineOfSight(enemy);
+    ai.seenPlayer = sight.clear;
+    ai.sightTimer = .24 + Math.random() * .18;
+
+    if (sight.clear) {
+      ai.lastKnownPlayer.copy(player.position);
+    }
+  }
+
+  if (ai.decisionTimer > 0) return;
+
+  ai.decisionTimer =
+    enemy.role === 'rusher'
+      ? .28 + Math.random() * .24
+      : .48 + Math.random() * .42;
+
+  const flatToPlayer = toPlayer.clone();
+  if (flatToPlayer.lengthSq() < .001) flatToPlayer.set(0, 0, -1);
+  else flatToPlayer.normalize();
+
+  const side = new THREE.Vector3(
+    -flatToPlayer.z,
+    0,
+    flatToPlayer.x,
+  );
+
+  const phase = ai.flankSeed + performance.now() * .00045;
+  const lane =
+    ((slot % 5) - 2) *
+    (enemy.role === 'rusher' ? 1.9 : 3.6);
+
+  const lateral =
+    lane +
+    Math.sin(phase * .9) *
+    (enemy.role === 'rusher' ? 2.4 : 3.2);
+
+  const desiredRange =
+    enemy.role === 'rusher'
+      ? 2.2
+      : enemy.role === 'rifleman'
+        ? 24
+        : 29;
+
+  const wantsCover =
+    enemy.role !== 'rusher' &&
+    (!ai.seenPlayer || ai.suppressedTimer > 0);
+
+  if (wantsCover) {
+    const cover = findEnemyCoverPoint(enemy);
+    if (cover) {
+      ai.coverPoint = cover;
+      ai.inCover = true;
+      ai.desiredDistance = 1.15;
+      ai.target.copy(cover);
+      return;
+    }
+  }
+
+  ai.inCover = false;
+  ai.desiredDistance = 1.15;
+
+  const tacticalTarget = player.position.clone()
+    .addScaledVector(flatToPlayer, -desiredRange)
+    .addScaledVector(side, lateral);
+
+  if (enemy.role === 'rusher') {
+    tacticalTarget.addScaledVector(
+      side,
+      Math.sin(phase * 1.7) * 2.8,
+    );
+  }
+
+  tacticalTarget.x = THREE.MathUtils.clamp(
+    tacticalTarget.x,
+    -HALF_W + 5,
+    HALF_W - 5,
+  );
+  tacticalTarget.z = THREE.MathUtils.clamp(
+    tacticalTarget.z,
+    -HALF_D + 5,
+    HALF_D - 5,
+  );
+
+  tacticalTarget.y =
+    getGroundHeightAt(
+      tacticalTarget.x,
+      tacticalTarget.z,
+    ) + ENEMY_GROUND_Y;
+
+  ai.target.copy(tacticalTarget);
+}
+
 function updateEnemies(dt) {
   for (let i = enemies.length - 1; i >= 0; i -= 1) {
     const enemy = enemies[i];
@@ -7257,18 +7431,27 @@ function updateEnemies(dt) {
 
     const dist = toPlayer.length();
 
+    updateEnemyTactics(
+      enemy,
+      i,
+      dt,
+      toPlayer,
+    );
+
     const desiredDistance =
-      enemy.role === 'rusher'
-        ? 2.25
-        : enemy.role === 'rifleman'
-          ? 24
-          : 26;
+      enemy.ai?.desiredDistance || (
+        enemy.role === 'rusher'
+          ? 2.25
+          : enemy.role === 'rifleman'
+            ? 24
+            : 26
+      );
 
     if (!enemy.navAgent && navMeshService.canPathfind) {
       enemy.navAgent = new NavMeshAgent({
         object: enemy.group,
         navMesh: navMeshService,
-        getTarget: () => player.position,
+        getTarget: () => enemy.ai?.target || player.position,
         speed: enemy.speed,
         repathInterval: .35,
         obstacles,
@@ -7276,25 +7459,23 @@ function updateEnemies(dt) {
           enemy.role === 'heavy'
             ? .68
             : .58,
-        desiredDistance:
-          enemy.role === 'rusher'
-            ? 2.25
-            : enemy.role === 'rifleman'
-              ? 24
-              : 26,
+        desiredDistance: 1.15,
       });
     }
 
     if (enemy.navAgent) {
       enemy.navAgent.speed = enemy.speed;
+      enemy.navAgent.desiredDistance =
+        enemy.ai?.desiredDistance || 1.15;
       enemy.navAgent.update(dt);
     } else {
       enemy.steering?.update(
         dt,
-        player.position,
+        enemy.ai?.target || player.position,
         {
           speed: enemy.speed,
-          desiredDistance,
+          desiredDistance:
+            enemy.ai?.desiredDistance || desiredDistance,
         },
       );
     }
