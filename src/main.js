@@ -8,7 +8,7 @@ import { AssetManager } from './assets/AssetManager.js?v=modulefix-20261004';
 import { MapLoader } from './world/MapLoader.js?v=modulefix-20261004';
 import { PropInstancer } from './world/PropInstancer.js?v=modulefix-20261004';
 import { applyBakedLightmap } from './world/BakedLighting.js?v=modulefix-20261004';
-import { configureAtmosphere } from './world/Atmosphere.js?v=brightai-20261003';
+import { configureAtmosphere } from './world/Atmosphere.js?v=wide-war-20261003';
 import { NavMeshService } from './ai/NavMeshService.js?v=wide-map-20261003';
 import { NavMeshAgent } from './ai/NavMeshAgent.js?v=wide-map-20261003';
 
@@ -73,6 +73,7 @@ const els = {
   damageOverlay: document.querySelector('#damage-overlay'),
   combatCallout: document.querySelector('#combat-callout'),
   comboCount: document.querySelector('#combo-count'),
+  weaponPickupPrompt: document.querySelector('#weapon-pickup-prompt'),
 };
 
 const scene = new THREE.Scene();
@@ -2957,6 +2958,7 @@ function createWeapon() {
     new THREE.SphereGeometry(.115, 20, 14),
     gloveMat,
   );
+  leftHand.name = 'WeaponLeftHand';
   leftHand.scale.set(1.0, .66, 1.30);
   leftHand.position.set(-.16, -.18, -1.02);
   leftHand.castShadow = true;
@@ -2966,6 +2968,7 @@ function createWeapon() {
     new THREE.SphereGeometry(.11, 20, 14),
     gloveMat,
   );
+  rightHand.name = 'WeaponRightHand';
   rightHand.scale.set(.98, .68, 1.24);
   rightHand.position.set(.16, -.16, .17);
   rightHand.castShadow = true;
@@ -3023,6 +3026,7 @@ function createWeapon() {
     7,
     2,
   );
+  flash.name = 'WeaponMuzzleLight';
   flash.position.set(0, .04, -2.96);
   weapon.add(flash);
 
@@ -3035,6 +3039,7 @@ function createWeapon() {
       blending: THREE.AdditiveBlending,
     }),
   );
+  flashMesh.name = 'WeaponMuzzleFlash';
   flashMesh.rotation.x = -Math.PI / 2;
   flashMesh.position.set(0, .04, -3.06);
   weapon.add(flashMesh);
@@ -3070,6 +3075,279 @@ const syncWorldWeaponAnchor = () => {
 };
 
 syncWorldWeaponAnchor();
+
+function createDroppedWeaponMesh() {
+  const mesh = weapon.clone(true);
+  mesh.name = 'DroppedEnemyRifle';
+  mesh.scale.setScalar(.62);
+
+  mesh.traverse((child) => {
+    if (
+      child.name === 'WeaponLeftArm' ||
+      child.name === 'WeaponRightArm' ||
+      child.name === 'WeaponLeftHand' ||
+      child.name === 'WeaponRightHand' ||
+      child.name === 'WeaponMuzzleLight' ||
+      child.name === 'WeaponMuzzleFlash'
+    ) {
+      child.visible = false;
+    }
+
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+      child.frustumCulled = false;
+    }
+  });
+
+  return mesh;
+}
+
+function spawnDroppedWeapon(enemy, impactPoint = null, direction = null) {
+  if (!weapon || droppedGuns.length >= 18) {
+    return null;
+  }
+
+  const mesh =
+    createDroppedWeaponMesh();
+
+  const start =
+    impactPoint?.clone() ||
+    enemy.group.position.clone();
+
+  start.y = Math.max(
+    .62,
+    start.y + .18,
+  );
+
+  const launch =
+    direction?.clone() ||
+    new THREE.Vector3(
+      Math.random() - .5,
+      .25,
+      Math.random() - .5,
+    );
+
+  launch.y = Math.max(
+    .18,
+    launch.y,
+  );
+
+  if (launch.lengthSq() < .001) {
+    launch.set(0, 0.3, 0);
+  }
+
+  launch.normalize();
+
+  mesh.position.copy(start);
+  mesh.rotation.set(
+    .08,
+    enemy.group.rotation.y + Math.PI,
+    .12,
+  );
+
+  scene.add(mesh);
+
+  const ammoGrant =
+    enemy.role === 'heavy'
+      ? 45
+      : enemy.role === 'rifleman'
+        ? 36
+        : 30;
+
+  const drop = {
+    mesh,
+    velocity:
+      launch
+        .multiplyScalar(2.2)
+        .add(new THREE.Vector3(0, 2.9, 0)),
+    angularVelocity:
+      new THREE.Vector3(
+        2.2,
+        4.0,
+        1.6,
+      ),
+    resting: false,
+    life: 90,
+    ammoGrant,
+    pickupRadius: 2.5,
+  };
+
+  droppedGuns.push(drop);
+  return drop;
+}
+
+function getNearestDroppedWeapon() {
+  let nearest = null;
+  let nearestDistance = Infinity;
+
+  for (const drop of droppedGuns) {
+    const distance =
+      player.position.distanceTo(
+        drop.mesh.position,
+      );
+
+    if (
+      distance <= drop.pickupRadius &&
+      distance < nearestDistance
+    ) {
+      nearest = drop;
+      nearestDistance = distance;
+    }
+  }
+
+  return nearest;
+}
+
+function updateWeaponPickupPrompt() {
+  if (
+    !els.weaponPickupPrompt ||
+    !state.active ||
+    state.over
+  ) {
+    els.weaponPickupPrompt?.classList.add('hidden');
+    return;
+  }
+
+  const nearest =
+    getNearestDroppedWeapon();
+
+  if (!nearest) {
+    els.weaponPickupPrompt.classList.add('hidden');
+    return;
+  }
+
+  els.weaponPickupPrompt.innerHTML =
+    '<strong>[E]</strong> PICK UP // ENEMY RIFLE' +
+    '<span>+' + nearest.ammoGrant + ' RESERVE AMMO</span>';
+
+  els.weaponPickupPrompt.classList.remove('hidden');
+}
+
+function pickupNearestDroppedWeapon() {
+  const drop =
+    getNearestDroppedWeapon();
+
+  if (!drop) {
+    return false;
+  }
+
+  state.ammo =
+    Math.min(
+      CONFIG.magSize,
+      state.ammo + 12,
+    );
+
+  state.reserve =
+    Math.min(
+      300,
+      state.reserve + drop.ammoGrant,
+    );
+
+  state.score += 25;
+
+  scene.remove(drop.mesh);
+
+  const index =
+    droppedGuns.indexOf(drop);
+
+  if (index !== -1) {
+    droppedGuns.splice(
+      index,
+      1,
+    );
+  }
+
+  spawnBurst(
+    drop.mesh.position.clone(),
+    0xb8d6e8,
+    6,
+  );
+
+  updateHud();
+  updateWeaponPickupPrompt();
+  return true;
+}
+
+function updateDroppedWeapons(dt) {
+  for (
+    let i = droppedGuns.length - 1;
+    i >= 0;
+    i -= 1
+  ) {
+    const drop =
+      droppedGuns[i];
+
+    drop.life -= dt;
+
+    if (!drop.resting) {
+      drop.velocity.y -=
+        18 * dt;
+
+      drop.mesh.position.addScaledVector(
+        drop.velocity,
+        dt,
+      );
+
+      drop.mesh.rotation.x +=
+        drop.angularVelocity.x * dt;
+      drop.mesh.rotation.y +=
+        drop.angularVelocity.y * dt;
+      drop.mesh.rotation.z +=
+        drop.angularVelocity.z * dt;
+
+      const floorY = .10;
+
+      if (
+        drop.mesh.position.y <=
+        floorY
+      ) {
+        drop.mesh.position.y =
+          floorY;
+
+        if (
+          Math.abs(drop.velocity.y) >
+          .55
+        ) {
+          drop.velocity.y =
+            Math.abs(drop.velocity.y) *
+            .22;
+
+          drop.velocity.x *= .58;
+          drop.velocity.z *= .58;
+          drop.angularVelocity.multiplyScalar(.62);
+        } else {
+          drop.velocity.set(
+            0,
+            0,
+            0,
+          );
+
+          drop.angularVelocity.multiplyScalar(
+            .10,
+          );
+
+          drop.resting = true;
+        }
+      }
+    } else {
+      drop.mesh.rotation.y +=
+        Math.sin(
+          performance.now() * .002 +
+          i,
+        ) * .0007;
+    }
+
+    if (
+      drop.life <= 0
+    ) {
+      scene.remove(drop.mesh);
+      droppedGuns.splice(i, 1);
+    }
+  }
+
+  updateWeaponPickupPrompt();
+}
 
 const worldHitMarkers = [];
 
@@ -4037,6 +4315,12 @@ function removeEnemy(
   state.comboTimer = 2.6;
   state.score +=
     Math.min(state.combo, 10) * 15;
+
+  spawnDroppedWeapon(
+    enemy,
+    hitPoint,
+    direction,
+  );
 
   createRagdoll(
     enemy,
@@ -5482,6 +5766,7 @@ function tickEffects(dt) {
   }
 
   updateWorldHitMarkers(dt);
+  updateDroppedWeapons(dt);
 
   if (state.hurtFlash > 0) {
     renderer.domElement.style.filter = 'brightness(1.2) contrast(1.12) saturate(1.08)';
@@ -5737,6 +6022,13 @@ els.updateDismiss.addEventListener('click', () => {
 });
 
 window.addEventListener('keydown', (event) => {
+  if (event.code === 'KeyE') {
+    if (pickupNearestDroppedWeapon()) {
+      event.preventDefault();
+      return;
+    }
+  }
+
   if (event.code === 'KeyR') reload();
   if (event.code === 'ControlLeft' || event.code === 'ControlRight' || event.code === 'KeyC') {
     state.slideQueued = true;
