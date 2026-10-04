@@ -347,7 +347,8 @@ const physicsWorld = new PhysicsWorld({
   fixedStep: 1 / 60,
   maxSubSteps: 3,
 });
-physicsWorld.syncArena(obstacles);
+const fallbackPhysicsBodies =
+  physicsWorld.syncArena(obstacles);
 
 const ragdollController = new RagdollController({
   scene,
@@ -394,11 +395,12 @@ async function loadWorldAssets() {
       i < fallbackObstacleCount;
       i += 1
     ) {
-      const fallback = obstacles.shift();
-      if (fallback) {
-        fallbackArenaRoot.remove(fallback);
-      }
+      obstacles.shift();
     }
+
+    physicsWorld.removeBodies(
+      fallbackPhysicsBodies,
+    );
 
     fallbackArenaRoot.visible = false;
     arenaGrid.visible = false;
@@ -409,7 +411,7 @@ async function loadWorldAssets() {
     try {
       bakedLightmapTexture =
         await applyBakedLightmap(
-          loadedMap.root,
+          mapLoader.visualRoot,
           new THREE.TextureLoader(),
           './assets/maps/warfex-lightmap.jpg',
           1.0,
@@ -2155,6 +2157,22 @@ function updateEnemies(dt) {
         : enemy.role === 'rifleman'
           ? 24
           : 26;
+
+    if (!enemy.navAgent && navMeshService.ready) {
+      enemy.navAgent = new NavMeshAgent({
+        object: enemy.group,
+        navMesh: navMeshService,
+        getTarget: () => player.position,
+        speed: enemy.speed,
+        repathInterval: .35,
+        desiredDistance:
+          enemy.role === 'rusher'
+            ? 2.25
+            : enemy.role === 'rifleman'
+              ? 24
+              : 26,
+      });
+    }
 
     if (enemy.navAgent) {
       enemy.navAgent.speed = enemy.speed;
