@@ -70,7 +70,11 @@ export class PhysicsWorld {
   }
 
   syncArena(obstacles = []) {
-    this.addGround();
+    const bodies = [];
+
+    bodies.push(
+      this.addGround(),
+    );
 
     for (const obstacle of obstacles) {
       const p = obstacle.geometry?.parameters;
@@ -82,7 +86,20 @@ export class PhysicsWorld {
         z: p.depth ?? 1,
       };
 
-      this.addBox(size, obstacle.position);
+      bodies.push(
+        this.addBox(
+          size,
+          obstacle.position,
+        ),
+      );
+    }
+
+    return bodies;
+  }
+
+  removeBodies(bodies = []) {
+    for (const body of bodies) {
+      this.world.removeBody(body);
     }
   }
 
