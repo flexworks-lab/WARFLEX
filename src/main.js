@@ -8,7 +8,7 @@ import { AssetManager } from './assets/AssetManager.js?v=modulefix-20261004';
 import { MapLoader } from './world/MapLoader.js?v=modulefix-20261004';
 import { PropInstancer } from './world/PropInstancer.js?v=modulefix-20261004';
 import { applyBakedLightmap } from './world/BakedLighting.js?v=modulefix-20261004';
-import { configureAtmosphere } from './world/Atmosphere.js?v=wide-war-20261003';
+import { configureAtmosphere } from './world/Atmosphere.js?v=wide-war-lighting-20261003';
 import { NavMeshService } from './ai/NavMeshService.js?v=wide-map-20261003';
 import { NavMeshAgent } from './ai/NavMeshAgent.js?v=wide-map-20261003';
 
@@ -168,7 +168,7 @@ const sun = new THREE.DirectionalLight(
   0xfff7e8,
   5.8,
 );
-sun.position.set(-28, 48, 18);
+sun.position.set(-52, 62, 28);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.bias = -0.0005;
@@ -185,7 +185,7 @@ const daylightFill = new THREE.DirectionalLight(
   0x9fc4ff,
   1.3,
 );
-daylightFill.position.set(34, 22, -30);
+daylightFill.position.set(46, 30, -52);
 scene.add(daylightFill);
 
 const ambientLight = new THREE.AmbientLight(
@@ -2362,15 +2362,23 @@ function buildInstancedProps() {
   };
 
   for (const [x, z, scale, rotation] of [
-    [-43, -30, 1.0, -.12],
-    [-44, 7, .86, .08],
-    [43, -8, 1.08, .16],
-    [42, 27, .92, -.11],
-    [16, 31, .82, .05],
-    [-12, 28, .9, -.10],
-    [-38, -4, .72, .28],
-    [36, -24, .74, -.20],
-    [8, 35, .68, .12],
+    // Command compound / west staging.
+    [-94, 12, .92, -.06],
+    [-96, 19, .82, .04],
+    [-72, 13, .88, -.08],
+    [-69, 29, .72, .12],
+    // Logistics yard / east.
+    [52, 12, .98, .02],
+    [61, 12, .84, -.04],
+    [70, 12, .92, .06],
+    [82, 12, .76, -.08],
+    [59, 29, .72, .10],
+    [83, 31, .66, -.05],
+    // Main road / combat staging.
+    [-17, 34, .72, .16],
+    [17, 38, .82, -.10],
+    [-24, -22, .76, .06],
+    [24, -22, .80, -.08],
   ]) {
     createDetailedCrate(
       new THREE.Vector3(
@@ -2500,14 +2508,25 @@ function buildInstancedProps() {
   };
 
   for (const [x, z, rotation] of [
-    [-34, -22, .05],
-    [-30, 16, -.18],
-    [-4, 5, .0],
-    [25, 7, .12],
-    [31, -14, -.08],
-    [18, -33, .18],
-    [36, 22, .25],
-    [-18, 36, -.12],
+    // Road checkpoints.
+    [-8, 42, .0],
+    [8, 42, .0],
+    [-8, 26, .0],
+    [8, 26, .0],
+    // Command courtyard.
+    [-101, 10, Math.PI / 2],
+    [-101, 28, Math.PI / 2],
+    // Logistics loading lane.
+    [44, 24, 0],
+    [93, 24, 0],
+    [95, 7, Math.PI / 2],
+    // Defensive line.
+    [-72, -40, 0],
+    [-44, -40, 0],
+    [-16, -40, 0],
+    [16, -40, 0],
+    [44, -40, 0],
+    [72, -40, 0],
   ]) {
     createBarrier(
       new THREE.Vector3(
@@ -2981,6 +3000,7 @@ function createWeapon() {
     handMat,
     [0, 0, Math.PI / 2],
     18,
+    'WeaponLeftHandGrip',
   );
 
   addCylinder(
@@ -2990,6 +3010,7 @@ function createWeapon() {
     handMat,
     [0, 0, Math.PI / 2],
     18,
+    'WeaponRightHandGrip',
   );
 
   const leftArm = new THREE.Group();
@@ -3087,6 +3108,8 @@ function createDroppedWeaponMesh() {
       child.name === 'WeaponRightArm' ||
       child.name === 'WeaponLeftHand' ||
       child.name === 'WeaponRightHand' ||
+      child.name === 'WeaponLeftHandGrip' ||
+      child.name === 'WeaponRightHandGrip' ||
       child.name === 'WeaponMuzzleLight' ||
       child.name === 'WeaponMuzzleFlash'
     ) {
