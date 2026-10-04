@@ -3627,7 +3627,7 @@ function installImportedWeaponModel(target, sourceScene, {
   }
 
   const model = sourceScene.clone(true);
-  model.name = 'ImportedAK47Model';
+  model.name = 'ImportedAk47Model';
 
   const bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());
@@ -3728,7 +3728,7 @@ function installImportedWeaponModel(target, sourceScene, {
 window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
   try {
     const url = new URL(
-      './assets/guns/ak4/source/AK47.glb',
+      './assets/guns/Ak47.usdz',
       import.meta.url,
     ).href;
 
