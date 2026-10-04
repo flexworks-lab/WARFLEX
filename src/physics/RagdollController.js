@@ -21,22 +21,27 @@ function setWorldTransform(object, position, quaternion) {
     return;
   }
 
-  const worldMatrix = new THREE.Matrix4().compose(
-    position,
-    quaternion,
-    new THREE.Vector3(1, 1, 1),
-  );
+  // Convert only world position/rotation back into the object's local space.
+  // Preserve the model's original local scale. Decomposing a world matrix
+  // here would include the ragdoll root's 0.54 visual scale and make some
+  // body parts grow dramatically when the ragdoll starts.
+  const localPosition =
+    parent.worldToLocal(
+      position.clone(),
+    );
 
-  const inverseParent = new THREE.Matrix4()
-    .copy(parent.matrixWorld)
-    .invert();
+  const parentWorldQuaternion =
+    parent.getWorldQuaternion(
+      new THREE.Quaternion(),
+    ).invert();
 
-  object.matrix.copy(inverseParent).multiply(worldMatrix);
-  object.matrix.decompose(
-    object.position,
-    object.quaternion,
-    object.scale,
-  );
+  const localQuaternion =
+    parentWorldQuaternion
+      .multiply(quaternion.clone());
+
+  object.position.copy(localPosition);
+  object.quaternion.copy(localQuaternion);
+  object.updateMatrix();
 }
 
 function cannonVec(v) {
