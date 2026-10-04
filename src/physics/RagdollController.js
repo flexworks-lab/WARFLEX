@@ -540,21 +540,6 @@ export class RagdollController {
     ragdoll.sleep = false;
   }
 
-  #(parts, hitPoint) {
-    if (!parts) return 'upperBody';
-
-    const head = parts.head;
-    if (head) {
-      const hp = findWorldPosition(head);
-      if (hp.distanceTo(hitPoint) < 0.48) return 'head';
-    }
-
-    if (parts.leftArm) return 'leftArm';
-    if (parts.rightArm) return 'rightArm';
-
-    return 'upperBody';
-  }
-
   update() {
     const now = performance.now();
 
