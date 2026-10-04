@@ -77,8 +77,8 @@ const els = {
 };
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x070a0e);
-scene.fog = new THREE.Fog(0x070a0e, 28, 110);
+scene.background = new THREE.Color(0x0b1117);
+scene.fog = new THREE.Fog(0x0b1117, 42, 210);
 
 const camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.05, 260);
 camera.rotation.order = 'YXZ';
@@ -1565,6 +1565,7 @@ function addArena() {
 
     sign.userData.facilityLabel = label;
     signLight.userData.facilityLabel = label;
+    root.userData.buildingHeight = height;
 
     return root;
   };
@@ -1722,14 +1723,14 @@ function addArena() {
     const start =
       new THREE.Vector3(
         a.position.x,
-        7.2 + liftA,
+        (a.userData.buildingHeight || 7.2) + liftA,
         a.position.z,
       );
 
     const end =
       new THREE.Vector3(
         b.position.x,
-        7.2 + liftB,
+        (b.userData.buildingHeight || 7.2) + liftB,
         b.position.z,
       );
 
@@ -2315,6 +2316,13 @@ function addArena() {
   }
 
   // Logistics loading lane: one coherent work area instead of scattered props.
+  const loadingCrateMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x5a4a36,
+      roughness: .88,
+      metalness: .06,
+    });
+
   const loadingPadMat =
     new THREE.MeshStandardMaterial({
       color: 0x384348,
@@ -2341,7 +2349,7 @@ function addArena() {
           .13,
           1.05,
         ),
-        crateMat,
+        loadingCrateMat,
       );
     pallet.position.set(x, .12, z);
     pallet.castShadow = true;
@@ -2355,7 +2363,7 @@ function addArena() {
             .14,
             .82,
           ),
-          y > .2 ? containerMatC : crateMat,
+          y > .2 ? containerMatC : loadingCrateMat,
         );
       load.position.set(x, y, z);
       load.castShadow = true;
@@ -2845,6 +2853,9 @@ function addArena() {
     [-53, 7, -46, 0xff8f45, 20],
     [2, 7, -46, 0xff8f45, 20],
     [53, 7, -46, 0xff8f45, 20],
+    [18, 6, 53, 0x9fe4ff, 18],
+    [94, 7, -21, 0xff6958, 24],
+    [-92, 7, 43, 0x72a7ff, 24],
   ];
 
   for (const [
