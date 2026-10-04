@@ -2672,51 +2672,40 @@ waveDirector = new WaveDirector({
   },
 });
 
-function wireMenuButton(button, handler) {
-  if (!button) return;
-  button.addEventListener('click', handler);
-}
-
 for (const button of els.waveChoices) {
-  wireMenuButton(button, () => setWaveChoice(button.dataset.waveChoice));
+  button.addEventListener('click', () => setWaveChoice(button.dataset.waveChoice));
 }
 
-wireMenuButton(els.wavesButton, () => showMenuView('waves'));
-wireMenuButton(els.optionsButton, () => showMenuView('options'));
-wireMenuButton(els.backFromWaves, () => showMenuView('main'));
-wireMenuButton(els.backFromOptions, () => showMenuView('main'));
+els.wavesButton.addEventListener('click', () => showMenuView('waves'));
+els.optionsButton.addEventListener('click', () => showMenuView('options'));
+els.backFromWaves.addEventListener('click', () => showMenuView('main'));
+els.backFromOptions.addEventListener('click', () => showMenuView('main'));
 
 setWaveChoice('1');
 showMenuView('main');
 
 function enterGame() {
-  try {
-    resetGame(false);
+  resetGame(false);
 
-    renderer.domElement.style.display = 'block';
+  renderer.domElement.style.display =
+    'block';
 
-    els.start.classList.add('hidden');
-    els.pause.classList.add('hidden');
-    els.gameOver.classList.add('hidden');
-    els.hud.classList.remove('hidden');
+  els.start.classList.add('hidden');
+  els.pause.classList.add('hidden');
+  els.gameOver.classList.add('hidden');
+  els.hud.classList.remove('hidden');
 
-    if (waveDirector) {
-      waveDirector.wave = state.wave;
-      waveDirector.start();
-    }
-
-    renderer.domElement.requestPointerLock?.();
-  } catch (error) {
-    showRuntimeError(error, 'Failed to start WARFLEX');
+  if (waveDirector) {
+    waveDirector.wave = state.wave;
+    waveDirector.start();
   }
+
+  renderer.domElement.requestPointerLock?.();
 }
 
-wireMenuButton(els.startButton, enterGame);
-wireMenuButton(els.resumeButton, () => {
-  els.pause.classList.add('hidden');
-  renderer.domElement.requestPointerLock?.();
-});
-wireMenuButton(els.restartButton, enterGame);
+els.startButton.addEventListener('click', enterGame);
+els.resumeButton.addEventListener('click', () => renderer.domElement.requestPointerLock());
+els.restartButton.addEventListener('click', enterGame);
 els.updateReload.addEventListener('click', () => {
   if (pendingUpdate?.version) localStorage.setItem(UPDATE_STORAGE_KEY, pendingUpdate.version);
   location.reload();
