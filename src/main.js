@@ -6087,6 +6087,20 @@ function spawnEnemy(index = 0, spawnPosition = null) {
   const radius =
     role === 'heavy' ? .68 : .58;
 
+  const aiState = {
+    target: group.position.clone(),
+    desiredDistance: 1.15,
+    decisionTimer: .1 + Math.random() * .3,
+    sightTimer: 0,
+    seenPlayer: true,
+    lastKnownPlayer: player.position.clone(),
+    coverPoint: null,
+    inCover: false,
+    suppressedTimer: 0,
+    flankSeed: index + Math.random() * 12,
+  };
+  aiState.target.copy(player.position);
+
   const steering = new SteeringAgent({
     object: group,
     obstacles,
@@ -6105,7 +6119,7 @@ function spawnEnemy(index = 0, spawnPosition = null) {
     ? new NavMeshAgent({
         object: group,
         navMesh: navMeshService,
-        getTarget: () => player.position,
+        getTarget: () => aiState.target,
         speed:
           (CONFIG.enemySpeed +
             Math.min(state.wave * .08, 1.2)) *
@@ -6163,6 +6177,7 @@ function spawnEnemy(index = 0, spawnPosition = null) {
     // enemy after every successful hit.
     shotVelocity: new THREE.Vector3(),
     dying: false,
+    ai: aiState,
     steering,
     navAgent,
   });
