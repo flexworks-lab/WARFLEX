@@ -204,9 +204,12 @@
         background: 'rgba(5,7,10,.92)',
         color: '#f4f6f8',
         font: '12px/1.45 monospace',
-        textAlign: 'center',
+        textAlign: 'left',
         display: 'none',
-        pointerEvents: 'none',
+        pointerEvents: 'auto',
+        userSelect: 'text',
+        WebkitUserSelect: 'text',
+        cursor: 'text',
       });
       document.body.appendChild(bootMessage);
 
