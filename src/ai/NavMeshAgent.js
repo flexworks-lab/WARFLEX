@@ -7,12 +7,14 @@ export class NavMeshAgent {
     getTarget,
     speed = 2.7,
     repathInterval = 0.35,
+    desiredDistance = 1.8,
   }) {
     this.object = object;
     this.navMesh = navMesh;
     this.getTarget = getTarget;
     this.speed = speed;
     this.repathInterval = repathInterval;
+    this.desiredDistance = desiredDistance;
 
     this.timer = 0;
     this.path = [];
@@ -77,6 +79,16 @@ export class NavMeshAgent {
     }
 
     this.tmp.normalize();
+
+    if (
+      this.tmp.lengthSq() <
+      this.desiredDistance * this.desiredDistance
+    ) {
+      this.velocity.multiplyScalar(
+        Math.exp(-12 * dt),
+      );
+      return;
+    }
 
     const desired =
       this.tmp
