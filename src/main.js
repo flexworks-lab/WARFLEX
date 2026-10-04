@@ -4904,7 +4904,7 @@ for (let i = 0; i < menuGunPalettes.length; i += 1) {
   const palette = menuGunPalettes[i];
 
   const hero = prepareMenuGun(
-    weapon,
+    rifleModel,
     palette,
     1,
     i,
@@ -4914,7 +4914,7 @@ for (let i = 0; i < menuGunPalettes.length; i += 1) {
   hero.rotation.set(-.12, .62 + i * .22, .06);
 
   const secondary = prepareMenuGun(
-    weapon,
+    rifleModel,
     palette,
     .78,
     i,
@@ -5180,7 +5180,10 @@ syncWorldWeaponAnchor();
 setActiveWeapon(0);
 
 function createDroppedWeaponMesh() {
-  const mesh = weapon.clone(true);
+  const sourceModel =
+    weapon.userData.activeModel ||
+    rifleModel;
+  const mesh = sourceModel.clone(true);
   mesh.name = 'DroppedEnemyRifle';
   mesh.scale.setScalar(.62);
 
