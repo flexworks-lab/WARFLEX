@@ -3688,6 +3688,11 @@ function installImportedWeaponModel(target, sourceScene, {
         clone.envMapIntensity =
           Math.max(clone.envMapIntensity ?? 1, 1.15);
 
+        if (clone.color) {
+          clone.color.set(0xffffff);
+        }
+        clone.toneMapped = true;
+
         // The menu fade system controls opacity directly. Imported GLTF
         // materials are normally opaque, so explicitly enable transparency.
         clone.transparent = true;
@@ -3787,13 +3792,26 @@ window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
       installImportedWeaponModel(
         pair.hero,
         asset.scene,
-        { keepHands: false, scaleTarget: 3.35, animations: asset.animations },
+        { keepHands: false, scaleTarget: 3.35, animations: [] },
       );
       installImportedWeaponModel(
         pair.secondary,
         asset.scene,
-        { keepHands: false, scaleTarget: 3.35, animations: asset.animations },
+        { keepHands: false, scaleTarget: 3.35, animations: [] },
       );
+
+      // The menu's old procedural transform is not suitable for the imported
+      // model. Give the real AK a known, explicit menu transform.
+      pair.hero.scale.setScalar(1);
+      pair.hero.position.set(2.65, -.05, -3.20);
+      pair.hero.rotation.set(-.12, .62, .06);
+
+      pair.secondary.scale.setScalar(.78);
+      pair.secondary.position.set(3.65, -.82, -4.55);
+      pair.secondary.rotation.set(-.12, -.42, .06);
+
+      pair.hero.visible = true;
+      pair.secondary.visible = true;
     }
 
     syncWorldWeaponAnchor();
