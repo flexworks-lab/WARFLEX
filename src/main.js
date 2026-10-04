@@ -4740,7 +4740,7 @@ function pickupNearestDroppedWeapon() {
 
   state.ammo =
     Math.min(
-      CONFIG.magSize,
+      getCurrentWeaponDef().magSize,
       state.ammo + 12,
     );
 
@@ -6250,14 +6250,16 @@ function getShotDirection() {
     keys.has('ShiftLeft') ||
     keys.has('ShiftRight');
 
+  const weaponSpread =
+    getCurrentWeaponDef().spread;
   const spreadDegrees =
     state.slideTimer > 0
-      ? 1.55
+      ? weaponSpread + 1.1
       : sprinting
-        ? 1.10
+        ? weaponSpread + .65
         : moving
-          ? .55
-          : .24;
+          ? weaponSpread + .25
+          : weaponSpread;
 
   const angle =
     THREE.MathUtils.degToRad(
@@ -6328,12 +6330,15 @@ function shoot() {
     return;
   }
 
+  const weaponDef = getCurrentWeaponDef();
+
   state.ammo -= 1;
   state.fireTimer =
-    CONFIG.fireInterval;
+    weaponDef.fireInterval;
 
-  state.weaponKick = 1.15;
-  state.weaponRecoilPitch += .020 + Math.random() * .006;
+  state.weaponKick = weaponDef.kick;
+  state.weaponRecoilPitch +=
+    weaponDef.recoil + Math.random() * weaponDef.recoil * .3;
   state.weaponRecoilYaw += (Math.random() - .5) * .010;
   state.muzzleFlash = .105;
   state.shake =
@@ -6467,7 +6472,9 @@ function shoot() {
         hitPart === 'head';
 
       enemy.health -=
-        headshot ? 70 : 34;
+        headshot
+          ? weaponDef.headshotDamage
+          : weaponDef.damage;
 
       // Bullets physically shove living enemies backward from the impact.
       // Keep this horizontal so shots do not make soldiers randomly fly
@@ -6654,15 +6661,22 @@ function applyRagdollHit(
 }
 
 function reload() {
-  if (state.reloadTimer > 0 || state.ammo >= CONFIG.magSize || state.reserve <= 0 || state.over) return;
-  state.reloadTimer = CONFIG.reloadTime;
+  const weaponDef = getCurrentWeaponDef();
+  if (
+    state.reloadTimer > 0 ||
+    state.ammo >= weaponDef.magSize ||
+    state.reserve <= 0 ||
+    state.over
+  ) return;
+  state.reloadTimer = weaponDef.reloadTime;
   state.weaponKick = Math.max(state.weaponKick, .35);
   state.weaponRecoilPitch = Math.min(state.weaponRecoilPitch, -.010);
   els.reload.classList.remove('hidden');
 }
 
 function finishReload() {
-  const needed = CONFIG.magSize - state.ammo;
+  const weaponDef = getCurrentWeaponDef();
+  const needed = weaponDef.magSize - state.ammo;
   const take = Math.min(needed, state.reserve);
   state.ammo += take;
   state.reserve -= take;
@@ -7517,6 +7531,10 @@ function updateWeapon(dt) {
   }
 }
 
+function weaponDefIndex(id) {
+  return WEAPON_DEFS.findIndex(def => def.id === id);
+}
+
 function updateHud() {
   els.wave.textContent = state.wave;
   els.health.textContent = Math.ceil(state.health);
@@ -7525,6 +7543,14 @@ function updateHud() {
   els.reserve.textContent = state.reserve;
   els.kills.textContent = state.kills;
   els.score.textContent = state.score.toLocaleString();
+  const weaponDef = getCurrentWeaponDef();
+  if (els.weaponSlots) {
+    els.weaponSlots.forEach((slot, index) => {
+      slot.classList.toggle('active', index === weaponDefIndex(weaponDef.id));
+    });
+  }
+  const weaponLabel = document.querySelector('.weapon');
+  if (weaponLabel) weaponLabel.textContent = weaponDef.display;
   if (els.comboCount) els.comboCount.textContent = state.combo;
   if (els.combatCallout) els.combatCallout.classList.toggle('hidden', state.combo < 2);
 }
@@ -8045,8 +8071,8 @@ function enterGame(fromEditorPlaytest = false) {
       verticalVelocity: 0,
       onGround: true,
       health: CONFIG.maxHealth,
-      ammo: CONFIG.magSize,
-      reserve: CONFIG.reserveAmmo,
+      ammo: getCurrentWeaponDef().magSize,
+      reserve: getCurrentWeaponDef().reserve,
       kills: 0,
       score: 0,
       wave: Number(state.selectedWave) > 0 ? Number(state.selectedWave) : 1,
