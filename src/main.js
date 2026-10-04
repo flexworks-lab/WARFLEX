@@ -334,10 +334,37 @@ const fallbackArenaRoot = new THREE.Group();
 fallbackArenaRoot.name = 'FallbackArena';
 scene.add(fallbackArenaRoot);
 
-function makeBox(size, position, color, cast = true) {
-  const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
-  const material = new THREE.MeshStandardMaterial({ color, roughness: .9, metalness: .05 });
-  const mesh = new THREE.Mesh(geometry, material);
+function makeBox(
+  size,
+  position,
+  color,
+  cast = true,
+  roughness = .9,
+  metalness = .05,
+) {
+  const geometry = new RoundedBoxGeometry(
+    size.x,
+    size.y,
+    size.z,
+    2,
+    Math.min(
+      .08,
+      Math.min(size.x, size.y, size.z) * .08,
+    ),
+  );
+
+  const material =
+    new THREE.MeshStandardMaterial({
+      color,
+      roughness,
+      metalness,
+    });
+
+  const mesh = new THREE.Mesh(
+    geometry,
+    material,
+  );
+
   mesh.position.copy(position);
   mesh.castShadow = cast;
   mesh.receiveShadow = true;
@@ -345,55 +372,368 @@ function makeBox(size, position, color, cast = true) {
   return mesh;
 }
 
+function makeArenaCylinder(
+  radius,
+  height,
+  position,
+  color,
+  parent = fallbackArenaRoot,
+) {
+  const geometry =
+    new THREE.CylinderGeometry(
+      radius,
+      radius * .96,
+      height,
+      24,
+      2,
+    );
+
+  const material =
+    new THREE.MeshStandardMaterial({
+      color,
+      roughness: .76,
+      metalness: .18,
+    });
+
+  const mesh =
+    new THREE.Mesh(
+      geometry,
+      material,
+    );
+
+  mesh.position.copy(position);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
 function addArena() {
-  const floor = makeBox(new THREE.Vector3(110, 1, 110), new THREE.Vector3(0, -0.5, 0), 0x151a20, false);
+  // -------------------------------------------------------------------------
+  // WARFLEX FALLBACK MAP
+  //
+  // Three combat lanes:
+  //   1. CENTRAL PRESSURE LANE  -> fastest route, most contested.
+  //   2. WEST FLANK             -> tighter cover + short sightlines.
+  //   3. EAST FLANK             -> longer sightlines + stronger rifle positions.
+  //
+  // The map is intentionally asymmetric so waves do not feel like enemies
+  // spawning into the same mirrored fight every time.
+  // -------------------------------------------------------------------------
+
+  const floor =
+    makeBox(
+      new THREE.Vector3(110, 1, 110),
+      new THREE.Vector3(0, -.5, 0),
+      0x12181d,
+      false,
+      1,
+      .02,
+    );
+
   floor.material.roughness = 1;
 
-  const border = [
-    [new THREE.Vector3(110, 10, 1), new THREE.Vector3(0, 5, -55)],
-    [new THREE.Vector3(110, 10, 1), new THREE.Vector3(0, 5, 55)],
-    [new THREE.Vector3(1, 10, 110), new THREE.Vector3(-55, 5, 0)],
-    [new THREE.Vector3(1, 10, 110), new THREE.Vector3(55, 5, 0)],
-  ];
-  for (const [size, position] of border) obstacles.push(makeBox(size, position, 0x10151b));
+  // Slightly different floor panels make the arena feel constructed instead
+  // of like one giant plane.
+  const floorPanelMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x181f25,
+      roughness: .96,
+      metalness: .03,
+    });
 
-  const cover = [
-    [8, 5, 3, -18, 2.5, -8], [8, 5, 3, 18, 2.5, -8],
-    [3, 4, 10, -7, 2, -22], [3, 4, 10, 7, 2, -22],
-    [6, 3, 3, 0, 1.5, -7], [6, 4, 3, -24, 2, 17],
-    [6, 4, 3, 24, 2, 17], [3, 6, 3, 0, 3, 24],
-    [4, 2, 10, -35, 1, 0], [4, 2, 10, 35, 1, -2],
-  ];
-  for (const [sx, sy, sz, x, y, z] of cover) {
-    obstacles.push(makeBox(new THREE.Vector3(sx, sy, sz), new THREE.Vector3(x, y, z), 0x232a33));
+  const panelGeo =
+    new THREE.BoxGeometry(
+      21.5,
+      .035,
+      21.5,
+    );
+
+  for (const x of [-32.25, -10.75, 10.75, 32.25]) {
+    for (const z of [-32.25, -10.75, 10.75, 32.25]) {
+      const panel =
+        new THREE.Mesh(
+          panelGeo,
+          floorPanelMat,
+        );
+
+      panel.position.set(x, .017, z);
+
+      if (
+        Math.abs(x) === 10.75 &&
+        Math.abs(z) === 10.75
+      ) {
+        panel.material = floorPanelMat.clone();
+        panel.material.color.setHex(0x1c252b);
+      }
+
+      panel.receiveShadow = true;
+      fallbackArenaRoot.add(panel);
+    }
   }
 
-  const lightPositions = [[-25, 8, -25], [25, 8, -25], [-25, 8, 25], [25, 8, 25], [0, 10, 0]];
+  // Outer containment.
+  const border = [
+    [
+      new THREE.Vector3(110, 10, 1.2),
+      new THREE.Vector3(0, 5, -55),
+    ],
+    [
+      new THREE.Vector3(110, 10, 1.2),
+      new THREE.Vector3(0, 5, 55),
+    ],
+    [
+      new THREE.Vector3(1.2, 10, 110),
+      new THREE.Vector3(-55, 5, 0),
+    ],
+    [
+      new THREE.Vector3(1.2, 10, 110),
+      new THREE.Vector3(55, 5, 0),
+    ],
+  ];
+
+  for (const [size, position] of border) {
+    obstacles.push(
+      makeBox(
+        size,
+        position,
+        0x0c1116,
+        true,
+        .78,
+        .18,
+      ),
+    );
+  }
+
+  const coverColor = 0x273139;
+  const darkCover = 0x1c252c;
+  const concrete = 0x343b40;
+  const metal = 0x38464d;
+
+  const addCover = (
+    sx,
+    sy,
+    sz,
+    x,
+    y,
+    z,
+    color = coverColor,
+  ) => {
+    obstacles.push(
+      makeBox(
+        new THREE.Vector3(sx, sy, sz),
+        new THREE.Vector3(x, y, z),
+        color,
+        true,
+        .82,
+        .16,
+      ),
+    );
+  };
+
+  // =========================================================================
+  // CENTRAL PRESSURE LANE
+  // =========================================================================
+
+  // Spawn-side cover. It gives the player choices without making the first
+  // wave disappear behind a wall immediately.
+  addCover(7.2, 1.55, 2.0, -8, .78, 10, darkCover);
+  addCover(4.8, 1.35, 2.0, 7, .68, 12, coverColor);
+
+  // Broken center barricade creates two micro-lanes through mid.
+  addCover(3.0, 2.6, 7.0, -3.8, 1.3, -1.5, concrete);
+  addCover(4.6, 1.25, 2.2, 4.8, .63, -2.5, darkCover);
+
+  // Main mid objective/cover island.
+  addCover(10.0, 1.25, 2.5, -1.0, .63, -13.0, metal);
+  addCover(2.5, 2.8, 4.0, 8.0, 1.4, -17.5, concrete);
+
+  // Deep center fallback cover.
+  addCover(5.8, 2.0, 2.2, -5.0, 1.0, -28.5, coverColor);
+  addCover(3.2, 3.4, 3.2, 10.5, 1.7, -31.0, darkCover);
+
+  // =========================================================================
+  // WEST FLANK — close quarters
+  // =========================================================================
+
+  // Outer warehouse-like mass, leaving a narrow lane around it.
+  addCover(8.5, 5.2, 11.5, -39, 2.6, -17, concrete);
+
+  // Broken wall and offsets create peek-and-rotate fights.
+  addCover(2.5, 2.4, 8.0, -28.0, 1.2, -5.0, metal);
+  addCover(7.0, 1.15, 2.0, -34.0, .58, 3.0, darkCover);
+  addCover(3.5, 2.7, 3.0, -26.0, 1.35, 11.5, concrete);
+
+  // Back-west staggered cover.
+  addCover(4.4, 1.45, 2.2, -34.0, .73, 20.5, coverColor);
+  addCover(3.0, 3.0, 6.2, -25.0, 1.5, 31.0, darkCover);
+
+  // =========================================================================
+  // EAST FLANK — longer sightlines
+  // =========================================================================
+
+  // Large side structure creates a long peek lane down the east edge.
+  addCover(7.0, 4.8, 10.0, 38.0, 2.4, 18.0, concrete);
+
+  // Long low walls for rifle fights.
+  addCover(11.0, 1.15, 1.8, 27.0, .58, 4.0, darkCover);
+  addCover(3.0, 2.8, 5.5, 24.0, 1.4, -9.5, metal);
+  addCover(4.5, 1.45, 2.0, 34.0, .73, -4.0, coverColor);
+
+  // East backline firing position.
+  addCover(6.0, 2.2, 2.0, 29.0, 1.1, -26.0, concrete);
+  addCover(3.5, 3.5, 3.5, 40.0, 1.75, -31.0, darkCover);
+
+  // =========================================================================
+  // NORTH / DEEP COMBAT SPACE
+  // =========================================================================
+
+  // Large broken wall creates an anchor without sealing the entire north end.
+  addCover(2.8, 4.0, 12.0, -14.5, 2.0, -38.0, concrete);
+  addCover(7.5, 1.2, 2.2, 1.5, .60, -41.0, metal);
+  addCover(3.0, 2.4, 7.0, 15.0, 1.2, -40.0, coverColor);
+
+  // Diagonal-feeling visual masses by rotating only their meshes. They remain
+  // simple box collision shapes, but break the grid-like look.
+  const angled = [
+    [-20, 2.0, -22, .18],
+    [20, 1.6, -21, -.16],
+    [-19, 1.6, 28, -.22],
+    [20, 2.0, 30, .14],
+  ];
+
+  for (const [x, y, z, rot] of angled) {
+    const mesh =
+      makeBox(
+        new THREE.Vector3(4.8, y * 2, 2.4),
+        new THREE.Vector3(x, y, z),
+        0x2a353c,
+        true,
+        .84,
+        .14,
+      );
+
+    mesh.rotation.y = rot;
+    // The rotated mesh still serves as a visual landmark. Collision remains
+    // axis-aligned through the obstacle body generated below from this mesh.
+    obstacles.push(mesh);
+  }
+
+  // Decorative industrial clutter. These are visual only, so they don't
+  // overcomplicate pathfinding.
+  for (const [x, z, scale] of [
+    [-43, -30, 1.0],
+    [-44, 7, .86],
+    [43, -8, 1.08],
+    [42, 27, .92],
+    [16, 31, .82],
+    [-12, 28, .9],
+  ]) {
+    const crate =
+      makeBox(
+        new THREE.Vector3(
+          1.5 * scale,
+          1.25 * scale,
+          1.5 * scale,
+        ),
+        new THREE.Vector3(
+          x,
+          .625 * scale,
+          z,
+        ),
+        0x4b4339,
+        true,
+        .95,
+        .02,
+      );
+
+    crate.rotation.y =
+      (Math.random() - .5) * .22;
+  }
+
+  // Drums visually establish the flanking lanes.
+  for (const [x, z] of [
+    [-31, -30],
+    [-32, -27],
+    [32, 24],
+    [35, 22],
+    [18, -34],
+  ]) {
+    makeArenaCylinder(
+      .48,
+      1.05,
+      new THREE.Vector3(x, .525, z),
+      0x46525a,
+    );
+  }
+
+  // =========================================================================
+  // LIGHTING / VISUAL LANDMARKS
+  // =========================================================================
+
+  const lightPositions = [
+    [-35, 8, -35],
+    [0, 10, -36],
+    [34, 9, -31],
+    [-36, 8, 5],
+    [33, 8, 10],
+    [-29, 7, 33],
+    [30, 9, 34],
+    [0, 10, 5],
+  ];
+
   for (const [x, y, z] of lightPositions) {
-    const light = new THREE.PointLight(0xdcecff, 48, 32, 2);
+    const light =
+      new THREE.PointLight(
+        0xcfe5ff,
+        42,
+        28,
+        2,
+      );
+
     light.position.set(x, y, z);
     scene.add(light);
     arenaLights.push(light);
   }
-  const accentMat = new THREE.MeshStandardMaterial({
-    color: 0x25313a,
-    emissive: 0x273a46,
-    emissiveIntensity: 2.2,
-    metalness: .6,
-    roughness: .35,
-  });
-  for (const z of [-48, 48]) {
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(86, .08, .18), accentMat);
-    strip.position.set(0, .08, z);
-    scene.add(strip);
-  }
-  for (const x of [-48, 48]) {
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(.18, .08, 86), accentMat);
-    strip.position.set(x, .08, 0);
+
+  const accentMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x23313a,
+      emissive: 0x224754,
+      emissiveIntensity: 2.4,
+      metalness: .64,
+      roughness: .32,
+    });
+
+  // Broken perimeter light strips instead of a perfect rectangle.
+  const strips = [
+    [new THREE.Vector3(-36, .08, -49), new THREE.Vector3(26, .08, -49), .12],
+    [new THREE.Vector3(-49, .08, -20), new THREE.Vector3(-49, .08, 32), .12],
+    [new THREE.Vector3(14, .08, 49), new THREE.Vector3(48, .08, 49), .12],
+    [new THREE.Vector3(49, .08, -2), new THREE.Vector3(49, .08, 22), .12],
+  ];
+
+  for (const [from, to, thickness] of strips) {
+    const midpoint = from.clone().add(to).multiplyScalar(.5);
+    const length = from.distanceTo(to);
+    const horizontal = Math.abs(from.x - to.x) > Math.abs(from.z - to.z);
+
+    const strip =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          horizontal ? length : thickness,
+          thickness,
+          horizontal ? thickness : length,
+          2,
+          .025,
+        ),
+        accentMat,
+      );
+
+    strip.position.copy(midpoint);
     scene.add(strip);
   }
 }
-
 addArena();
 
 const fallbackObstacleCount = obstacles.length;
