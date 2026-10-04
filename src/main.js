@@ -613,8 +613,57 @@ window.addEventListener('warfex-start-request', () => {
   }
 });
 
+function copyTextToClipboard(text) {
+  if (!text) return;
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+    return;
+  }
+
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.style.position = 'fixed';
+  area.style.left = '-9999px';
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  try { document.execCommand('copy'); } catch {}
+  area.remove();
+}
+
+function copyErrorPanel(title, error) {
+  const panel = document.querySelector('#warfex-copy-error');
+  const heading = document.querySelector('#warfex-copy-error-title');
+  const textNode = document.querySelector('#warfex-copy-error-text');
+  const copyButton = document.querySelector('#warfex-copy-error-copy');
+
+  if (!panel || !textNode) return;
+
+  const message = [
+    'WARFLEX ERROR',
+    title,
+    '',
+    error?.stack || error?.message || String(error),
+  ].join('\n');
+
+  if (heading) heading.textContent = title;
+  textNode.textContent = message;
+  panel.classList.remove('hidden');
+
+  copyButton?.onclick = () => {
+    copyTextToClipboard(message);
+    if (copyButton) {
+      copyButton.textContent = 'COPIED';
+      window.setTimeout(() => {
+        copyButton.textContent = 'COPY ERROR';
+      }, 1000);
+    }
+  };
+}
+
 function showRuntimeError(error, context = 'Runtime error') {
   console.error('[WARFLEX]', context, error);
+  copyErrorPanel(context, error);
 
   if (!DEBUG_MODE) return;
 
@@ -8480,7 +8529,10 @@ async function enterMultiplayer() {
     els.hud.classList.add('hidden');
     els.start.classList.remove('hidden');
     showMenuView('main');
-    alert('WARFLEX multiplayer is not online yet. ' + (error?.message || 'SERVER UNAVAILABLE'));
+    copyErrorPanel(
+      'MULTIPLAYER UNAVAILABLE',
+      new Error(error?.message || 'SERVER UNAVAILABLE'),
+    );
   }
 }
 
