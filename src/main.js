@@ -2975,19 +2975,19 @@ function createMaterial(color, metalness = .1, roughness = .65) {
 
 function createWeapon() {
   const weapon = new THREE.Group();
-  weapon.name = 'MK-01_3D_RIFLE';
+  weapon.name = 'AK-47_ASSAULT_RIFLE';
 
   // True custom hard-surface mesh helpers. These are actual polygonal weapon
   // parts rather than stretched boxes, giving the rifle a real side silhouette.
-  const dark = createMaterial(0x0a0d10, .90, .20);
-  const receiverMat = createMaterial(0x252d35, .86, .21);
-  const upperMat = createMaterial(0x313a43, .82, .22);
-  const polymer = createMaterial(0x161c21, .20, .43);
-  const polymerSoft = createMaterial(0x10151a, .08, .66);
-  const metal = createMaterial(0x68747f, .88, .18);
-  const metalDark = createMaterial(0x343d46, .84, .21);
-  const accent = createMaterial(0xb8c0c8, .62, .18);
-  const rubber = createMaterial(0x05070a, .02, .94);
+  const dark = createMaterial(0x090b0c, .92, .18);
+  const receiverMat = createMaterial(0x383b3a, .84, .29);
+  const upperMat = createMaterial(0x4a4d4a, .80, .30);
+  const polymer = createMaterial(0x3b2618, .10, .58);
+  const polymerSoft = createMaterial(0x24170f, .08, .68);
+  const metal = createMaterial(0x72756f, .90, .20);
+  const metalDark = createMaterial(0x202321, .86, .24);
+  const accent = createMaterial(0xb4b6af, .60, .22);
+  const rubber = createMaterial(0x11110f, .03, .88);
 
   const glass = new THREE.MeshStandardMaterial({
     color: 0x061015,
@@ -3129,54 +3129,72 @@ function createWeapon() {
   };
 
   // Narrow receiver profile — this is the main silhouette of the rifle.
+  // Stamped AK-style receiver with a taller rear and pronounced magazine
+  // well transition.
   makeProfile(
     [
-      [-1.18, .16],
-      [-1.00, .22],
-      [-.68, .22],
-      [-.54, .16],
-      [-.08, .15],
-      [.10, .10],
-      [.18, -.08],
-      [.06, -.22],
-      [-.28, -.28],
-      [-.62, -.20],
-      [-.96, -.05],
-      [-1.18, .06],
+      [-1.24, .15],
+      [-1.12, .25],
+      [-.64, .27],
+      [-.34, .23],
+      [-.10, .14],
+      [.16, .08],
+      [.22, -.08],
+      [.12, -.25],
+      [-.12, -.30],
+      [-.40, -.26],
+      [-.64, -.22],
+      [-.94, -.10],
+      [-1.20, -.02],
     ],
     .34,
     receiverMat,
     'RifleReceiverMesh',
   );
 
-  // Raised upper receiver and rear housing.
+  // Long AK dust cover.
   makeProfile(
     [
-      [-.70, .24],
-      [-.44, .31],
-      [-.05, .27],
-      [.10, .18],
-      [.02, .10],
-      [-.48, .12],
+      [-1.02, .25],
+      [-.72, .34],
+      [-.12, .31],
+      [.10, .21],
+      [.03, .13],
+      [-.72, .16],
     ],
     .30,
     upperMat,
     'UpperReceiverMesh',
   );
 
-  // Tapered handguard — noticeably slimmer than the previous version.
+  // Classic AK lower handguard / wood furniture.
   makeProfile(
     [
-      [-2.03, .16],
-      [-1.18, .17],
-      [-1.10, .10],
-      [-1.10, -.05],
-      [-2.02, -.02],
-      [-2.12, .05],
+      [-2.14, .19],
+      [-1.20, .20],
+      [-1.08, .13],
+      [-1.08, -.10],
+      [-1.34, -.18],
+      [-2.08, -.08],
+      [-2.18, .05],
     ],
-    .19,
+    .23,
     polymer,
     'HandguardMesh',
+  );
+
+  // AK gas tube / upper handguard.
+  makeProfile(
+    [
+      [-2.05, .20],
+      [-1.16, .24],
+      [-1.06, .16],
+      [-1.12, .11],
+      [-2.08, .10],
+    ],
+    .16,
+    polymerSoft,
+    'AKGasTube',
   );
 
   // Top rail follows the receiver instead of sitting on a giant rectangular
@@ -3192,51 +3210,77 @@ function createWeapon() {
     );
   }
 
-  // Low optic with a genuine beveled-ish custom prism body.
-  makeProfile(
-    [
-      [-.67, .35],
-      [-.56, .42],
-      [-.28, .42],
-      [-.19, .36],
-      [-.22, .29],
-      [-.63, .29],
-    ],
-    .13,
-    polymerSoft,
-    'OpticBodyMesh',
-  );
-
-  addMesh(
-    new THREE.OctahedronGeometry(.075, 1),
-    [0, .355, -.42],
+  // Small AK rear sight block.
+  addBoxDetail(
+    [.16, .10, .18],
+    [0, .39, -.62],
+    metalDark,
     [0, 0, 0],
-    glass,
-    'OpticLens',
+    'OpticBodyMesh',
+    .018,
   );
 
-  // Barrel is thin and centered inside the handguard.
-  addCylinder(
-    .045,
-    1.48,
-    [0, .06, -2.35],
+  addBoxDetail(
+    [.07, .08, .06],
+    [0, .47, -.62],
     metal,
+    [0, 0, 0],
+    'OpticLens',
+    .012,
+  );
+
+  // AK barrel.
+  addCylinder(
+    .052,
+    1.58,
+    [0, .06, -2.43],
+    metalDark,
     [Math.PI / 2, 0, 0],
     24,
     'Barrel',
   );
 
-  // Compact muzzle brake.
+  // Front sight block.
+  addBoxDetail(
+    [.18, .20, .20],
+    [0, .10, -2.96],
+    metalDark,
+    [0, 0, 0],
+    'AKFrontSightBlock',
+    .018,
+  );
+
+  addBoxDetail(
+    [.055, .18, .07],
+    [0, .26, -2.98],
+    metal,
+    [0, 0, 0],
+    'AKFrontSightPost',
+    .012,
+  );
+
+  // Gas block collar.
+  addCylinder(
+    .095,
+    .18,
+    [0, .08, -2.62],
+    metalDark,
+    [Math.PI / 2, 0, 0],
+    20,
+    'AKGasBlock',
+  );
+
+  // AK-style slant brake.
   makeProfile(
     [
-      [-2.97, .08],
-      [-2.92, .11],
-      [-2.66, .10],
-      [-2.60, .06],
-      [-2.62, -.06],
-      [-2.95, -.07],
+      [-3.12, .09],
+      [-3.08, .13],
+      [-2.78, .11],
+      [-2.70, .05],
+      [-2.74, -.08],
+      [-3.08, -.04],
     ],
-    .12,
+    .13,
     metalDark,
     'MuzzleDeviceMesh',
   );
@@ -3249,30 +3293,36 @@ function createWeapon() {
     'MuzzleTopCut',
   );
 
-  // Magazine well and a visibly angled magazine.
+  // AK magazine well.
   makeProfile(
     [
-      [-.55, -.12],
-      [-.25, -.10],
-      [-.12, -.22],
-      [-.18, -.35],
-      [-.52, -.31],
-      [-.61, -.20],
+      [-.62, -.10],
+      [-.25, -.08],
+      [-.12, -.20],
+      [-.20, -.38],
+      [-.56, -.35],
+      [-.68, -.20],
     ],
     .20,
     metalDark,
     'MagazineWellMesh',
   );
 
+  // Deeply curved 7.62-style AK magazine.
   makeProfile(
     [
-      [-.44, -.29],
-      [-.12, -.36],
-      [.02, -.80],
-      [-.22, -.86],
-      [-.50, -.70],
+      [-.48, -.28],
+      [-.10, -.34],
+      [.06, -.48],
+      [.02, -.72],
+      [-.16, -.98],
+      [-.38, -1.12],
+      [-.64, -1.02],
+      [-.74, -.82],
+      [-.66, -.56],
+      [-.54, -.42],
     ],
-    .17,
+    .18,
     polymer,
     'MagazineMesh',
   );
@@ -3305,18 +3355,18 @@ function createWeapon() {
     'PistolGripMesh',
   );
 
-  // Buttstock is no longer a block: tapered and kicked downward.
+  // Classic AK fixed stock with a stronger downward angle.
   makeProfile(
     [
-      [.08, .08],
-      [.44, .08],
-      [.98, -.05],
-      [1.10, -.18],
-      [.98, -.28],
-      [.54, -.21],
-      [.13, -.08],
+      [.10, .08],
+      [.42, .04],
+      [.98, -.10],
+      [1.12, -.23],
+      [.98, -.35],
+      [.52, -.27],
+      [.14, -.10],
     ],
-    .22,
+    .24,
     polymer,
     'StockMesh',
   );
@@ -3359,6 +3409,26 @@ function createWeapon() {
     .12,
     rubber,
     'ForegripMesh',
+  );
+
+  // AK charging handle.
+  addBoxDetail(
+    [.10, .07, .18],
+    [-.01, .24, -.40],
+    metal,
+    [0, 0, 0],
+    'AKChargingHandle',
+    .012,
+  );
+
+  // AK safety / selector lever.
+  addBoxDetail(
+    [.045, .09, .25],
+    [.18, -.02, -.26],
+    metalDark,
+    [0, 0, -.28],
+    'AKSelector',
+    .010,
   );
 
   // Small controls make the mesh read as a functional firearm.
