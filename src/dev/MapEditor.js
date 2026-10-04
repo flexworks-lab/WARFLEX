@@ -22,6 +22,9 @@ export class MapEditor {
     this.look = false;
     this.pan = false;
     this.directDragging = false;
+    this.directScaling = false;
+    this.scaleStart = new this.THREE.Vector3();
+    this.scalePointerY = 0;
     this.dragPlane = new this.THREE.Plane();
     this.dragOffset = new this.THREE.Vector3();
     this.dragPoint = new this.THREE.Vector3();
@@ -233,11 +236,29 @@ export class MapEditor {
       const normal=this.camera.getWorldDirection(new this.THREE.Vector3()).normalize();
       this.dragPlane.setFromNormalAndCoplanarPoint(normal,o.getWorldPosition(new this.THREE.Vector3()));
       if(this.raycaster.ray.intersectPlane(this.dragPlane,this.dragPoint)){this.dragOffset.copy(o.position).sub(this.dragPoint);this.directDragging=true;this.transformDragging=true;}
+    }else if(this.transform==='scale' && this.selected.size===1){
+      const o=hit;
+      this.scaleStart.copy(o.scale);
+      this.scalePointerY=e.clientY;
+      this.directScaling=true;
+      this.transformDragging=true;
     }
     e.preventDefault();e.stopPropagation();
   }
   onMove(e){
     if(!this.enabled)return;
+    if(this.directScaling && this.selected.size===1){
+      const o=[...this.selected][0];
+      const delta=(this.scalePointerY-e.clientY)*0.012;
+      const min=.05;
+      o.scale.set(
+        Math.max(min,this.scaleStart.x+delta),
+        Math.max(min,this.scaleStart.y+delta),
+        Math.max(min,this.scaleStart.z+delta)
+      );
+      this.markDirty();this.refreshInspector();this.refreshColliders();
+      e.preventDefault();e.stopPropagation();return;
+    }
     if(this.directDragging && this.selected.size===1){
       const r=this.renderer.domElement.getBoundingClientRect();
       this.pointer.x=((e.clientX-r.left)/r.width)*2-1; this.pointer.y=-((e.clientY-r.top)/r.height)*2+1;
@@ -251,7 +272,7 @@ export class MapEditor {
     if(this.look){this.euler.setFromQuaternion(this.camera.quaternion);this.euler.y-=e.movementX*this.sensitivity;this.euler.x-=e.movementY*this.sensitivity;this.euler.x=this.THREE.MathUtils.clamp(this.euler.x,-Math.PI*.49,Math.PI*.49);this.camera.quaternion.setFromEuler(this.euler);e.preventDefault();e.stopPropagation();return;}
     if(this.pan){const right=new this.THREE.Vector3(1,0,0).applyQuaternion(this.camera.quaternion);const up=new this.THREE.Vector3(0,1,0).applyQuaternion(this.camera.quaternion);this.camera.position.addScaledVector(right,-e.movementX*.018*this.speed);this.camera.position.addScaledVector(up,e.movementY*.018*this.speed);e.preventDefault();e.stopPropagation();}
   }
-  onUp(e){if(e.button===0){this.directDragging=false;this.transformDragging=false;}if(e.button===2)this.look=false;if(e.button===1)this.pan=false;}
+  onUp(e){if(e.button===0){this.directDragging=false;this.directScaling=false;this.transformDragging=false;}if(e.button===2)this.look=false;if(e.button===1)this.pan=false;}
   onWheel(e){if(!this.enabled||e.target?.closest?.('#warfex-editor'))return;this.speed=this.THREE.MathUtils.clamp(this.speed+(e.deltaY<0?2:-2),1,200);const i=this.ui?.querySelector('#we-speed');if(i)i.value=this.speed;e.preventDefault();e.stopPropagation();}
 
   onKeyDown(e){
