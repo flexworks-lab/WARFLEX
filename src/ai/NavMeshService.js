@@ -390,7 +390,7 @@ export class NavMeshService {
       ];
     }
 
-    const open = new Map();
+    const heap = [];
     const closed = new Set();
     const cameFrom = new Map();
     const nodes = new Map();
@@ -399,9 +399,80 @@ export class NavMeshService {
 
     const key = (x, z) => `${x}:${z}`;
 
+    const pushHeap = (entry) => {
+      heap.push(entry);
+
+      let index = heap.length - 1;
+
+      while (index > 0) {
+        const parent =
+          Math.floor((index - 1) / 2);
+
+        if (
+          heap[parent].f <=
+          heap[index].f
+        ) {
+          break;
+        }
+
+        const swap = heap[parent];
+        heap[parent] = heap[index];
+        heap[index] = swap;
+        index = parent;
+      }
+    };
+
+    const popHeap = () => {
+      const root = heap[0];
+      const last = heap.pop();
+
+      if (heap.length && last) {
+        heap[0] = last;
+
+        let index = 0;
+
+        while (true) {
+          const left =
+            index * 2 + 1;
+          const right =
+            left + 1;
+
+          let smallest = index;
+
+          if (
+            left < heap.length &&
+            heap[left].f <
+              heap[smallest].f
+          ) {
+            smallest = left;
+          }
+
+          if (
+            right < heap.length &&
+            heap[right].f <
+              heap[smallest].f
+          ) {
+            smallest = right;
+          }
+
+          if (smallest === index) {
+            break;
+          }
+
+          const swap = heap[index];
+          heap[index] = heap[smallest];
+          heap[smallest] = swap;
+          index = smallest;
+        }
+      }
+
+      return root;
+    };
+
     const heuristic = (a, b) => {
       const dx = Math.abs(a.x - b.x);
       const dz = Math.abs(a.z - b.z);
+
       return (
         Math.max(dx, dz) +
         (Math.SQRT2 - 1) *
@@ -416,7 +487,6 @@ export class NavMeshService {
       );
 
     nodes.set(startKey, startCell);
-    open.set(startKey, true);
     gScore.set(startKey, 0);
     fScore.set(
       startKey,
@@ -425,6 +495,11 @@ export class NavMeshService {
         targetCell,
       ),
     );
+
+    pushHeap({
+      key: startKey,
+      f: fScore.get(startKey),
+    });
 
     const directions = [
       [1, 0, 1],
@@ -440,29 +515,38 @@ export class NavMeshService {
     let iterations = 0;
 
     while (
-      open.size &&
+      heap.length &&
       iterations < 12000
     ) {
       iterations += 1;
 
-      let currentKey = null;
-      let current = null;
-      let currentF = Infinity;
+      const currentEntry =
+        popHeap();
 
-      for (const candidateKey of open.keys()) {
-        const score =
-          fScore.get(candidateKey) ??
-          Infinity;
+      if (!currentEntry) break;
 
-        if (score < currentF) {
-          currentF = score;
-          currentKey = candidateKey;
-          current =
-            nodes.get(candidateKey);
-        }
+      const currentKey =
+        currentEntry.key;
+
+      if (closed.has(currentKey)) {
+        continue;
       }
 
-      if (!current) break;
+      const knownF =
+        fScore.get(currentKey) ??
+        Infinity;
+
+      if (
+        currentEntry.f >
+        knownF + .0001
+      ) {
+        continue;
+      }
+
+      const current =
+        nodes.get(currentKey);
+
+      if (!current) continue;
 
       if (
         current.x === targetCell.x &&
@@ -507,7 +591,6 @@ export class NavMeshService {
         return this.simplifyPath(points);
       }
 
-      open.delete(currentKey);
       closed.add(currentKey);
 
       for (const [
@@ -551,15 +634,23 @@ export class NavMeshService {
           nextKey,
           tentative,
         );
-        fScore.set(
-          nextKey,
+
+        const nextF =
           tentative +
           heuristic(
             next,
             targetCell,
-          ),
+          );
+
+        fScore.set(
+          nextKey,
+          nextF,
         );
-        open.set(nextKey, true);
+
+        pushHeap({
+          key: nextKey,
+          f: nextF,
+        });
       }
     }
 
