@@ -259,7 +259,10 @@ export class Multiplayer {
 
   sendRespawn(){
     if(!this.connected) return;
-    this.socket.send(JSON.stringify({type:'respawn'}));
+    this.socket.send(JSON.stringify({
+      type:'respawn',
+      position:{x:this.localPlayer.position.x,y:1.65,z:this.localPlayer.position.z},
+    }));
   }
 
   sendState(now,yaw,health){
