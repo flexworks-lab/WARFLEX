@@ -1538,6 +1538,12 @@ function spawnEnemy(index = 0, spawnPosition = null) {
       .5 + Math.random(),
     hurtFlash: 0,
     deathTimer: 0,
+    // The latest hit controls a short localized hit reaction.
+    hitReactionPart: 'upperBody',
+    hitReactionTimer: 0,
+    hitReactionStrength: 0,
+    hitReactionSide: 0,
+    hitReactionLocalDirection: new THREE.Vector3(),
     // Short-lived velocity used for bullet knockback. AI steering still
     // controls normal movement, while this impulse physically pushes the
     // enemy after every successful hit.
@@ -2032,6 +2038,38 @@ function shoot() {
             .setLength(maxKnockbackSpeed);
         }
       }
+
+      // Replace the previous reaction with the location/direction
+      // of this shot. The animation system consumes this every frame.
+      const localHitPoint =
+        enemy.group.worldToLocal(
+          enemyHit.point.clone(),
+        );
+
+      const localShotDirection =
+        enemy.group.worldToLocal(
+          enemyHit.point.clone()
+            .addScaledVector(direction, 1),
+        )
+          .sub(localHitPoint)
+          .normalize();
+
+      enemy.hitReactionPart = hitPart;
+      enemy.hitReactionTimer = .34;
+      enemy.hitReactionStrength =
+        headshot ? 1.35 : 1;
+
+      // Negative/positive X identifies the side of the body that was hit.
+      enemy.hitReactionSide =
+        THREE.MathUtils.clamp(
+          localHitPoint.x / .72,
+          -1,
+          1,
+        );
+
+      enemy.hitReactionLocalDirection.copy(
+        localShotDirection,
+      );
 
       enemy.hurtFlash = .08;
 
@@ -2550,6 +2588,163 @@ function updateEnemies(dt) {
       Math.sin(
         enemy.animTime * .55,
       ) * .01;
+
+    // Localized reaction to the most recent bullet impact.
+    // This is layered on top of the normal walk/aim animation so the
+    // soldier reacts without losing his regular animation.
+    if (enemy.hitReactionTimer > 0) {
+      enemy.hitReactionTimer =
+        Math.max(
+          0,
+          enemy.hitReactionTimer - dt,
+        );
+
+      const reactionProgress =
+        enemy.hitReactionTimer / .34;
+
+      const reaction =
+        Math.sin(
+          reactionProgress * Math.PI,
+        ) *
+        enemy.hitReactionStrength;
+
+      const side =
+        enemy.hitReactionSide || 0;
+
+      const hitDirection =
+        enemy.hitReactionLocalDirection;
+
+      switch (enemy.hitReactionPart) {
+        case 'head':
+          if (parts.head?.isObject3D) {
+            parts.head.rotation.x +=
+              -hitDirection.z *
+              .24 *
+              reaction;
+
+            parts.head.rotation.y +=
+              -side *
+              .30 *
+              reaction;
+
+            parts.head.rotation.z +=
+              hitDirection.x *
+              .16 *
+              reaction;
+          }
+
+          parts.upperBody.rotation.x +=
+            -hitDirection.z *
+            .045 *
+            reaction;
+
+          parts.upperBody.rotation.z +=
+            -side *
+            .045 *
+            reaction;
+          break;
+
+        case 'leftArm':
+        case 'rightArm': {
+          const hitLeft =
+            enemy.hitReactionPart === 'leftArm';
+
+          const arm =
+            hitLeft
+              ? parts.leftArm
+              : parts.rightArm;
+
+          if (arm) {
+            arm.rotation.x +=
+              .42 * reaction;
+
+            arm.rotation.y +=
+              hitDirection.x *
+              .18 *
+              reaction;
+
+            arm.rotation.z +=
+              (hitLeft ? -1 : 1) *
+              .52 *
+              reaction;
+          }
+
+          parts.upperBody.rotation.z +=
+            (hitLeft ? -.08 : .08) *
+            reaction;
+
+          break;
+        }
+
+        case 'leftLeg':
+        case 'rightLeg': {
+          const hitLeft =
+            enemy.hitReactionPart === 'leftLeg';
+
+          const leg =
+            hitLeft
+              ? parts.leftLeg
+              : parts.rightLeg;
+
+          const knee =
+            hitLeft
+              ? parts.leftKnee
+              : parts.rightKnee;
+
+          if (leg) {
+            leg.rotation.x +=
+              -.34 * reaction;
+
+            leg.rotation.z +=
+              (hitLeft ? -.18 : .18) *
+              reaction;
+          }
+
+          if (knee) {
+            knee.rotation.x +=
+              -.72 * reaction;
+          }
+
+          parts.hips.rotation.z +=
+            (hitLeft ? -.10 : .10) *
+            reaction;
+
+          break;
+        }
+
+        case 'lowerBody':
+          parts.hips.rotation.z +=
+            -side *
+            .16 *
+            reaction;
+
+          parts.hips.rotation.x +=
+            -hitDirection.z *
+            .11 *
+            reaction;
+          break;
+
+        case 'upperBody':
+        default:
+          parts.upperBody.rotation.x +=
+            -hitDirection.z *
+            .14 *
+            reaction;
+
+          parts.upperBody.rotation.z +=
+            -side *
+            .22 *
+            reaction;
+
+          if (parts.head?.isObject3D) {
+            parts.head.rotation.z +=
+              side *
+              .10 *
+              reaction;
+          }
+          break;
+      }
+    }
 
     enemy.walkTime +=
       dt *
