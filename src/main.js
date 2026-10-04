@@ -481,8 +481,103 @@ let multiplayerActive = false;
 let multiplayerDeathActive = false;
 let multiplayerDeathEndsAt = 0;
 let multiplayerDeathRagdoll = null;
-const savedMultiplayerUsername = localStorage.getItem('WARFLEX_USERNAME') || 'PLAYER';
-if (els.multiplayerUsername) els.multiplayerUsername.value = savedMultiplayerUsername;
+const PLAYER_NAME_KEY = 'WARFLEX_PLAYER_NAME';
+const PLAYER_NAME_LOCKED_KEY = 'WARFLEX_PLAYER_NAME_LOCKED';
+
+const blockedPlayerNameTerms = [
+  'sex', 'porn', 'xxx', 'nude', 'naked', 'nsfw',
+  'dick', 'cock', 'pussy', 'cunt', 'slut',
+  'whore', 'boob', 'boobs', 'tits', 'cum',
+  'horny', 'fuck',
+];
+
+function normalizePlayerName(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 16);
+}
+
+function validatePlayerName(value) {
+  const name = normalizePlayerName(value);
+
+  if (name.length < 3) return 'NAME MUST BE AT LEAST 3 CHARACTERS.';
+  if (!/^[A-Za-z0-9 _-]+$/.test(name)) {
+    return 'USE LETTERS, NUMBERS, SPACES, _ OR - ONLY.';
+  }
+
+  const lower = name.toLowerCase().replace(/[ _-]/g, '');
+  if (blockedPlayerNameTerms.some(term => lower.includes(term))) {
+    return 'CHOOSE A NON-SEXUAL, NON-EXPLICIT PLAYER NAME.';
+  }
+
+  return '';
+}
+
+function getLockedPlayerName() {
+  return normalizePlayerName(
+    localStorage.getItem(PLAYER_NAME_KEY) || '',
+  );
+}
+
+function applyLockedPlayerName(name) {
+  const normalized = normalizePlayerName(name);
+  localStorage.setItem(PLAYER_NAME_KEY, normalized);
+  localStorage.setItem(PLAYER_NAME_LOCKED_KEY, '1');
+  localStorage.setItem('WARFLEX_USERNAME', normalized);
+
+  if (els.multiplayerUsername) {
+    els.multiplayerUsername.value = normalized;
+    els.multiplayerUsername.readOnly = true;
+    els.multiplayerUsername.disabled = true;
+  }
+}
+
+function initializePlayerNameGate() {
+  const existing = getLockedPlayerName();
+  const locked =
+    localStorage.getItem(PLAYER_NAME_LOCKED_KEY) === '1';
+
+  if (locked && !validatePlayerName(existing)) {
+    applyLockedPlayerName(existing);
+    els.playerNameGate?.classList.add('hidden');
+    return;
+  }
+
+  els.playerNameGate?.classList.remove('hidden');
+
+  if (els.playerNameInput) {
+    els.playerNameInput.value = existing || '';
+    requestAnimationFrame(() => els.playerNameInput.focus());
+  }
+}
+
+function confirmPlayerName() {
+  const name = normalizePlayerName(els.playerNameInput?.value);
+  const error = validatePlayerName(name);
+
+  if (error) {
+    if (els.playerNameError) els.playerNameError.textContent = error;
+    return;
+  }
+
+  applyLockedPlayerName(name);
+  if (els.playerNameError) els.playerNameError.textContent = '';
+  if (els.playerNameInput) els.playerNameInput.readOnly = true;
+  if (els.playerNameConfirm) els.playerNameConfirm.disabled = true;
+  els.playerNameGate?.classList.add('hidden');
+}
+
+const savedMultiplayerUsername =
+  getLockedPlayerName() ||
+  localStorage.getItem('WARFLEX_USERNAME') ||
+  'PLAYER';
+
+if (els.multiplayerUsername) {
+  els.multiplayerUsername.value = savedMultiplayerUsername;
+  els.multiplayerUsername.readOnly = true;
+  els.multiplayerUsername.disabled = true;
+}
 
 let multiplayer;
 
@@ -6703,7 +6798,7 @@ multiplayer = new Multiplayer({
   THREE,
   scene,
   localPlayer: player,
-  getUsername: () => els.multiplayerUsername?.value?.trim() || localStorage.getItem('WARFLEX_USERNAME') || 'PLAYER',
+  getUsername: () => getLockedPlayerName() || 'PLAYER',
   damagePlayer,
   onRemoteShot: handleRemoteShot,
 });
@@ -7884,25 +7979,119 @@ for (const [index, button] of menuNavButtons.entries()) {
 
 let directorWaveInitialized = false;
 
-const waveDirectorSpawnPoints = [
-  new THREE.Vector3(-64, 0, -61),
-  new THREE.Vector3(-34, 0, -64),
-  new THREE.Vector3(0, 0, -64),
-  new THREE.Vector3(34, 0, -64),
-  new THREE.Vector3(64, 0, -61),
-  new THREE.Vector3(-96, 0, -48),
-  new THREE.Vector3(96, 0, -48),
-  new THREE.Vector3(0, 0, -57),
-];
+const waveDirectorSpawnPoints = Array.from(
+  { length: 16 },
+  (_, index) => new THREE.Vector3(),
+);
+
+let cachedDynamicSpawnWave = -1;
+let cachedDynamicSpawnOrigin = new THREE.Vector3(
+  Infinity,
+  0,
+  Infinity,
+);
+
+function pointInsideObstacle(point) {
+  for (const obstacle of obstacles) {
+    const geometry = obstacle?.geometry;
+    const p = geometry?.parameters;
+    if (!p) continue;
+
+    const hx = (p.width ?? 1) * .5 + .8;
+    const hz = (p.depth ?? 1) * .5 + .8;
+    if (
+      Math.abs(point.x - obstacle.position.x) < hx &&
+      Math.abs(point.z - obstacle.position.z) < hz
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function rebuildDynamicSpawnPoints() {
+  const origin = player.position.clone();
+  const angleOffset =
+    ((state.wave * 37) % 360) *
+    Math.PI / 180;
+
+  let found = 0;
+  for (let i = 0; i < 32 && found < waveDirectorSpawnPoints.length; i += 1) {
+    const angle =
+      angleOffset +
+      (i / 32) * Math.PI * 2;
+
+    const ring =
+      22 +
+      (i % 4) * 6 +
+      Math.sin(
+        (state.wave + i) * 1.73,
+      ) * 2.5;
+
+    const point = new THREE.Vector3(
+      origin.x + Math.cos(angle) * ring,
+      0,
+      origin.z + Math.sin(angle) * ring,
+    );
+
+    point.x = THREE.MathUtils.clamp(
+      point.x,
+      -HALF_W + 5,
+      HALF_W - 5,
+    );
+    point.z = THREE.MathUtils.clamp(
+      point.z,
+      -HALF_D + 5,
+      HALF_D - 5,
+    );
+
+    if (
+      point.distanceTo(origin) < 17 ||
+      pointInsideObstacle(point)
+    ) {
+      continue;
+    }
+
+    // Keep the candidates spread out so a wave cannot collapse into one pile.
+    let tooClose = false;
+    for (let j = 0; j < found; j += 1) {
+      if (
+        point.distanceTo(waveDirectorSpawnPoints[j]) < 9
+      ) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (tooClose) continue;
+
+    waveDirectorSpawnPoints[found].copy(point);
+    found += 1;
+  }
+
+  cachedDynamicSpawnWave = state.wave;
+  cachedDynamicSpawnOrigin.copy(origin);
+}
 
 function getWaveSpawnPoints() {
   const custom = getActiveEnemySpawns();
-  const source = custom.length ? custom : waveDirectorSpawnPoints;
-  return source.map((point) => {
-    const next = point.clone();
-    if (next.distanceTo(player.position) < 12) next.z -= 8;
-    return next;
-  });
+
+  if (custom.length) {
+    return custom
+      .map(point => point.clone())
+      .filter(point => !pointInsideObstacle(point));
+  }
+
+  const moved =
+    cachedDynamicSpawnWave !== state.wave ||
+    cachedDynamicSpawnOrigin.distanceTo(player.position) > 12;
+
+  if (moved) {
+    rebuildDynamicSpawnPoints();
+  }
+
+  return waveDirectorSpawnPoints
+    .slice(0, 16)
+    .map(point => point.clone());
 }
 
 waveDirector = new WaveDirector({
@@ -7969,6 +8158,23 @@ if(new URLSearchParams(location.search).get('editor')==='WARFLEX_DEV' && els.edi
 setWaveChoice('1');
 showMenuView('main');
 refreshMapList();
+initializePlayerNameGate();
+
+els.playerNameConfirm?.addEventListener('click', confirmPlayerName);
+els.playerNameInput?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    confirmPlayerName();
+  }
+});
+
+els.weaponSlots.forEach((slot) => {
+  slot.addEventListener('click', () => {
+    if (!state.active || state.over) return;
+    setActiveWeapon(Number(slot.dataset.weaponSlot));
+  });
+});
+
 updateMenuSelection(0, false);
 
 function exitEditorPlaytest() {
@@ -8005,7 +8211,7 @@ function exitEditorPlaytest() {
 
 async function enterMultiplayer() {
   if (mapEditor.enabled) return;
-  const username = (els.multiplayerUsername?.value || 'PLAYER').trim().slice(0,18) || 'PLAYER';
+  const username = getLockedPlayerName() || 'PLAYER';
   localStorage.setItem('WARFLEX_USERNAME', username);
   state.gameMode = 'multiplayer';
   multiplayerActive = true;
@@ -8277,6 +8483,12 @@ window.addEventListener('keydown', (event) => {
       event.preventDefault();
       return;
     }
+  }
+
+  if (/^Digit[1-5]$/.test(event.code) && state.active && !state.over) {
+    setActiveWeapon(Number(event.code.slice(-1)) - 1);
+    event.preventDefault();
+    return;
   }
 
   if (event.code === 'KeyR') reload();
