@@ -3674,20 +3674,220 @@ function createWeapon() {
   weapon.userData.flashMesh = flashMesh;
   weapon.userData.muzzle = weapon.getObjectByName('MuzzleDeviceMesh');
 
-  // Imported rifles are centered around their model origin, so keep the
-  // first-person weapon safely in front of the camera instead of clipping it.
-  weapon.position.set(.39, -.48, -2.35);
-  weapon.rotation.set(-.025, -.045, -.012);
-
-  // Render the live first-person weapon through the main world camera so it
-  // is guaranteed to appear in gameplay with the same camera transform.
-  camera.add(weapon);
-  scene.add(camera);
-
   return weapon;
 }
-const weapon = createWeapon();
-weapon.visible = false;
+
+const weapon = new THREE.Group();
+weapon.name = 'WARFLEX_WEAPON_ROOT';
+camera.add(weapon);
+scene.add(camera);
+
+const weaponModels = [];
+
+function normalizeWeaponModel(model, id) {
+  model.name = 'WeaponModel_' + id;
+  model.position.set(0, 0, 0);
+  model.rotation.set(0, 0, 0);
+  model.visible = false;
+  model.traverse((child) => {
+    if (child.isMesh) child.frustumCulled = false;
+  });
+
+  model.userData.muzzle =
+    model.getObjectByName('MuzzleDeviceMesh') ||
+    model.getObjectByName('Barrel') ||
+    null;
+  model.userData.flash =
+    model.getObjectByName('WeaponMuzzleLight') || null;
+  model.userData.flashMesh =
+    model.getObjectByName('WeaponMuzzleFlash') || null;
+  return model;
+}
+
+function hideWeaponParts(model, names) {
+  const hidden = new Set(names);
+  model.traverse((child) => {
+    if (hidden.has(child.name)) child.visible = false;
+  });
+}
+
+function addVariantCylinder(model, name, radius, length, position, material) {
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius * .94, length, 20),
+    material,
+  );
+  mesh.name = name;
+  mesh.rotation.x = Math.PI / 2;
+  mesh.position.set(...position);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  model.add(mesh);
+  return mesh;
+}
+
+const rifleModel = normalizeWeaponModel(createWeapon(), 'rifle');
+weaponModels.push(rifleModel);
+
+const shotgunModel = normalizeWeaponModel(rifleModel.clone(true), 'shotgun');
+hideWeaponParts(shotgunModel, [
+  'OpticBodyMesh',
+  'OpticLens',
+  'MagazineMesh',
+  'MagazineWellMesh',
+  'ForegripMesh',
+  ...[...shotgunModel.children]
+    .filter(child => child.name === 'RailTooth')
+    .map(child => child.name),
+]);
+const shotgunTube = addVariantCylinder(
+  shotgunModel,
+  'ShotgunTube',
+  .095,
+  2.25,
+  [0, .23, -2.0],
+  createMaterial(0x252a2c, .84, .24),
+);
+shotgunModel.getObjectByName('Barrel')?.scale.set(.1, 1.45, .1);
+shotgunModel.scale.set(1.04, 1.04, .94);
+weaponModels.push(shotgunModel);
+
+const sniperModel = normalizeWeaponModel(rifleModel.clone(true), 'sniper');
+hideWeaponParts(sniperModel, ['ForegripMesh']);
+sniperModel.scale.set(1.0, 1.0, 1.42);
+addVariantCylinder(
+  sniperModel,
+  'SniperBarrel',
+  .045,
+  2.55,
+  [0, .07, -2.75],
+  createMaterial(0x15191c, .9, .18),
+);
+const sniperScope = new THREE.Mesh(
+  new THREE.CylinderGeometry(.115, .11, .72, 20),
+  createMaterial(0x161b20, .78, .22),
+);
+sniperScope.name = 'SniperScope';
+sniperScope.rotation.z = Math.PI / 2;
+sniperScope.position.set(0, .43, -.55);
+sniperScope.castShadow = true;
+sniperModel.add(sniperScope);
+weaponModels.push(sniperModel);
+
+const pistolModel = normalizeWeaponModel(rifleModel.clone(true), 'pistol');
+hideWeaponParts(pistolModel, [
+  'StockMesh',
+  'ButtpadMesh',
+  'CheekRestMesh',
+  'HandguardMesh',
+  'AKGasTube',
+  'ForegripMesh',
+  'OpticBodyMesh',
+  'OpticLens',
+  'MuzzleDeviceMesh',
+]);
+pistolModel.scale.set(.72, .72, .72);
+pistolModel.position.z = .18;
+const pistolSlide = new THREE.Mesh(
+  new RoundedBoxGeometry(.24, .16, 1.02, 2, .025),
+  createMaterial(0x282c2f, .82, .3),
+);
+pistolSlide.name = 'PistolSlide';
+pistolSlide.position.set(0, .23, -.42);
+pistolSlide.castShadow = true;
+pistolModel.add(pistolSlide);
+addVariantCylinder(
+  pistolModel,
+  'PistolBarrel',
+  .04,
+  .82,
+  [0, .22, -1.05],
+  createMaterial(0x747a78, .9, .2),
+);
+weaponModels.push(pistolModel);
+
+const smgModel = normalizeWeaponModel(rifleModel.clone(true), 'smg');
+hideWeaponParts(smgModel, [
+  'OpticLens',
+  'StockMesh',
+  'ButtpadMesh',
+  'CheekRestMesh',
+]);
+smgModel.scale.set(1.0, 1.0, .78);
+smgModel.position.z = .06;
+addVariantCylinder(
+  smgModel,
+  'SMGBarrel',
+  .055,
+  1.35,
+  [0, .06, -2.05],
+  createMaterial(0x1b2023, .86, .22),
+);
+weaponModels.push(smgModel);
+
+let activeWeaponDef = WEAPON_DEFS[0];
+function getCurrentWeaponDef() {
+  return activeWeaponDef || WEAPON_DEFS[0];
+}
+
+function setActiveWeapon(indexOrId, { resetAmmo = false } = {}) {
+  const index =
+    typeof indexOrId === 'number'
+      ? THREE.MathUtils.clamp(indexOrId, 0, WEAPON_DEFS.length - 1)
+      : WEAPON_DEFS.findIndex(item => item.id === indexOrId);
+  if (index < 0) return;
+
+  const nextDef = WEAPON_DEFS[index];
+  const nextModel = weaponModels[index];
+  if (!nextModel) return;
+
+  activeWeaponDef = nextDef;
+  state.weaponId = nextDef.id;
+
+  for (const model of weaponModels) {
+    model.visible = false;
+  }
+  nextModel.visible = true;
+
+  weapon.userData.muzzle = nextModel.userData.muzzle;
+  weapon.userData.flash = nextModel.userData.flash;
+  weapon.userData.flashMesh = nextModel.userData.flashMesh;
+  weapon.userData.activeModel = nextModel;
+  weapon.userData.magAnimation = null;
+  weapon.userData.weaponIndex = index;
+
+  const saved = weaponAmmoState.get(nextDef.id);
+  if (!saved || resetAmmo) {
+    weaponAmmoState.set(nextDef.id, {
+      ammo: nextDef.magSize,
+      reserve: nextDef.reserve,
+    });
+  }
+  const ammo = weaponAmmoState.get(nextDef.id);
+  state.ammo = ammo.ammo;
+  state.reserve = ammo.reserve;
+  state.reloadTimer = 0;
+  state.fireTimer = 0;
+
+  if (els.weaponSelector) {
+    els.weaponSlots.forEach((slot, slotIndex) => {
+      slot.classList.toggle('active', slotIndex === index);
+    });
+  }
+  const weaponLabel = document.querySelector('.weapon');
+  if (weaponLabel) weaponLabel.textContent = nextDef.display;
+
+  syncWorldWeaponAnchor();
+  updateHud();
+}
+
+const weaponAmmoState = new Map(
+  WEAPON_DEFS.map(def => [
+    def.id,
+    { ammo: def.magSize, reserve: def.reserve },
+  ]),
+);
+
+setActiveWeapon(0);
 
 const menuGunPairs = [];
 
@@ -4379,8 +4579,6 @@ const syncWorldWeaponAnchor = () => {
 };
 
 syncWorldWeaponAnchor();
-
-void loadAK47Weapon();
 
 function createDroppedWeaponMesh() {
   const mesh = weapon.clone(true);
