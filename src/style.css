@@ -1398,8 +1398,8 @@ body {
   overflow: hidden;
   color: #edf3f6;
   background:
-    radial-gradient(circle at 66% 43%, rgba(76,95,110,.18), transparent 30%),
-    linear-gradient(120deg, rgba(4,7,10,.97), rgba(9,13,17,.90) 55%, rgba(3,6,9,.97));
+    radial-gradient(circle at 66% 43%, rgba(76,95,110,.22), transparent 30%),
+    linear-gradient(120deg, rgba(4,7,10,.72), rgba(9,13,17,.42) 55%, rgba(3,6,9,.70));
 }
 .loadout-screen::before {
   content: "";
