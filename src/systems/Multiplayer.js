@@ -13,7 +13,7 @@ export class Multiplayer {
     this.lastSend=0;
     this.url=window.__WARFLEX_MULTIPLAYER_URL || (
       location.protocol==='https:'
-        ? 'wss://warfex-multiplayer-production.up.railway.app'
+        ? 'wss://multiplayer-production-10d1.up.railway.app'
         : 'ws://localhost:8080'
     );
   }
