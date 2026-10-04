@@ -5594,7 +5594,14 @@ function spawnEnemyModel() {
 
   // Neck / jaw / head.
   cyl(.16, .18, .22, [0, 1.27, 0], skin, hips, [0,0,0], 12, 'Neck');
-  sphere(.39, [0, 1.56, 0], skin, hips, [1, 1.06, .95], 'RagdollHead');
+  const head = sphere(
+    .39,
+    [0, 1.56, 0],
+    skin,
+    hips,
+    [1, 1.06, .95],
+    'RagdollHead',
+  );
   box([.50, .22, .34], [0, 1.44, -.03], skinDark, hips, 'JawShadow');
   box([.18, .10, .08], [-.13, 1.61, -.36], armorBlack, hips, 'LeftEyeline');
   box([.18, .10, .08], [.13, 1.61, -.36], armorBlack, hips, 'RightEyeline');
