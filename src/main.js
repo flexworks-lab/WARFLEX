@@ -1447,6 +1447,7 @@ function addArena() {
     rocks.name = 'WARFLEX_RockScatter';
     rocks.castShadow = true;
     rocks.receiveShadow = true;
+    const rockDummy = new THREE.Object3D();
 
     for (let i = 0; i < rocks.count; i += 1) {
       const seed = i + 1601.1;
@@ -1459,19 +1460,19 @@ function addArena() {
       const y = getSimpleTerrainHeight(x, z);
       const s = .32 + seeded(seed + 12.7) * 1.45;
 
-      grassDummy.position.set(x, y + s * .28, z);
-      grassDummy.rotation.set(
+      rockDummy.position.set(x, y + s * .28, z);
+      rockDummy.rotation.set(
         seeded(seed + 18.2) * .45,
         seeded(seed + 21.4) * Math.PI * 2,
         seeded(seed + 24.7) * .35,
       );
-      grassDummy.scale.set(
+      rockDummy.scale.set(
         s * 1.25,
         s * (.55 + seeded(seed + 29.7) * .75),
         s,
       );
-      grassDummy.updateMatrix();
-      rocks.setMatrixAt(i, grassDummy.matrix);
+      rockDummy.updateMatrix();
+      rocks.setMatrixAt(i, rockDummy.matrix);
     }
 
     rocks.instanceMatrix.needsUpdate = true;
