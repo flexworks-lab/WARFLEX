@@ -11,6 +11,8 @@ export class NavMeshAgent {
     desiredDistance = 1.8,
     obstacles = [],
     radius = 0.55,
+    getNeighbors = () => [],
+    separationRadius = 4.25,
   }) {
     this.object = object;
     this.navMesh = navMesh;
@@ -20,6 +22,11 @@ export class NavMeshAgent {
     this.desiredDistance = desiredDistance;
     this.obstacles = obstacles;
     this.radius = radius;
+    this.getNeighbors = getNeighbors;
+    this.separationRadius = separationRadius;
+
+    this.separation =
+      new THREE.Vector3();
 
     this.timer = 0;
     this.path = [];
@@ -112,6 +119,49 @@ export class NavMeshAgent {
       toWaypoint.multiplyScalar(
         this.speed,
       );
+
+    // Strong squad spacing. Navmesh pathing used to let several enemies
+    // converge on the same waypoint and form a single clump.
+    this.separation.set(0, 0, 0);
+    const neighbors = this.getNeighbors?.() || [];
+    for (const neighbor of neighbors) {
+      if (!neighbor || neighbor === this.object) continue;
+
+      const deltaFromNeighbor =
+        this.object.position
+          .clone()
+          .sub(neighbor.position);
+      deltaFromNeighbor.y = 0;
+
+      const distance = deltaFromNeighbor.length();
+      const minimum =
+        Math.max(
+          this.radius * 2.15,
+          this.separationRadius,
+        );
+
+      if (
+        distance < .001 ||
+        distance >= minimum
+      ) continue;
+
+      deltaFromNeighbor.normalize();
+      const strength =
+        1 - distance / minimum;
+
+      this.separation.addScaledVector(
+        deltaFromNeighbor,
+        strength * strength,
+      );
+    }
+
+    if (this.separation.lengthSq() > .001) {
+      this.separation.normalize();
+      desired.addScaledVector(
+        this.separation,
+        this.speed * 2.9,
+      );
+    }
 
     const delta =
       desired.clone().sub(
