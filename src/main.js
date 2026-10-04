@@ -2674,11 +2674,7 @@ waveDirector = new WaveDirector({
 
 function wireMenuButton(button, handler) {
   if (!button) return;
-  button.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    handler(event);
-  });
+  button.addEventListener('click', handler);
 }
 
 for (const button of els.waveChoices) {
@@ -2716,7 +2712,10 @@ function enterGame() {
 }
 
 wireMenuButton(els.startButton, enterGame);
-wireMenuButton(els.resumeButton, () => renderer.domElement.requestPointerLock?.());
+wireMenuButton(els.resumeButton, () => {
+  els.pause.classList.add('hidden');
+  renderer.domElement.requestPointerLock?.();
+});
 wireMenuButton(els.restartButton, enterGame);
 els.updateReload.addEventListener('click', () => {
   if (pendingUpdate?.version) localStorage.setItem(UPDATE_STORAGE_KEY, pendingUpdate.version);
