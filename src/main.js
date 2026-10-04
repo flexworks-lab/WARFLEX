@@ -11,7 +11,7 @@ import { applyBakedLightmap } from './world/BakedLighting.js?v=modulefix-2026100
 import { configureAtmosphere } from './world/Atmosphere.js?v=readability-20261003';
 import { NavMeshService } from './ai/NavMeshService.js?v=wide-map-20261003';
 import { NavMeshAgent } from './ai/NavMeshAgent.js?v=wide-map-20261003';
-import { MapEditor } from './dev/MapEditor.js?v=editor-20261004';
+import { MapEditor } from './dev/MapEditor.js?v=25ca825c34bbaa566827e7977542ea4f3948b2ec';
 
 const CONFIG = {
   maxHealth: 100,
