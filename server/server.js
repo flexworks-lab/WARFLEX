@@ -122,7 +122,9 @@ wss.on('connection',(ws)=>{
 
     if(msg.type==='respawn'){
       p.health=100;
-      p.position={x:(Math.random()-.5)*70,y:1.65,z:20+Math.random()*45};
+      p.position=msg.position && Number.isFinite(msg.position.x) && Number.isFinite(msg.position.z)
+        ? {x:Math.max(-70,Math.min(70,msg.position.x)),y:1.65,z:Math.max(-45,Math.min(65,msg.position.z))}
+        : {x:(Math.random()-.5)*70,y:1.65,z:20+Math.random()*45};
       broadcast({type:'player_respawned',player:p});
     }
   });
