@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { PhysicsWorld } from './physics/PhysicsWorld.js?v=modulefix-20261004';
+import { PhysicsWorld } from './physics/PhysicsWorld.js?v=physics-ground-20261003';
 import { RagdollController } from './physics/RagdollController.js?v=modulefix-20261004';
 import { WaveDirector } from './systems/WaveDirector.js?v=modulefix-20261004';
 import { SteeringAgent } from './systems/SteeringAgent.js?v=wide-map-20261003';
