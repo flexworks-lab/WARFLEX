@@ -371,6 +371,164 @@ function makeBox(
   mesh.castShadow = cast;
   mesh.receiveShadow = true;
   fallbackArenaRoot.add(mesh);
+
+  // Detailed architectural dressing for cover/structures. The collision
+  // object stays simple, while the visible object gets real modeled panels,
+  // trim, fasteners, and edge pieces.
+  const isLargeFloor =
+    size.x * size.z > 500 ||
+    size.y < .12;
+
+  const isBoundary =
+    size.x > 40 ||
+    size.z > 40;
+
+  if (
+    cast &&
+    !isLargeFloor &&
+    !isBoundary
+  ) {
+    const detailMaterial =
+      new THREE.MeshStandardMaterial({
+        color:
+          color > 0x300000
+            ? Math.max(
+                0,
+                color - 0x0d0d0d,
+              )
+            : 0x1a2228,
+        roughness: .72,
+        metalness: .14,
+      });
+
+    const detailGroup =
+      new THREE.Group();
+
+    const trimHeight =
+      Math.min(
+        .08,
+        Math.max(.025, size.y * .028),
+      );
+
+    const trimThickness =
+      Math.min(
+        .075,
+        Math.max(.025, Math.min(size.x, size.z) * .018),
+      );
+
+    const topTrim =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          Math.max(.4, size.x * .94),
+          trimHeight,
+          Math.max(.25, size.z * .94),
+          2,
+          Math.min(.018, trimHeight * .28),
+        ),
+        detailMaterial,
+      );
+
+    topTrim.position.y =
+      size.y * .5 + trimHeight * .35;
+
+    topTrim.castShadow = true;
+    topTrim.receiveShadow = true;
+    detailGroup.add(topTrim);
+
+    // Front service panel.
+    if (
+      size.z > 1.4 &&
+      size.y > .8
+    ) {
+      const panelDepth =
+        Math.min(
+          .045,
+          size.z * .018,
+        );
+
+      const panel =
+        new THREE.Mesh(
+          new RoundedBoxGeometry(
+            Math.max(.35, size.x * .62),
+            Math.max(.16, size.y * .48),
+            panelDepth,
+            2,
+            Math.min(.025, panelDepth * .45),
+          ),
+          detailMaterial,
+        );
+
+      panel.position.set(
+        0,
+        0,
+        size.z * .5 + panelDepth * .5 + .002,
+      );
+
+      panel.castShadow = true;
+      detailGroup.add(panel);
+
+      // Panel seams.
+      for (const x of [-.5, 0, .5]) {
+        const seam =
+          new THREE.Mesh(
+            new RoundedBoxGeometry(
+              Math.max(.012, size.x * .018),
+              Math.max(.10, size.y * .34),
+              .012,
+              1,
+              .004,
+            ),
+            new THREE.MeshStandardMaterial({
+              color: 0x0d1216,
+              roughness: .88,
+              metalness: .08,
+            }),
+          );
+
+        seam.position.set(
+          x * Math.max(.18, size.x * .48),
+          0,
+          size.z * .5 + panelDepth + .006,
+        );
+
+        detailGroup.add(seam);
+      }
+
+      // Four visible fasteners.
+      for (const x of [-1, 1]) {
+        for (const y of [-1, 1]) {
+          const bolt =
+            new THREE.Mesh(
+              new THREE.CylinderGeometry(
+                .018,
+                .018,
+                .010,
+                12,
+              ),
+              new THREE.MeshStandardMaterial({
+                color: 0x7f8a90,
+                metalness: .82,
+                roughness: .22,
+              }),
+            );
+
+          bolt.rotation.x =
+            Math.PI / 2;
+
+          bolt.position.set(
+            x * size.x * .24,
+            y * size.y * .16,
+            size.z * .5 + panelDepth + .016,
+          );
+
+          detailGroup.add(bolt);
+        }
+      }
+    }
+
+    mesh.add(detailGroup);
+  }
+
   return mesh;
 }
 
@@ -407,6 +565,52 @@ function makeArenaCylinder(
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   parent.add(mesh);
+
+  // Drum bands and top/bottom lips make the prop read as a modeled mesh.
+  const bandMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x202a2f,
+      metalness: .58,
+      roughness: .32,
+    });
+
+  for (const y of [-.30, .30]) {
+    const band =
+      new THREE.Mesh(
+        new THREE.TorusGeometry(
+          radius * 1.005,
+          .028,
+          12,
+          28,
+        ),
+        bandMat,
+      );
+
+    band.position.set(
+      0,
+      y * height,
+      0,
+    );
+
+    parent.add(band);
+  }
+
+  const cap =
+    new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        radius * .80,
+        radius * .80,
+        .035,
+        24,
+      ),
+      bandMat,
+    );
+
+  cap.position.y =
+    height * .5 + .018;
+
+  parent.add(cap);
+
   return mesh;
 }
 
@@ -445,10 +649,12 @@ function addArena() {
     });
 
   const panelGeo =
-    new THREE.BoxGeometry(
+    new RoundedBoxGeometry(
       21.5,
       .035,
       21.5,
+      2,
+      .012,
     );
 
   for (const x of [-32.25, -10.75, 10.75, 32.25]) {
@@ -876,43 +1082,286 @@ async function loadNavMeshAsset() {
 }
 
 function buildInstancedProps() {
-  /*
-   * Decorative props are GPU-instanced. They do not become gameplay
-   * collision bodies, which keeps CPU physics/raycast work low.
-   */
-  const crates = propInstancer.createBoxProp({
-    name: 'InstancedCrates',
-    count: 72,
-    size: new THREE.Vector3(1.2, 1.0, 1.2),
-    color: 0x4e4236,
-    roughness: .92,
-  });
+  // These props are visual-only and intentionally use full meshes rather
+  // than GPU-instanced placeholder cubes. Each one is dressed with slats,
+  // brackets, seams, and hardware.
 
-  propInstancer.populate(crates, {
-    halfExtents: new THREE.Vector2(45, 45),
-    avoidRadius: 13,
-    minScale: .82,
-    maxScale: 1.18,
-  });
+  const crateMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x4b4032,
+      roughness: .88,
+      metalness: .04,
+    });
 
-  const barriers = propInstancer.createBoxProp({
-    name: 'InstancedBarriers',
-    count: 40,
-    size: new THREE.Vector3(2.8, 1.1, .55),
-    color: 0x5c6368,
-    metalness: .32,
-    roughness: .78,
-  });
+  const crateDark =
+    new THREE.MeshStandardMaterial({
+      color: 0x1b2023,
+      roughness: .68,
+      metalness: .24,
+    });
 
-  propInstancer.populate(barriers, {
-    halfExtents: new THREE.Vector2(47, 47),
-    avoidRadius: 15,
-    minScale: .9,
-    maxScale: 1.1,
-    rotationSnap: Math.PI / 2,
-  });
+  const createDetailedCrate = (
+    position,
+    scale,
+    rotation = 0,
+  ) => {
+    const root =
+      new THREE.Group();
+
+    root.position.copy(position);
+    root.rotation.y = rotation;
+    root.scale.setScalar(scale);
+    fallbackArenaRoot.add(root);
+
+    const core =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          1.45,
+          1.18,
+          1.45,
+          3,
+          .045,
+        ),
+        crateMat,
+      );
+
+    core.castShadow = true;
+    core.receiveShadow = true;
+    root.add(core);
+
+    for (const side of [-1, 1]) {
+      for (const y of [-.32, 0, .32]) {
+        const slat =
+          new THREE.Mesh(
+            new RoundedBoxGeometry(
+              .09,
+              .075,
+              1.18,
+              2,
+              .012,
+            ),
+            crateDark,
+          );
+
+        slat.position.set(
+          side * .72,
+          y,
+          0,
+        );
+
+        slat.rotation.y =
+          side * .035;
+
+        slat.castShadow = true;
+        root.add(slat);
+      }
+    }
+
+    for (const z of [-.58, 0, .58]) {
+      const slat =
+        new THREE.Mesh(
+          new RoundedBoxGeometry(
+            1.14,
+            .075,
+            .085,
+            2,
+            .012,
+          ),
+          crateDark,
+        );
+
+      slat.position.set(
+        0,
+        0,
+        z,
+      );
+
+      root.add(slat);
+    }
+
+    for (const x of [-1, 1]) {
+      for (const y of [-1, 1]) {
+        const bracket =
+          new THREE.Mesh(
+            new RoundedBoxGeometry(
+              .10,
+              .10,
+              .12,
+              2,
+              .015,
+            ),
+            crateDark,
+          );
+
+        bracket.position.set(
+          x * .64,
+          y * .48,
+          .65,
+        );
+
+        root.add(bracket);
+      }
+    }
+  };
+
+  for (const [x, z, scale, rotation] of [
+    [-43, -30, 1.0, -.12],
+    [-44, 7, .86, .08],
+    [43, -8, 1.08, .16],
+    [42, 27, .92, -.11],
+    [16, 31, .82, .05],
+    [-12, 28, .9, -.10],
+    [-38, -4, .72, .28],
+    [36, -24, .74, -.20],
+    [8, 35, .68, .12],
+  ]) {
+    createDetailedCrate(
+      new THREE.Vector3(
+        x,
+        .62 * scale,
+        z,
+      ),
+      scale,
+      rotation,
+    );
+  }
+
+  // Detailed steel barriers.
+  const barrierMat =
+    new THREE.MeshStandardMaterial({
+      color: 0x4b555b,
+      roughness: .62,
+      metalness: .42,
+    });
+
+  const barrierDark =
+    new THREE.MeshStandardMaterial({
+      color: 0x20282d,
+      roughness: .58,
+      metalness: .50,
+    });
+
+  const createBarrier = (
+    position,
+    rotation = 0,
+  ) => {
+    const root =
+      new THREE.Group();
+
+    root.position.copy(position);
+    root.rotation.y = rotation;
+    fallbackArenaRoot.add(root);
+
+    const body =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          2.8,
+          1.05,
+          .55,
+          4,
+          .06,
+        ),
+        barrierMat,
+      );
+
+    body.castShadow = true;
+    body.receiveShadow = true;
+    root.add(body);
+
+    for (const x of [-.92, 0, .92]) {
+      const support =
+        new THREE.Mesh(
+          new RoundedBoxGeometry(
+            .14,
+            1.28,
+            .68,
+            3,
+            .035,
+          ),
+          barrierDark,
+        );
+
+      support.position.set(
+        x,
+        .02,
+        .02,
+      );
+
+      root.add(support);
+
+      const brace =
+        new THREE.Mesh(
+          new RoundedBoxGeometry(
+            .12,
+            .14,
+            .44,
+            2,
+            .025,
+          ),
+          barrierDark,
+        );
+
+      brace.position.set(
+        x,
+        .44,
+        -.10,
+      );
+
+      brace.rotation.z =
+        x === 0
+          ? 0
+          : x < 0
+            ? -.18
+            : .18;
+
+      root.add(brace);
+    }
+
+    const warning =
+      new THREE.Mesh(
+        new RoundedBoxGeometry(
+          2.0,
+          .065,
+          .035,
+          2,
+          .01,
+        ),
+        new THREE.MeshStandardMaterial({
+          color: 0x8a5a2b,
+          roughness: .64,
+          metalness: .28,
+        }),
+      );
+
+    warning.position.set(
+      0,
+      .18,
+      -.295,
+    );
+
+    root.add(warning);
+  };
+
+  for (const [x, z, rotation] of [
+    [-34, -22, .05],
+    [-30, 16, -.18],
+    [-4, 5, .0],
+    [25, 7, .12],
+    [31, -14, -.08],
+    [18, -33, .18],
+    [36, 22, .25],
+    [-18, 36, -.12],
+  ]) {
+    createBarrier(
+      new THREE.Vector3(
+        x,
+        .52,
+        z,
+      ),
+      rotation,
+    );
+  }
 }
-
 buildInstancedProps();
 
 Promise.all([
