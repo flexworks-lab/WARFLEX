@@ -3802,6 +3802,14 @@ window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
   try {
     const asset = await assetManager.loadGLTF(AK47_GLTF_URL);
 
+    let importedMeshCount = 0;
+    asset.scene.traverse((node) => {
+      if (node.isMesh) importedMeshCount += 1;
+    });
+    if (!importedMeshCount) {
+      throw new Error('AK47 GLTF loaded but contains no mesh geometry.');
+    }
+
     installImportedWeaponModel(
       weapon,
       asset.scene,
@@ -3822,16 +3830,14 @@ window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
 
       // The menu's old procedural transform is not suitable for the imported
       // model. Give the real AK a known, explicit menu transform.
+      // Single-model import test: keep the real AK permanently visible.
       pair.hero.scale.setScalar(1);
-      pair.hero.position.set(2.65, -.05, -3.20);
-      pair.hero.rotation.set(-.12, .62, .06);
-
-      pair.secondary.scale.setScalar(.78);
-      pair.secondary.position.set(3.65, -.82, -4.55);
-      pair.secondary.rotation.set(-.12, -.42, .06);
-
+      pair.hero.position.set(1.45, -.05, -3.35);
+      pair.hero.rotation.set(-.12, .58, .06);
       pair.hero.visible = true;
-      pair.secondary.visible = true;
+      pair.hero.userData.forceImportedVisible = true;
+
+      pair.secondary.visible = false;
     }
 
     syncWorldWeaponAnchor();
@@ -4189,6 +4195,8 @@ let menuGunCurrent = 0;
 let menuGunPrevious = -1;
 
 function setMenuGunOpacity(gun, opacity) {
+  if (gun.userData?.forceImportedVisible) opacity = 1;
+
   gun.traverse((child) => {
     if (!child.isMesh || !child.material) return;
 
@@ -4255,6 +4263,14 @@ function updateMenuGuns(dt) {
 
   for (let i = 0; i < menuGunPairs.length; i += 1) {
     const pair = menuGunPairs[i];
+
+    if (pair.hero.userData?.forceImportedVisible) {
+      setMenuGunOpacity(pair.hero, 1);
+      pair.hero.visible = true;
+      pair.secondary.visible = false;
+      continue;
+    }
+
     const isCurrent = i === menuGunCurrent;
     const isPrevious = i === menuGunPrevious;
 
