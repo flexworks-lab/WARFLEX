@@ -909,3 +909,14 @@ body {
     opacity: .04 !important;
   }
 }
+
+/* Custom map selection */
+.map-section{margin-top:24px;width:min(430px,100%)}
+.map-label,.menu-label{margin:0 0 9px;color:#697783;font-size:9px;font-weight:900;letter-spacing:.22em}
+.map-list{display:flex;flex-direction:column;gap:7px;max-height:260px;overflow:auto}
+.map-choice{display:flex!important;flex-direction:column;align-items:flex-start!important;gap:3px;width:100%!important;padding:10px 12px!important;border:1px solid rgba(255,255,255,.08)!important;background:rgba(255,255,255,.025)!important;text-align:left!important}
+.map-choice strong{font-family:Inter,system-ui,sans-serif!important;font-size:13px!important;letter-spacing:.1em!important}
+.map-choice span{font-size:8px!important;letter-spacing:.16em!important;color:#697681!important}
+.map-choice.active{border-color:rgba(220,232,239,.42)!important;background:rgba(220,232,239,.08)!important}
+.map-section .deploy-button{margin-top:12px;width:100%!important}
+.dev-only-menu{display:none}
