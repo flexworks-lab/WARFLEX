@@ -6892,8 +6892,8 @@ function frame() {
   if (multiplayerActive) multiplayer?.sendState(performance.now(), state.yaw, state.health);
 
   const hasPointerLock =
-    document.pointerLockElement ===
-    renderer.domElement;
+    isTouchDevice ||
+    document.pointerLockElement === renderer.domElement;
 
   if (state.active && !state.over && !multiplayerActive) {
     // Keep wave spawning alive even if pointer-lock briefly drops.
@@ -7512,6 +7512,7 @@ renderer.domElement.addEventListener('click', () => {
 });
 
 document.addEventListener('pointerlockchange', () => {
+  if (isTouchDevice) return;
   if (state.over || !state.active) return;
   if (document.pointerLockElement === renderer.domElement) {
     els.pause.classList.add('hidden');
