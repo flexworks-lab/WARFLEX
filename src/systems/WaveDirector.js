@@ -120,7 +120,15 @@ export class WaveDirector {
 
       if (spawnPosition) {
         const index = this.queue.shift();
-        this.spawnEnemy(index, spawnPosition);
+
+        try {
+          this.spawnEnemy(index, spawnPosition);
+        } catch (error) {
+          // One bad enemy construction must not permanently jam the wave queue.
+          console.error('[WARFLEX] enemy spawn failed:', error);
+          this.spawnTimer = 0.20;
+          return;
+        }
 
         this.spawnIndex += 1;
         this.spawnTimer = this.spawnInterval;
@@ -234,7 +242,8 @@ export class WaveDirector {
 
     if (best) return best.clone();
 
-    // Fallback: farthest spawn point when every point is technically visible.
+    // Never allow a wave to stall because every spawn point is visible.
+    // The fallback is intentionally a real battlefield spawn instead of null.
     let fallback = points[0];
     let fallbackDistance = -Infinity;
 
