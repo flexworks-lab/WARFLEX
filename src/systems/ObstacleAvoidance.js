@@ -8,13 +8,7 @@ export function resolveObstacleOverlap(
 ) {
   let corrected = false;
 
-  let bounds = obstacles
-    .filter(Boolean)
-    .map((obstacle) =>
-      new THREE.Box3().setFromObject(
-        obstacle,
-      ),
-    );
+  let bounds;
 
   if (cache) {
     const signature =
@@ -26,10 +20,26 @@ export function resolveObstacleOverlap(
       cache.signature !== signature
     ) {
       cache.signature = signature;
-      cache.bounds = bounds;
-    } else {
-      bounds = cache.bounds;
+      cache.bounds =
+        obstacles
+          .filter(Boolean)
+          .map((obstacle) =>
+            new THREE.Box3().setFromObject(
+              obstacle,
+            ),
+          );
     }
+
+    bounds = cache.bounds;
+  } else {
+    bounds =
+      obstacles
+        .filter(Boolean)
+        .map((obstacle) =>
+          new THREE.Box3().setFromObject(
+            obstacle,
+          ),
+        );
   }
 
   for (let pass = 0; pass < 3; pass += 1) {
