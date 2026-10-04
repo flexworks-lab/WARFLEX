@@ -275,7 +275,7 @@ export class Multiplayer {
   update(dt){
     for(const remote of this.players.values()){
       remote.group.position.lerp(remote.targetPosition,1-Math.exp(-18*dt));
-      remote.group.rotation.y=THREE.MathUtils.damp(remote.group.rotation.y,remote.targetYaw,18,dt);
+      remote.group.rotation.y=this.THREE.MathUtils.damp(remote.group.rotation.y,remote.targetYaw,18,dt);
     }
   }
 }
