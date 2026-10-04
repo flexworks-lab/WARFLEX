@@ -357,6 +357,13 @@ const state = {
   hurtFlash: 0,
   walkTime: 0,
   weaponKick: 0,
+  weaponRecoilPitch: 0,
+  weaponRecoilYaw: 0,
+  weaponSwayX: 0,
+  weaponSwayY: 0,
+  sprintBlend: 0,
+  slideBlend: 0,
+  equipBlend: 0,
   muzzleFlash: 0,
   shake: 0,
   selectedWave: 1,
@@ -3933,22 +3940,32 @@ function updateMenuGuns(dt) {
 
     if (pair.hero.visible) {
       pair.hero.rotation.x =
-        -.12 + Math.sin(t * .39) * .075;
+        -.12 +
+        Math.sin(t * .72) * .055 +
+        Math.sin(t * 1.31) * .018;
       pair.hero.rotation.y =
-        .62 + Math.sin(t * .46) * .48;
+        .62 +
+        Math.sin(t * .42) * .36 +
+        Math.sin(t * .83) * .055;
       pair.hero.rotation.z =
-        .06 + Math.sin(t * .28) * .045;
+        .06 + Math.sin(t * .56) * .035;
       pair.hero.position.y =
-        -.05 + Math.sin(t * .66) * .075;
+        -.05 + Math.sin(t * .82) * .065;
+      pair.hero.position.x =
+        2.65 + Math.sin(t * .31) * .035;
     }
 
     if (pair.secondary.visible) {
       pair.secondary.rotation.x =
-        -.12 + Math.sin(t * .35) * .055;
+        -.12 + Math.sin(t * .48) * .042;
       pair.secondary.rotation.y =
-        -.48 + Math.sin(t * .42) * .30;
+        -.48 + Math.sin(t * .31) * .24;
+      pair.secondary.rotation.z =
+        -.02 + Math.sin(t * .57) * .028;
       pair.secondary.position.y =
-        -.82 + Math.cos(t * .58) * .05;
+        -.82 + Math.cos(t * .52) * .045;
+      pair.secondary.position.x =
+        3.65 + Math.cos(t * .36) * .025;
     }
   }
 
@@ -3993,7 +4010,7 @@ function updateMenuGuns(dt) {
   menuGunLights.key.intensity =
     THREE.MathUtils.damp(
       menuGunLights.key.intensity,
-      2.8 * pulse,
+      3.35 * pulse,
       5,
       dt,
     );
@@ -5762,12 +5779,14 @@ function shoot() {
   state.fireTimer =
     CONFIG.fireInterval;
 
-  state.weaponKick = 1;
-  state.muzzleFlash = .075;
+  state.weaponKick = 1.15;
+  state.weaponRecoilPitch += .020 + Math.random() * .006;
+  state.weaponRecoilYaw += (Math.random() - .5) * .010;
+  state.muzzleFlash = .105;
   state.shake =
     Math.max(
       state.shake,
-      .035,
+      .050,
     );
 
   spawnMuzzleVfx();
@@ -6084,6 +6103,8 @@ function applyRagdollHit(
 function reload() {
   if (state.reloadTimer > 0 || state.ammo >= CONFIG.magSize || state.reserve <= 0 || state.over) return;
   state.reloadTimer = CONFIG.reloadTime;
+  state.weaponKick = Math.max(state.weaponKick, .35);
+  state.weaponRecoilPitch = Math.min(state.weaponRecoilPitch, -.010);
   els.reload.classList.remove('hidden');
 }
 
@@ -6603,18 +6624,65 @@ function updateWeapon(dt) {
     weapon.visible = false;
     return;
   }
+
   weapon.visible = true;
-  const moving = keys.has('KeyW') || keys.has('KeyA') || keys.has('KeyS') || keys.has('KeyD');
-  const sprinting = keys.has('ShiftLeft') || keys.has('ShiftRight');
-  const bobSpeed = sprinting ? 15 : 10;
-  const bobAmount = moving && state.onGround ? (sprinting ? .035 : .018) : .006;
+
+  const moving =
+    keys.has('KeyW') ||
+    keys.has('KeyA') ||
+    keys.has('KeyS') ||
+    keys.has('KeyD');
+
+  const sprinting =
+    moving &&
+    (keys.has('ShiftLeft') || keys.has('ShiftRight')) &&
+    state.slideTimer <= 0 &&
+    !state.aiming;
+
   const t = performance.now() * .001;
 
-  state.weaponKick = Math.max(0, state.weaponKick - dt * 10);
-  state.muzzleFlash = Math.max(0, state.muzzleFlash - dt);
+  state.sprintBlend = THREE.MathUtils.damp(
+    state.sprintBlend,
+    sprinting ? 1 : 0,
+    12,
+    dt,
+  );
+  state.slideBlend = THREE.MathUtils.damp(
+    state.slideBlend,
+    state.slideTimer > 0 ? 1 : 0,
+    18,
+    dt,
+  );
+  state.equipBlend = THREE.MathUtils.damp(
+    state.equipBlend,
+    state.active && !state.over ? 1 : 0,
+    10,
+    dt,
+  );
 
-  // Smooth first-person ADS. Hold right mouse to bring the optic toward
-  // the center of the screen and tighten the camera FOV.
+  state.weaponKick = THREE.MathUtils.damp(
+    state.weaponKick,
+    0,
+    19,
+    dt,
+  );
+  state.weaponRecoilPitch = THREE.MathUtils.damp(
+    state.weaponRecoilPitch,
+    0,
+    24,
+    dt,
+  );
+  state.weaponRecoilYaw = THREE.MathUtils.damp(
+    state.weaponRecoilYaw,
+    0,
+    28,
+    dt,
+  );
+  state.muzzleFlash = Math.max(
+    0,
+    state.muzzleFlash - dt,
+  );
+
   const targetAim =
     state.aiming && state.active && !state.over
       ? 1
@@ -6627,51 +6695,136 @@ function updateWeapon(dt) {
     dt,
   );
 
-  const breathing = Math.sin(t * 1.7) * .006;
-  const hipBobX =
-    Math.sin(t * bobSpeed) *
-    bobAmount;
+  const bobSpeed = state.sprintBlend > .5 ? 15.5 : 9.5;
+  const bobAmount =
+    moving && state.onGround
+      ? THREE.MathUtils.lerp(.016, .038, state.sprintBlend)
+      : .004;
 
-  const hipBobY =
-    breathing +
-    Math.abs(Math.cos(t * bobSpeed)) *
-    bobAmount;
+  const bobX = Math.sin(t * bobSpeed) * bobAmount;
+  const bobY =
+    Math.sin(t * 1.75) * .0055 +
+    Math.abs(Math.cos(t * bobSpeed)) * bobAmount;
+
+  state.weaponSwayX = THREE.MathUtils.damp(
+    state.weaponSwayX,
+    (keys.has('KeyD') ? .012 : 0) -
+      (keys.has('KeyA') ? .012 : 0),
+    9,
+    dt,
+  );
+  state.weaponSwayY = THREE.MathUtils.damp(
+    state.weaponSwayY,
+    (keys.has('KeyS') ? .006 : 0) -
+      (keys.has('KeyW') ? .006 : 0),
+    9,
+    dt,
+  );
+
+  const sprintDrop = .16 * state.sprintBlend;
+  const slideDrop = .12 * state.slideBlend;
+  const sprintSide = .15 * state.sprintBlend;
 
   const hipPosition = new THREE.Vector3(
-    .39 + hipBobX,
-    -.48 + hipBobY - state.weaponKick * .045,
-    -1.01 + state.weaponKick * .09,
+    .39 +
+      bobX +
+      state.weaponSwayX +
+      sprintSide +
+      state.weaponRecoilYaw * .8,
+    -.48 +
+      bobY +
+      state.weaponSwayY -
+      sprintDrop -
+      slideDrop -
+      state.weaponKick * .052,
+    -1.01 +
+      state.weaponKick * .11,
   );
 
-  // Keep the rifle narrow and bring its optic onto the camera centerline.
   const adsPosition = new THREE.Vector3(
     -.005,
-    -.475 - state.weaponKick * .015,
-    -.78 + state.weaponKick * .035,
+    -.475 - state.weaponKick * .018,
+    -.78 + state.weaponKick * .04,
   );
 
-  weapon.position.lerpVectors(
+  const targetPosition = new THREE.Vector3().lerpVectors(
     hipPosition,
     adsPosition,
     state.aimBlend,
   );
 
+  weapon.position.lerp(
+    targetPosition,
+    1 - Math.exp(-18 * dt),
+  );
+
   const hipRotation = new THREE.Euler(
-    -.025 - state.weaponKick * .09,
-    -.045 + Math.sin(t * bobSpeed * .5) * bobAmount * 1.2,
-    -.012 + Math.sin(t * bobSpeed) * bobAmount * .8,
+    -.025 -
+      state.weaponKick * .105 +
+      state.weaponRecoilPitch * .85 +
+      Math.sin(t * bobSpeed) * bobAmount * .75,
+    -.045 +
+      state.weaponRecoilYaw +
+      Math.sin(t * bobSpeed * .5) * bobAmount * 1.5,
+    -.012 +
+      Math.sin(t * bobSpeed) * bobAmount * .9 -
+      state.weaponSwayX * .9,
   );
 
   const adsRotation = new THREE.Euler(
-    -.015 - state.weaponKick * .035,
-    -.002,
-    0,
+    -.015 -
+      state.weaponKick * .042 +
+      state.weaponRecoilPitch * .55,
+    state.weaponRecoilYaw * .55,
+    -state.weaponSwayX * .45,
   );
 
-  weapon.rotation.set(
+  const blendedRotation = new THREE.Euler(
     THREE.MathUtils.lerp(hipRotation.x, adsRotation.x, state.aimBlend),
     THREE.MathUtils.lerp(hipRotation.y, adsRotation.y, state.aimBlend),
     THREE.MathUtils.lerp(hipRotation.z, adsRotation.z, state.aimBlend),
+  );
+
+  const sprintRotation = new THREE.Euler(.12, -.22, -.20);
+
+  blendedRotation.x = THREE.MathUtils.lerp(
+    blendedRotation.x,
+    sprintRotation.x,
+    state.sprintBlend,
+  );
+  blendedRotation.y = THREE.MathUtils.lerp(
+    blendedRotation.y,
+    sprintRotation.y,
+    state.sprintBlend,
+  );
+  blendedRotation.z = THREE.MathUtils.lerp(
+    blendedRotation.z,
+    sprintRotation.z,
+    state.sprintBlend,
+  );
+
+  if (state.slideBlend > .001) {
+    blendedRotation.x -= .28 * state.slideBlend;
+    blendedRotation.z += .12 * state.slideBlend;
+  }
+
+  weapon.rotation.x = THREE.MathUtils.damp(
+    weapon.rotation.x,
+    blendedRotation.x - (1 - state.equipBlend) * .6,
+    20,
+    dt,
+  );
+  weapon.rotation.y = THREE.MathUtils.damp(
+    weapon.rotation.y,
+    blendedRotation.y,
+    20,
+    dt,
+  );
+  weapon.rotation.z = THREE.MathUtils.damp(
+    weapon.rotation.z,
+    blendedRotation.z,
+    20,
+    dt,
   );
 
   const targetFov =
@@ -6681,30 +6834,111 @@ function updateWeapon(dt) {
       state.aimBlend,
     );
 
-  camera.fov =
-    THREE.MathUtils.damp(
-      camera.fov,
-      targetFov,
-      14,
-      dt,
-    );
+  camera.fov = THREE.MathUtils.damp(
+    camera.fov,
+    targetFov,
+    14,
+    dt,
+  );
   camera.updateProjectionMatrix();
+
+  // Visual-only camera kick. movePlayer() restores the real aim rotation each frame.
+  camera.rotation.x += state.weaponRecoilPitch * .24;
+  camera.rotation.y += state.weaponRecoilYaw * .18;
+  camera.rotation.z +=
+    state.weaponKick * .010 +
+    state.weaponRecoilYaw * .20;
+
   weapon.children.forEach((child) => {
     if (child.isMesh) child.frustumCulled = false;
   });
 
   const visible = state.active && !state.over;
   weapon.visible = visible;
+
+  if (visible && weapon.userData.magAnimation === undefined) {
+    const magazine = weapon.getObjectByName('MagazineMesh');
+    weapon.userData.magAnimation = magazine
+      ? {
+          object: magazine,
+          position: magazine.position.clone(),
+          quaternion: magazine.quaternion.clone(),
+        }
+      : null;
+  }
+
+  if (weapon.userData.magAnimation) {
+    const anim = weapon.userData.magAnimation.object;
+    const base = weapon.userData.magAnimation;
+
+    if (state.reloadTimer > 0) {
+      const progress =
+        1 -
+        state.reloadTimer / CONFIG.reloadTime;
+
+      const drop = THREE.MathUtils.smoothstep(
+        progress,
+        .06,
+        .28,
+      );
+      const seat = THREE.MathUtils.smoothstep(
+        progress,
+        .46,
+        .78,
+      );
+
+      anim.position.copy(base.position);
+      anim.position.y += (-drop + seat) * .16;
+      anim.position.z += (drop - seat) * .03;
+      anim.quaternion.copy(base.quaternion);
+      anim.rotation.x +=
+        Math.sin(progress * Math.PI) * .08;
+    } else {
+      anim.position.lerp(
+        base.position,
+        1 - Math.exp(-24 * dt),
+      );
+      anim.quaternion.slerp(
+        base.quaternion,
+        1 - Math.exp(-24 * dt),
+      );
+    }
+  }
+
   syncWorldWeaponAnchor();
 
-  const flashPower = state.muzzleFlash > 0 ? 18 : 0;
+  const flashPower =
+    state.muzzleFlash > 0
+      ? 22 + state.muzzleFlash * 45
+      : 0;
+
   weapon.userData.flash.intensity = flashPower;
-  weapon.userData.flashMesh.material.opacity = state.muzzleFlash > 0 ? .9 : 0;
+
+  weapon.userData.flashMesh.material.opacity =
+    state.muzzleFlash > 0
+      ? Math.min(.98, state.muzzleFlash * 11)
+      : 0;
+
+  const flashScale =
+    1 + state.muzzleFlash * 4;
+
+  weapon.userData.flashMesh.scale.set(
+    flashScale,
+    flashScale,
+    flashScale,
+  );
 
   if (state.reloadTimer > 0) {
-    const reloadProgress = 1 - state.reloadTimer / CONFIG.reloadTime;
-    weapon.rotation.x = -.03 - Math.sin(reloadProgress * Math.PI) * .55;
-    weapon.position.y -= Math.sin(reloadProgress * Math.PI) * .12;
+    const progress =
+      1 -
+      state.reloadTimer / CONFIG.reloadTime;
+    const reloadArc =
+      Math.sin(progress * Math.PI);
+
+    weapon.rotation.x -= reloadArc * .12;
+    weapon.rotation.z +=
+      Math.sin(progress * Math.PI * 2) * .035;
+    weapon.position.y -= reloadArc * .055;
   }
 }
 
