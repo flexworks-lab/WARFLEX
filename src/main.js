@@ -3641,8 +3641,14 @@ function installImportedWeaponModel(target, sourceScene, {
   const fittedBounds = new THREE.Box3().setFromObject(model);
   const center = fittedBounds.getCenter(new THREE.Vector3());
   model.position.sub(center);
+
+  // The exported AK uses a Z-up/Blender armature conversion. Rotate the
+  // imported rig into the horizontal first-person weapon axis.
+  model.rotation.x += Math.PI * .5;
+
   model.position.y -= .06;
   model.position.z -= .06;
+  model.visible = true;
 
   let magazine = null;
   let muzzle = null;
@@ -3757,19 +3763,19 @@ window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
     installImportedWeaponModel(
       weapon,
       asset.scene,
-      { keepHands: true, scaleTarget: 3.05, animations: asset.animations },
+      { keepHands: true, scaleTarget: 3.35, animations: asset.animations },
     );
 
     for (const pair of menuGunPairs) {
       installImportedWeaponModel(
         pair.hero,
         asset.scene,
-        { keepHands: false, scaleTarget: 3.05, animations: asset.animations },
+        { keepHands: false, scaleTarget: 3.35, animations: asset.animations },
       );
       installImportedWeaponModel(
         pair.secondary,
         asset.scene,
-        { keepHands: false, scaleTarget: 3.05, animations: asset.animations },
+        { keepHands: false, scaleTarget: 3.35, animations: asset.animations },
       );
     }
 
