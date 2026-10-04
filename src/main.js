@@ -3728,11 +3728,11 @@ function installImportedWeaponModel(target, sourceScene, {
 window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
   try {
     const url = new URL(
-      './assets/guns/Ak47.usdz',
+      './assets/ak47/scene.gltf',
       import.meta.url,
     ).href;
 
-    const asset = await assetManager.loadUSDZ(url);
+    const asset = await assetManager.loadGLTF(url);
 
     installImportedWeaponModel(
       weapon,
