@@ -2234,12 +2234,12 @@ function addArena() {
     root.position.set(x, 0, z);
     fallbackArenaRoot.add(root);
 
-    const wall = mat(accent, 0.72, 0.28);
-    const roofMat = mat(roof, 0.64, 0.50);
+    const wall = texturedMat(accent, 'paintedMetal', 0.74, 0.28, [4.5, 2.8], 0.028);
+    const roofMat = texturedMat(roof, 'corrugatedMetal', 0.64, 0.50, [7, 3], 0.032);
     const frame = steelDark;
-    const trim = mat(0x7a858b, 0.54, 0.52);
+    const trim = texturedMat(0x7a858b, 'paintedMetal', 0.54, 0.52, [5, 2], 0.018);
     const darkGlass = glass.clone();
-    const doorMat = mat(0x1f272b, 0.58, 0.56);
+    const doorMat = texturedMat(0x1f272b, 'rustSteel', 0.58, 0.56, [4, 3], 0.022);
 
     box(root, [width + 0.8, 0.38, depth + 0.8], [0, 0.19, 0], concreteEdge, 0, 0.02);
     box(root, [width, 0.55, depth], [0, height + 0.28, 0], roofMat, 0, 0.03);
@@ -2456,11 +2456,11 @@ function addArena() {
     root.rotation.y = rotation;
     fallbackArenaRoot.add(root);
 
-    const wall = mat(accent, 0.78, 0.24);
-    const roof = mat(0x20272a, 0.62, 0.54);
-    const frame = mat(0x3b464b, 0.56, 0.62);
-    const dark = mat(0x101619, 0.72, 0.72);
-    const door = mat(0x252d30, 0.64, 0.58);
+    const wall = texturedMat(accent, 'paintedMetal', 0.80, 0.24, [5, 3], 0.030);
+    const roof = texturedMat(0x20272a, 'corrugatedMetal', 0.64, 0.54, [8, 4], 0.034);
+    const frame = texturedMat(0x3b464b, 'rustSteel', 0.57, 0.62, [5, 4], 0.021);
+    const dark = texturedMat(0x101619, 'rustSteel', 0.73, 0.72, [4, 4], 0.020);
+    const door = texturedMat(0x252d30, 'paintedMetal', 0.66, 0.58, [4, 4], 0.026);
     const glassPanel = glass.clone();
 
     box(root, [width + 1.4, 0.35, depth + 1.4], [0, 0.18, 0], concreteEdge, 0, 0.03);
@@ -2584,9 +2584,9 @@ function addArena() {
     root.rotation.y = rotation;
     fallbackArenaRoot.add(root);
 
-    const bodyMat = mat(color, 0.76, 0.32);
+    const bodyMat = texturedMat(color, 'corrugatedMetal', 0.78, 0.32, [7, 2.6], 0.036);
     const ribMat = mat(0x20272a, 0.64, 0.66);
-    const floorMat = mat(0x5f6462, 0.88, 0.11);
+    const floorMat = texturedMat(0x5f6462, 'concrete', 0.88, 0.11, [4, 2], 0.028);
 
     box(root, [12.2, 2.45, 2.44], [0, 0, 0], bodyMat);
     box(root, [11.95, 0.10, 2.20], [0, -1.18, 0], floorMat);
@@ -2662,7 +2662,7 @@ function addArena() {
     root.scale.setScalar(scale);
     fallbackArenaRoot.add(root);
 
-    const woodMat = mat(wood, 0.88, 0.06);
+    const woodMat = texturedMat(wood, 'wood', 0.90, 0.06, [2.2, 2.2], 0.028);
     const darkWood = mat(0x241f1a, 0.86, 0.04);
 
     box(root, [1.25, 0.95, 1.25], [0, 0, 0], woodMat, 0, 0.035);
@@ -2695,7 +2695,7 @@ function addArena() {
     root.scale.setScalar(scale);
     fallbackArenaRoot.add(root);
 
-    const wood = mat(0x6a5036, 0.93, 0.02);
+    const wood = texturedMat(0x6a5036, 'wood', 0.94, 0.02, [2.6, 1.8], 0.026);
 
     box(root, [2.4, 0.16, 1.25], [0, 0, 0], wood);
     for (let px = -0.9; px <= 0.9; px += 0.45) {
@@ -2885,7 +2885,7 @@ function addArena() {
     root.rotation.y = rotation;
     fallbackArenaRoot.add(root);
 
-    const body = mat(accent, 0.78, 0.40);
+    const body = texturedMat(accent, 'paintedMetal', 0.80, 0.40, [4, 2.5], 0.026);
 
     box(root, [5.8, 1.35, 2.25], [0, 1.12, 0], body, 0, 0.07);
     box(root, [1.95, 1.80, 2.05], [1.70, 1.66, 0], body, 0, 0.08);
@@ -2989,7 +2989,7 @@ function addArena() {
     root.scale.setScalar(scale);
     fallbackArenaRoot.add(root);
 
-    const tank = mat(0x4d5656, 0.61, 0.55);
+    const tank = texturedMat(0x4d5656, 'rustSteel', 0.62, 0.55, [4, 3], 0.024);
 
     cyl(root, 2.7, 5.8, [0, 3.10, 0], tank, [0, 0, Math.PI / 2], 28);
 
@@ -3284,7 +3284,7 @@ function addArena() {
     root.rotation.y = rotation;
     fallbackArenaRoot.add(root);
 
-    const burnt = mat(0x292c2c, 0.95, 0.13);
+    const burnt = texturedMat(0x292c2c, 'rustSteel', 0.96, 0.13, [3, 2], 0.032);
 
     box(root, [4.8, 0.95, 2.0], [0, 0.78, 0], burnt, 0, 0.05);
     box(root, [1.8, 1.25, 1.9], [1.25, 1.40, 0], burnt, 0, 0.06);
