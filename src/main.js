@@ -1989,59 +1989,241 @@ function removeEnemy(
 
 function spawnBurst(position, color, count = 12) {
   for (let i = 0; i < count; i += 1) {
-    const size = .04 + Math.random() * .08;
+    const size = .035 + Math.random() * .075;
+
+    // Volumetric 3D chunks instead of flat-looking square particles.
+    const geometry =
+      Math.random() < .65
+        ? new THREE.IcosahedronGeometry(size, 0)
+        : new THREE.TetrahedronGeometry(size * 1.12, 0);
+
+    const material =
+      new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: .55,
+        metalness: .18,
+        roughness: .48,
+        transparent: true,
+        opacity: .96,
+      });
+
     const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(size, size, size),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .95 })
+      geometry,
+      material,
     );
-    mesh.position.copy(position).add(new THREE.Vector3(
-      (Math.random()-.5) * .18,
-      (Math.random()-.5) * .18,
-      (Math.random()-.5) * .18
-    ));
+
+    mesh.position.copy(position).add(
+      new THREE.Vector3(
+        (Math.random() - .5) * .20,
+        (Math.random() - .5) * .20,
+        (Math.random() - .5) * .20,
+      ),
+    );
+
+    mesh.rotation.set(
+      Math.random() * Math.PI,
+      Math.random() * Math.PI,
+      Math.random() * Math.PI,
+    );
+
+    mesh.scale.set(
+      .75 + Math.random() * .55,
+      .55 + Math.random() * .95,
+      .75 + Math.random() * .55,
+    );
+
     scene.add(mesh);
+
     const vel = new THREE.Vector3(
-      (Math.random()-.5) * 8,
+      (Math.random() - .5) * 8,
       Math.random() * 7 + 1,
-      (Math.random()-.5) * 8
+      (Math.random() - .5) * 8,
     );
-    particles.push({ mesh, vel, life: .25 + Math.random() * .6 });
+
+    particles.push({
+      mesh,
+      vel,
+      spin: new THREE.Vector3(
+        (Math.random() - .5) * 16,
+        (Math.random() - .5) * 16,
+        (Math.random() - .5) * 16,
+      ),
+      life: .22 + Math.random() * .58,
+    });
   }
 }
+
 function spawnMuzzleVfx() {
   const muzzleWorld = new THREE.Vector3();
   worldMuzzleAnchor.getWorldPosition(muzzleWorld);
-  spawnBurst(muzzleWorld, 0xffd36b, 7);
+
+  spawnBurst(
+    muzzleWorld,
+    0xffd36b,
+    9,
+  );
+
+  // A real 3D muzzle blast: several faceted cones around a bright core.
+  const blastGroup = new THREE.Group();
+  blastGroup.position.copy(muzzleWorld);
+
+  const blastMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffd36b,
+    emissive: 0xff9f22,
+    emissiveIntensity: 4.2,
+    metalness: .05,
+    roughness: .28,
+    transparent: true,
+    opacity: .92,
+  });
+
+  const core = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(.075, 1),
+    blastMaterial.clone(),
+  );
+  blastGroup.add(core);
+
+  for (let i = 0; i < 4; i += 1) {
+    const petal = new THREE.Mesh(
+      new THREE.ConeGeometry(
+        .045,
+        .24 + Math.random() * .15,
+        8,
+      ),
+      blastMaterial.clone(),
+    );
+
+    petal.position.set(
+      (Math.random() - .5) * .07,
+      (Math.random() - .5) * .07,
+      -.08 - Math.random() * .04,
+    );
+
+    petal.rotation.set(
+      (Math.random() - .5) * .55,
+      (Math.random() - .5) * .55,
+      Math.random() * Math.PI,
+    );
+
+    blastGroup.add(petal);
+  }
+
+  scene.add(blastGroup);
+
+  particles.push({
+    mesh: blastGroup,
+    vel: new THREE.Vector3(0, 0, 0),
+    spin: new THREE.Vector3(
+      0,
+      0,
+      8,
+    ),
+    life: .055,
+    muzzleBlast: true,
+  });
 
   for (let i = 0; i < 2; i += 1) {
     const shell = new THREE.Mesh(
-      new THREE.CylinderGeometry(.025, .025, .16, 8),
-      createMaterial(0xb8a06b, .7, .32)
+      new THREE.CylinderGeometry(
+        .025,
+        .022,
+        .16,
+        16,
+        2,
+      ),
+      createMaterial(0xb8a06b, .78, .25),
     );
-    shell.position.copy(muzzleWorld).add(new THREE.Vector3(.08 + Math.random()*.06, .02, .02));
-    shell.rotation.set(Math.random()*3, Math.random()*3, Math.random()*3);
+
+    shell.position.copy(muzzleWorld).add(
+      new THREE.Vector3(
+        .08 + Math.random() * .06,
+        .02,
+        .02,
+      ),
+    );
+
+    shell.rotation.set(
+      Math.random() * 3,
+      Math.random() * 3,
+      Math.random() * 3,
+    );
+
     scene.add(shell);
+
     shellCasings.push({
       mesh: shell,
-      velocity: new THREE.Vector3(.9 + Math.random(), 1.3 + Math.random()*1.5, (Math.random()-.5)*1.2),
-      angularVelocity: new THREE.Vector3((Math.random()-.5)*18, (Math.random()-.5)*18, (Math.random()-.5)*18),
+      velocity: new THREE.Vector3(
+        .9 + Math.random(),
+        1.3 + Math.random() * 1.5,
+        (Math.random() - .5) * 1.2,
+      ),
+      angularVelocity: new THREE.Vector3(
+        (Math.random() - .5) * 18,
+        (Math.random() - .5) * 18,
+        (Math.random() - .5) * 18,
+      ),
       life: 2.4,
     });
   }
-  state.shake = Math.max(state.shake, .055);
+
+  state.shake = Math.max(
+    state.shake,
+    .055,
+  );
 }
 
 function addTracer(from, to, color = 0xfff0c8, life = .055) {
   const dir = new THREE.Vector3().subVectors(to, from);
   const len = dir.length();
-  const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(.018, .018, len, 6),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .9 })
+
+  const material = new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 2.8,
+    metalness: .05,
+    roughness: .24,
+    transparent: true,
+    opacity: .96,
+  });
+
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(
+      .020,
+      .013,
+      len,
+      12,
+      2,
+    ),
+    material,
   );
-  mesh.position.copy(from).addScaledVector(dir, .5);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
-  scene.add(mesh);
-  tracers.push({ mesh, life });
+
+  body.position.set(0, 0, 0);
+  group.add(body);
+
+  const tip = new THREE.Mesh(
+    new THREE.SphereGeometry(.028, 12, 8),
+    material.clone(),
+  );
+  tip.position.y = len * .5;
+  group.add(tip);
+
+  group.position.copy(from).addScaledVector(
+    dir,
+    .5,
+  );
+
+  group.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    dir.normalize(),
+  );
+
+  scene.add(group);
+  tracers.push({
+    mesh: group,
+    life,
+  });
 }
 
 function playerCollides(next) {
@@ -3022,7 +3204,20 @@ function tickEffects(dt) {
 
   for (let i = tracers.length - 1; i >= 0; i -= 1) {
     tracers[i].life -= dt;
-    tracers[i].mesh.material.opacity = Math.max(0, tracers[i].life * 18);
+
+    tracers[i].mesh.traverse((child) => {
+      if (
+        child.material &&
+        'opacity' in child.material
+      ) {
+        child.material.opacity =
+          Math.max(
+            0,
+            tracers[i].life * 18,
+          );
+      }
+    });
+
     if (tracers[i].life <= 0) {
       scene.remove(tracers[i].mesh);
       tracers.splice(i, 1);
@@ -3032,8 +3227,39 @@ function tickEffects(dt) {
   for (let i = particles.length - 1; i >= 0; i -= 1) {
     const p = particles[i];
     p.life -= dt;
-    p.vel.y -= 9 * dt;
-    p.mesh.position.addScaledVector(p.vel, dt);
+
+    if (p.muzzleBlast) {
+      p.mesh.scale.multiplyScalar(
+        1 + dt * 18,
+      );
+    } else {
+      p.vel.y -= 9 * dt;
+      p.mesh.position.addScaledVector(
+        p.vel,
+        dt,
+      );
+
+      if (p.spin) {
+        p.mesh.rotation.x += p.spin.x * dt;
+        p.mesh.rotation.y += p.spin.y * dt;
+        p.mesh.rotation.z += p.spin.z * dt;
+      }
+    }
+
+    p.mesh.traverse((child) => {
+      if (!child.material) return;
+      if ('opacity' in child.material) {
+        child.material.opacity =
+          Math.max(
+            0,
+            Math.min(
+              .96,
+              p.life * (p.muzzleBlast ? 20 : 2.8),
+            ),
+          );
+      }
+    });
+
     if (p.life <= 0) {
       scene.remove(p.mesh);
       particles.splice(i, 1);
