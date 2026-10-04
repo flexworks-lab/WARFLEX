@@ -668,7 +668,7 @@ function showRuntimeError(error, context = 'Runtime error') {
   if (!DEBUG_MODE) return;
 
   const existing = document.querySelector('#warfex-debug-error');
-  const panel = existing || document.createElement('pre');
+  const panel = existing || document.createElement('textarea');
   panel.id = 'warfex-debug-error';
   panel.textContent =
     'WARFLEX ERROR\\n\\n' +
@@ -688,6 +688,8 @@ function showRuntimeError(error, context = 'Runtime error') {
     color: '#fff',
     font: '12px/1.45 monospace',
     whiteSpace: 'pre-wrap',
+    resize: 'vertical',
+    minHeight: '120px',
     pointerEvents: 'auto',
     userSelect: 'text',
     webkitUserSelect: 'text',
