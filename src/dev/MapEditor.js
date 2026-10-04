@@ -188,9 +188,9 @@ NaN
     if(e.code==='Delete'||e.code==='Backspace'){this.delete();e.preventDefault();e.stopPropagation();return;}
     if(e.code==='KeyG'){this.group();e.preventDefault();e.stopPropagation();return;}
     if(e.code==='KeyF'){this.focus();e.preventDefault();e.stopPropagation();return;}
-    if(e.code==='KeyW'){this.setTool('translate');e.preventDefault();e.stopPropagation();return;}
-    if(e.code==='KeyE'&&!(e.shiftKey)){this.setTool('rotate');e.preventDefault();e.stopPropagation();return;}
-    if(e.code==='KeyR'){this.setTool('scale');e.preventDefault();e.stopPropagation();return;}
+    if(e.altKey&&e.code==='KeyW'){this.setTool('translate');e.preventDefault();e.stopPropagation();return;}
+    if(e.altKey&&e.code==='KeyE'){this.setTool('rotate');e.preventDefault();e.stopPropagation();return;}
+    if(e.altKey&&e.code==='KeyR'){this.setTool('scale');e.preventDefault();e.stopPropagation();return;}
     if(e.code==='ArrowUp'){this.nudge(0,this.snap,0);e.preventDefault();e.stopPropagation();return;}
     if(e.code==='ArrowDown'){this.nudge(0,-this.snap,0);e.preventDefault();e.stopPropagation();return;}
     if(e.code==='ArrowLeft'){this.nudge(-this.snap,0,0);e.preventDefault();e.stopPropagation();return;}
@@ -207,7 +207,7 @@ NaN
     const right=new T.Vector3(-f.z,0,f.x); let v=this.speed;
     if(this.keys.has('ShiftLeft')||this.keys.has('ShiftRight'))v*=4;
     if(this.keys.has('ControlLeft')||this.keys.has('ControlRight'))v*=.25;
-    const d=new T.Vector3(); if(this.keys.has('KeyW'))d.add(f);if(this.keys.has('KeyS'))d.sub(f);if(this.keys.has('KeyD'))d.add(right);if(this.keys.has('KeyA'))d.sub(right);if(this.keys.has('KeyE')&&this.transform!=='rotate')d.y+=1;if(this.keys.has('KeyQ'))d.y-=1;
+    const d=new T.Vector3(); if(this.keys.has('KeyW'))d.add(f);if(this.keys.has('KeyS'))d.sub(f);if(this.keys.has('KeyD'))d.add(right);if(this.keys.has('KeyA'))d.sub(right);if(this.keys.has('KeyE'))d.y+=1;if(this.keys.has('KeyQ'))d.y-=1;
     if(d.lengthSq()>.001){d.normalize().multiplyScalar(v*dt);this.camera.position.add(d);}
     this.refreshColliders();
   }
