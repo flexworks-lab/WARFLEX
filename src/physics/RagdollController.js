@@ -223,6 +223,122 @@ function bodyForHitPart(ragdoll, hitPart) {
     || ragdoll.bodies.get('root');
 }
 
+function applyInitialHitPose(
+  model,
+  hitPart,
+  hitPoint,
+  direction,
+) {
+  const parts = model.userData?.parts;
+  if (!parts) return;
+
+  const worldPoint =
+    hitPoint?.clone() ||
+    findWorldPosition(parts.upperBody || model);
+
+  const localPoint =
+    model.worldToLocal(worldPoint);
+
+  const localDirection =
+    model.worldToLocal(
+      worldPoint.clone().add(
+        direction.clone().normalize(),
+      ),
+    )
+      .sub(localPoint)
+      .normalize();
+
+  const side =
+    THREE.MathUtils.clamp(
+      localPoint.x / .72,
+      -1,
+      1,
+    );
+
+  // Apply before Cannon bodies are created so their starting transforms
+  // already reflect the body part that was hit.
+  switch (hitPart) {
+    case 'head':
+      if (parts.head) {
+        parts.head.rotation.x +=
+          -localDirection.z * .24;
+        parts.head.rotation.y +=
+          -side * .28;
+        parts.head.rotation.z +=
+          localDirection.x * .12;
+      }
+
+      parts.upperBody.rotation.x +=
+        -localDirection.z * .035;
+      parts.upperBody.rotation.z +=
+        -side * .04;
+      break;
+
+    case 'leftArm':
+    case 'rightArm': {
+      const left =
+        hitPart === 'leftArm';
+      const arm =
+        left ? parts.leftArm : parts.rightArm;
+
+      if (arm) {
+        arm.rotation.x += .22;
+        arm.rotation.y += localDirection.x * .16;
+        arm.rotation.z +=
+          (left ? -.35 : .35);
+      }
+
+      parts.upperBody.rotation.z +=
+        (left ? -.06 : .06);
+      break;
+    }
+
+    case 'leftLeg':
+    case 'rightLeg': {
+      const left =
+        hitPart === 'leftLeg';
+      const leg =
+        left ? parts.leftLeg : parts.rightLeg;
+      const knee =
+        left ? parts.leftKnee : parts.rightKnee;
+
+      if (leg) {
+        leg.rotation.x += -.18;
+        leg.rotation.z +=
+          (left ? -.12 : .12);
+      }
+
+      if (knee) {
+        knee.rotation.x += -.28;
+      }
+
+      parts.hips.rotation.z +=
+        (left ? -.07 : .07);
+      break;
+    }
+
+    case 'lowerBody':
+      parts.hips.rotation.x +=
+        -localDirection.z * .08;
+      parts.hips.rotation.z +=
+        -side * .12;
+      break;
+
+    case 'upperBody':
+    default:
+      parts.upperBody.rotation.x +=
+        -localDirection.z * .10;
+      parts.upperBody.rotation.z +=
+        -side * .17;
+
+      if (parts.head) {
+        parts.head.rotation.z +=
+          side * .06;
+      }
+      break;
+  }
+}
+
 export class RagdollController {
   constructor({
     scene,
@@ -260,6 +376,19 @@ export class RagdollController {
     root.add(source);
 
     const headAssembly = moveMeshAssemblyToHead(source);
+
+    // Start the ragdoll from the exact hit location instead of a generic
+    // collapse. The pose is baked into the initial Cannon transforms.
+    if (hitPoint && direction) {
+      applyInitialHitPose(
+        source,
+        hitPart,
+        hitPoint,
+        direction,
+      );
+      source.updateMatrixWorld(true);
+      headAssembly?.updateMatrixWorld(true);
+    }
 
     // Capture every ragdoll object's local scale after the hierarchy has been
     // rearranged. Physics should move/rotate these objects, never resize them.
@@ -545,6 +674,40 @@ export class RagdollController {
       impulse,
       localPoint,
     );
+
+    // Give the exact hit body an immediate spin based on where the impact
+    // landed. This makes arm/leg/chest/head shots produce different starts.
+    const torqueAxis =
+      new CANNON.Vec3(
+        localPoint.y * impulse.z -
+          localPoint.z * impulse.y,
+        localPoint.z * impulse.x -
+          localPoint.x * impulse.z,
+        localPoint.x * impulse.y -
+          localPoint.y * impulse.x,
+      );
+
+    if (torqueAxis.lengthSquared() > .000001) {
+      torqueAxis.normalize();
+
+      const spinStrength =
+        hitPart === 'head' ? 4.5 :
+        hitPart === 'leftArm' ||
+        hitPart === 'rightArm' ? 3.8 :
+        hitPart === 'leftLeg' ||
+        hitPart === 'rightLeg' ? 3.2 :
+        2.6;
+
+      torqueAxis.scale(
+        spinStrength,
+        torqueAxis,
+      );
+
+      body.angularVelocity.vadd(
+        torqueAxis,
+        body.angularVelocity,
+      );
+    }
 
     // Transfer a little of the impact to connected parts so the body reacts
     // immediately instead of looking like only one rigid segment was hit.
