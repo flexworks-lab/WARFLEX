@@ -809,6 +809,7 @@ function addArena() {
       }),
     );
     collision.name = name;
+    collision.userData.fallbackCollision = true;
     collision.position.set(...position);
     collision.visible = false;
     fallbackArenaRoot.add(collision);
@@ -6537,7 +6538,13 @@ function refreshMapList(){
 }
 function activateSelectedMap(){
   const id=state.selectedMapId||getCurrentMapId()||'builtin';
-  if(id==='builtin'){editorMapRoot.visible=false;fallbackArenaRoot.visible=true;return;}
+  if(id==='builtin'){
+    editorMapRoot.visible=false; fallbackArenaRoot.visible=true;
+    for(const o of obstacles) if(o?.userData?.editorCollider){};
+    fallbackArenaRoot.traverse(o=>{if(o.userData?.fallbackCollision&&!obstacles.includes(o)) obstacles.push(o);});
+    try{physicsWorld.syncArena(obstacles);}catch{}
+    return;
+  }
   const record=mapEditor.getMapById(id); if(!record?.data){state.selectedMapId='builtin';editorMapRoot.visible=false;fallbackArenaRoot.visible=true;return;}
   mapEditor.loadMapRecord(id); editorMapRoot.visible=true; fallbackArenaRoot.visible=false;
   for(let i=0;i<fallbackObstacleCount;i++) obstacles.shift();
