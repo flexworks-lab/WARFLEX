@@ -54,6 +54,7 @@
         <div class="menu-nav" aria-label="Main menu">
           <button id="start-button" type="button">START</button>
           <button id="waves-button" type="button">WAVES</button>
+          <button id="multiplayer-button" type="button">MULTIPLAYER</button>
           <button id="options-button" type="button">OPTIONS</button>
           <button id="editor-button" type="button" class="dev-only-menu">MAP EDITOR</button>
         </div>
@@ -79,6 +80,19 @@
           <button id="start-map-button" class="deploy-button" type="button">START SELECTED MAP</button>
         </div>
         <button id="back-from-waves" class="back-button" type="button">BACK</button>
+      </div>
+
+
+      <div class="menu-view hidden" id="multiplayer-menu">
+        <p class="eyebrow gothic-eyebrow">LIVE COMBAT // NO WAVES</p>
+        <h2 class="menu-view-title">MULTIPLAYER</h2>
+        <div class="multiplayer-panel">
+          <label for="multiplayer-username">USERNAME</label>
+          <input id="multiplayer-username" maxlength="18" autocomplete="nickname" value="PLAYER" />
+          <p>FREE-FOR-ALL PVP · PLAYER RIGS · LIVE USERNAMES</p>
+          <button id="multiplayer-connect" class="deploy-button" type="button">JOIN PVP</button>
+        </div>
+        <button id="back-from-multiplayer" class="back-button" type="button">BACK</button>
       </div>
 
       <div class="menu-view hidden" id="options-menu">
@@ -153,6 +167,9 @@
       const main = $('#menu-main');
       const waves = $('#wave-menu');
       const options = $('#options-menu');
+      const multiplayer = $('#multiplayer-menu');
+      const multiplayerButton = $('#multiplayer-button');
+      const backMultiplayer = $('#back-from-multiplayer');
       const wavesButton = $('#waves-button');
       const optionsButton = $('#options-button');
       const backWaves = $('#back-from-waves');
@@ -166,12 +183,25 @@
         main.classList.toggle('hidden', view !== 'main');
         waves.classList.toggle('hidden', view !== 'waves');
         options.classList.toggle('hidden', view !== 'options');
+        multiplayer?.classList.toggle('hidden', view !== 'multiplayer');
       };
 
       wavesButton?.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
         show('waves');
+      });
+
+      multiplayerButton?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('multiplayer');
+      });
+
+      backMultiplayer?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('main');
       });
 
       optionsButton?.addEventListener('click', (event) => {
