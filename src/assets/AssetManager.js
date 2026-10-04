@@ -54,64 +54,6 @@ export class AssetManager {
     return asset;
   }
 
-  // Loads a GLTF JSON document while explicitly remapping external
-  // buffers/textures to Vite-emitted URLs. This is important for models
-  // whose .gltf references adjacent files such as scene.bin and textures.
-  async loadGLTFDocument(url, resourceUrls = {}) {
-    const cacheKey = url + '::resources';
-    if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey);
-    }
-
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) {
-      throw new Error(
-        'Failed to fetch GLTF: ' +
-        response.status +
-        ' ' +
-        response.statusText +
-        ' (' +
-        url +
-        ')',
-      );
-    }
-
-    const document = await response.json();
-
-    if (Array.isArray(document.buffers)) {
-      for (const buffer of document.buffers) {
-        if (buffer?.uri && resourceUrls[buffer.uri]) {
-          buffer.uri = resourceUrls[buffer.uri];
-        }
-      }
-    }
-
-    if (Array.isArray(document.images)) {
-      for (const image of document.images) {
-        if (image?.uri && resourceUrls[image.uri]) {
-          image.uri = resourceUrls[image.uri];
-        }
-      }
-    }
-
-    const basePath = new URL('./', url).href;
-    const gltf = await this.gltfLoader.parseAsync(
-      JSON.stringify(document),
-      basePath,
-    );
-
-    this.prepare(gltf.scene);
-
-    const asset = {
-      scene: gltf.scene,
-      animations: gltf.animations || [],
-      parser: gltf.parser,
-    };
-
-    this.cache.set(cacheKey, asset);
-    return asset;
-  }
-
   async loadUSDZ(url) {
     if (this.cache.has(url)) {
       return this.cache.get(url);
