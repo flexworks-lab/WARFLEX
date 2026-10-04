@@ -1,4 +1,5 @@
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT || 8080);
