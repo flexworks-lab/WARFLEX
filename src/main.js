@@ -77,10 +77,10 @@ const els = {
 };
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b1117);
-scene.fog = new THREE.Fog(0x0b1117, 42, 210);
+scene.background = new THREE.Color(0x111a22);
+scene.fog = new THREE.Fog(0x111a22, 58, 260);
 
-const camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.05, 260);
+const camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.05, 320);
 camera.rotation.order = 'YXZ';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -88,7 +88,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.AgXToneMapping;
-renderer.toneMappingExposure = 1.55;
+renderer.toneMappingExposure = 1.82;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
@@ -158,15 +158,15 @@ const assetManager = new AssetManager(renderer);
 // Bright outdoor daylight rig: a strong sun plus soft sky/ground fill
 // keeps the arena readable while preserving directional shadows.
 const worldHemiLight = new THREE.HemisphereLight(
-  0xe7f2ff,
-  0x26313a,
-  2.6,
+  0xf2f7ff,
+  0x34424b,
+  3.2,
 );
 scene.add(worldHemiLight);
 
 const sun = new THREE.DirectionalLight(
   0xfff7e8,
-  5.8,
+  6.8,
 );
 sun.position.set(-52, 62, 28);
 sun.castShadow = true;
@@ -182,15 +182,15 @@ sun.shadow.camera.bottom = -85;
 scene.add(sun);
 
 const daylightFill = new THREE.DirectionalLight(
-  0x9fc4ff,
-  1.3,
+  0xb8d8ff,
+  1.8,
 );
 daylightFill.position.set(46, 30, -52);
 scene.add(daylightFill);
 
 const ambientLight = new THREE.AmbientLight(
-  0xc8d9e8,
-  0.42,
+  0xd9e8f2,
+  0.62,
 );
 scene.add(ambientLight);
 
@@ -1453,6 +1453,39 @@ function addArena() {
       [width + .35, .32, depth + .35],
       [0, height + .08, 0],
       buildingDark,
+    );
+
+    const facilityAccentColors = {
+      COMMAND: 0x4b8aaa,
+      BARRACKS: 0x74865a,
+      LOGISTICS: 0xc17b35,
+      WORKSHOP: 0xb85c43,
+      ADMIN: 0x6e82c7,
+      'MOTOR POOL': 0x8e634a,
+      GUARD: 0xb9b39f,
+    };
+
+    const facilityAccent =
+      new THREE.MeshStandardMaterial({
+        color:
+          facilityAccentColors[label] ||
+          0x71818a,
+        roughness: .45,
+        metalness: .34,
+      });
+
+    addTrimBox(
+      root,
+      [width * .82, .12, .10],
+      [0, height - .34, depth * .5 + .11],
+      facilityAccent,
+    );
+
+    addTrimBox(
+      root,
+      [width * .46, .08, .07],
+      [0, height - .58, depth * .5 + .115],
+      facilityAccent,
     );
 
     // Entrance frame.
@@ -3122,7 +3155,7 @@ const arenaGrid = new THREE.GridHelper(258, 86, 0x33404b, 0x1b242d);
 arenaGrid.position.y = 0.015;
 arenaGrid.material.transparent = true;
 arenaGrid.material.opacity = 0.06;
-scene.add(arenaGrid);
+arenaGrid.visible = false;
 
 const physicsWorld = new PhysicsWorld({
   gravity: -22,
@@ -3559,7 +3592,7 @@ function buildInstancedProps() {
     );
   }
 }
-buildInstancedProps();
+// Legacy scattered prop layer removed; district geometry owns the map dressing.
 
 Promise.all([
   loadWorldAssets(),
@@ -4102,6 +4135,29 @@ const weapon = createWeapon();
 weapon.visible = false;
 
 const menuGunPairs = [];
+
+const menuToonGradient =
+  new THREE.DataTexture(
+    new Uint8Array([
+      30, 35, 40,
+      62, 70, 78,
+      112, 124, 136,
+      196, 206, 214,
+    ]),
+    4,
+    1,
+    THREE.RGBFormat,
+  );
+menuToonGradient.magFilter = THREE.NearestFilter;
+menuToonGradient.minFilter = THREE.NearestFilter;
+menuToonGradient.generateMipmaps = false;
+menuToonGradient.needsUpdate = true;
+
+const menuStaticOverlay =
+  document.createElement('div');
+menuStaticOverlay.className = 'menu-static-overlay';
+document.body.appendChild(menuStaticOverlay);
+
 const menuGunLights = {
   key: null,
   fill: null,
@@ -4168,7 +4224,20 @@ function prepareMenuGun(
 
     const cloned =
       materials.map((material) => {
-        const next = material.clone();
+        const isOptic =
+          child.name.includes('Optic') ||
+          child.name.includes('Lens');
+
+        const next =
+          isOptic
+            ? material.clone()
+            : new THREE.MeshToonMaterial({
+                color: material.color
+                  ? material.color.getHex()
+                  : palette.metal,
+                gradientMap: menuToonGradient,
+              });
+
         next.transparent = true;
         next.opacity = 0;
         next.depthWrite = true;
@@ -4300,11 +4369,11 @@ function prepareMenuGun(
     gun.add(suppressor);
   }
 
-  gun.position.set(1.9, -.10, -3.6);
+  gun.position.set(2.55, -.06, -3.15);
   gun.rotation.set(
-    -.08,
-    -.22,
-    .035,
+    -.12,
+    .62,
+    .06,
   );
 
   gunViewportScene.add(gun);
@@ -4318,7 +4387,7 @@ for (let i = 0; i < menuGunPalettes.length; i += 1) {
     prepareMenuGun(
       weapon,
       palette,
-      1.04 - i * .04,
+      1.22 - i * .045,
       i,
     );
 
@@ -4331,16 +4400,16 @@ for (let i = 0; i < menuGunPalettes.length; i += 1) {
     );
 
   hero.position.set(
-    1.95,
-    -.10,
-    -3.85,
+    2.65,
+    -.05,
+    -3.20,
   );
-  hero.rotation.y += i * .16;
+  hero.rotation.y += i * .22;
 
   secondary.position.set(
-    3.25,
-    -.86,
-    -5.05,
+    3.65,
+    -.82,
+    -4.55,
   );
   secondary.rotation.y -= .42 - i * .08;
   secondary.rotation.z = .06;
@@ -4393,6 +4462,34 @@ menuGunLights.rim.position.set(
   -2.6,
 );
 gunViewportScene.add(menuGunLights.rim);
+
+menuGunLights.glint =
+  new THREE.SpotLight(
+    0xffffff,
+    8.5,
+    16,
+    .30,
+    .82,
+    1.7,
+  );
+menuGunLights.glint.position.set(
+  1.2,
+  3.8,
+  2.8,
+);
+menuGunLights.glintTarget =
+  new THREE.Object3D();
+menuGunLights.glintTarget.position.set(
+  2.5,
+  -.15,
+  -3.2,
+);
+gunViewportScene.add(
+  menuGunLights.glint,
+  menuGunLights.glintTarget,
+);
+menuGunLights.glint.target =
+  menuGunLights.glintTarget;
 
 let menuGunCycle = 0;
 let menuGunCurrent = 0;
@@ -4477,22 +4574,22 @@ function updateMenuGuns(dt) {
 
     if (pair.hero.visible) {
       pair.hero.rotation.x =
-        -.08 + Math.sin(t * .42) * .035;
+        -.12 + Math.sin(t * .39) * .075;
       pair.hero.rotation.y =
-        -.22 + Math.sin(t * .55) * .13;
+        .62 + Math.sin(t * .46) * .48;
       pair.hero.rotation.z =
-        .035 + Math.sin(t * .31) * .022;
+        .06 + Math.sin(t * .28) * .045;
       pair.hero.position.y =
-        -.10 + Math.sin(t * .70) * .055;
+        -.05 + Math.sin(t * .66) * .075;
     }
 
     if (pair.secondary.visible) {
       pair.secondary.rotation.x =
-        -.10 + Math.sin(t * .37) * .028;
+        -.12 + Math.sin(t * .35) * .055;
       pair.secondary.rotation.y =
-        -.34 + Math.sin(t * .49) * .10;
+        -.48 + Math.sin(t * .42) * .30;
       pair.secondary.position.y =
-        -.86 + Math.cos(t * .62) * .04;
+        -.82 + Math.cos(t * .58) * .05;
     }
   }
 
@@ -4515,6 +4612,24 @@ function updateMenuGuns(dt) {
 
   const pulse =
     .85 + Math.sin(performance.now() * .0014) * .12;
+
+  const glintT =
+    performance.now() * .00135;
+
+  menuGunLights.glint.position.set(
+    1.0 + Math.sin(glintT) * 4.6,
+    3.0 + Math.sin(glintT * .63) * .75,
+    2.0 + Math.cos(glintT * .82) * 2.4,
+  );
+
+  menuGunLights.glintTarget.position.set(
+    2.4 + Math.sin(glintT * .41) * .7,
+    -.08,
+    -3.0,
+  );
+
+  menuStaticOverlay.style.opacity =
+    show ? '.065' : '0';
 
   menuGunLights.key.intensity =
     THREE.MathUtils.damp(
