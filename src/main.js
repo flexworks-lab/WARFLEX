@@ -3630,6 +3630,7 @@ function installImportedWeaponModel(target, sourceScene, {
 
   const model = SkeletonUtils.clone(sourceScene);
   model.name = 'ImportedAk47Model';
+  target.userData.importedWeaponAnimations = animations;
 
   const bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());
@@ -3768,7 +3769,7 @@ window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
       installImportedWeaponModel(
         pair.secondary,
         asset.scene,
-        { keepHands: false, scaleTarget: 3.05 },
+        { keepHands: false, scaleTarget: 3.05, animations: asset.animations },
       );
     }
 
@@ -3776,7 +3777,7 @@ window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
     weapon.visible = state.active && !state.over;
   } catch (error) {
     console.error(
-      '[WARFLEX] Failed to load Ak47.usdz; using fallback weapon.',
+      '[WARFLEX] Failed to load AK47 glTF model; using fallback weapon.',
       error,
     );
   }
