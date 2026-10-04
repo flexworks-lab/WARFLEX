@@ -4044,308 +4044,281 @@ function addVariantCylinder(model, name, radius, length, position, material) {
 const rifleModel = normalizeWeaponModel(createWeapon(), 'rifle');
 weaponModels.push(rifleModel);
 
-const shotgunModel = normalizeWeaponModel(rifleModel.clone(true), 'shotgun');
-hideRifleBody(shotgunModel);
+function addStandaloneWeaponMesh(model, geometry, name, position, material, rotation = [0, 0, 0]) {
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = name;
+  mesh.position.set(...position);
+  mesh.rotation.set(...rotation);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.frustumCulled = false;
+  model.add(mesh);
+  return mesh;
+}
 
-const shotgunMat = createMaterial(0x34393c, .82, .28);
-const shotgunPolymer = createMaterial(0x23282b, .16, .62);
-const shotgunAccent = createMaterial(0x6d7272, .88, .20);
+function addStandaloneBox(model, name, size, position, material, rotation = [0, 0, 0], bevel = .018) {
+  return addStandaloneWeaponMesh(
+    model,
+    new RoundedBoxGeometry(
+      size[0],
+      size[1],
+      size[2],
+      2,
+      Math.min(bevel, Math.min(...size) * .16),
+    ),
+    name,
+    position,
+    material,
+    rotation,
+  );
+}
 
-addVariantBox(
-  shotgunModel,
-  'ShotgunReceiver',
-  [.38, .34, 1.25],
-  [0, .08, -.70],
-  shotgunMat,
-  [0, 0, 0],
-  .045,
-);
-addVariantBox(
-  shotgunModel,
-  'ShotgunStock',
-  [.28, .40, .82],
-  [0, -.02, .55],
-  shotgunPolymer,
-  [0, 0, -.10],
-  .055,
-);
-addVariantBox(
-  shotgunModel,
-  'ShotgunGrip',
-  [.22, .48, .34],
-  [0, -.25, .12],
-  shotgunPolymer,
-  [0, 0, -.12],
-  .04,
-);
-addVariantCylinder(
-  shotgunModel,
-  'ShotgunBarrel',
-  .065,
-  2.65,
-  [0, .18, -2.08],
-  shotgunAccent,
-);
-addVariantCylinder(
-  shotgunModel,
-  'ShotgunTube',
-  .082,
-  2.05,
-  [0, .04, -1.72],
-  shotgunMat,
-);
-addVariantBox(
-  shotgunModel,
-  'ShotgunPump',
-  [.34, .20, .58],
-  [0, .08, -1.50],
-  shotgunPolymer,
-  [0, 0, 0],
-  .035,
-);
-addVariantBox(
-  shotgunModel,
-  'ShellCarrier',
-  [.08, .16, .72],
-  [.22, -.10, -.70],
-  shotgunAccent,
-  [0, 0, 0],
-  .018,
-);
-shotgunModel.position.z = .16;
-weaponModels.push(shotgunModel);
+function addStandaloneCylinder(model, name, radius, length, position, material, rotation = [Math.PI / 2, 0, 0], segments = 24) {
+  return addStandaloneWeaponMesh(
+    model,
+    new THREE.CylinderGeometry(radius, radius * .94, length, segments),
+    name,
+    position,
+    material,
+    rotation,
+  );
+}
 
-const sniperModel = normalizeWeaponModel(rifleModel.clone(true), 'sniper');
-hideRifleBody(sniperModel);
+function addStandaloneHands(model, variant = 'standard') {
+  const glove = createMaterial(
+    variant === 'pistol' ? 0x171b1f : 0x11171c,
+    .08,
+    .80,
+  );
+  const sleeve = createMaterial(
+    variant === 'pistol' ? 0x9ca8b1 : 0x737f87,
+    .16,
+    .58,
+  );
 
-const sniperChassis = createMaterial(0x1a1f23, .88, .22);
-const sniperPolymer = createMaterial(0x303840, .28, .54);
-const sniperMetal = createMaterial(0x78818a, .92, .17);
-const sniperGlass = new THREE.MeshStandardMaterial({
-  color: 0x0a1820,
-  emissive: 0x185f78,
-  emissiveIntensity: 1.8,
-  metalness: .72,
-  roughness: .10,
-});
+  const leftHand = new THREE.Mesh(
+    new THREE.SphereGeometry(.115, 18, 12),
+    glove,
+  );
+  leftHand.name = 'WeaponLeftHand';
+  leftHand.scale.set(1, .68, 1.3);
+  leftHand.position.set(
+    variant === 'pistol' ? -.02 : -.17,
+    variant === 'pistol' ? -.10 : -.17,
+    variant === 'pistol' ? -.72 : -1.02,
+  );
+  leftHand.castShadow = true;
+  model.add(leftHand);
 
-addVariantBox(
-  sniperModel,
-  'SniperChassis',
-  [.42, .40, 1.70],
-  [0, .08, -.35],
-  sniperChassis,
-  [0, 0, 0],
-  .055,
-);
-addVariantBox(
-  sniperModel,
-  'SniperButtstock',
-  [.32, .32, .95],
-  [0, .00, .92],
-  sniperPolymer,
-  [0, 0, -.04],
-  .05,
-);
-addVariantBox(
-  sniperModel,
-  'SniperGrip',
-  [.22, .54, .34],
-  [0, -.27, .14],
-  sniperPolymer,
-  [0, 0, -.09],
-  .04,
-);
-addVariantCylinder(
-  sniperModel,
-  'SniperBarrel',
-  .048,
-  3.75,
-  [0, .17, -2.80],
-  sniperMetal,
-);
-addVariantCylinder(
-  sniperModel,
-  'SniperMuzzleBrake',
-  .075,
-  .36,
-  [0, .17, -4.55],
-  sniperChassis,
-);
-const sniperScope = new THREE.Mesh(
-  new THREE.CylinderGeometry(.12, .105, 1.15, 20),
-  sniperChassis,
-);
-sniperScope.name = 'SniperScope';
-sniperScope.rotation.x = Math.PI / 2;
-sniperScope.position.set(0, .43, -.62);
-sniperScope.castShadow = true;
-sniperModel.add(sniperScope);
-addVariantBox(
-  sniperModel,
-  'SniperScopeGlass',
-  [.15, .16, .22],
-  [0, .43, -1.12],
-  sniperGlass,
-  [0, 0, 0],
-  .035,
-);
-addVariantBox(
-  sniperModel,
-  'SniperBipod',
-  [.10, .50, .10],
-  [-.13, -.34, -1.10],
-  sniperMetal,
-  [0.22, 0, 0],
-  .018,
-);
-addVariantBox(
-  sniperModel,
-  'SniperBipodRight',
-  [.10, .50, .10],
-  [.13, -.34, -1.10],
-  sniperMetal,
-  [-0.22, 0, 0],
-  .018,
-);
-sniperModel.position.z = .22;
-weaponModels.push(sniperModel);
+  const rightHand = new THREE.Mesh(
+    new THREE.SphereGeometry(.11, 18, 12),
+    glove,
+  );
+  rightHand.name = 'WeaponRightHand';
+  rightHand.scale.set(.98, .68, 1.22);
+  rightHand.position.set(
+    variant === 'pistol' ? .12 : .17,
+    variant === 'pistol' ? -.19 : -.16,
+    variant === 'pistol' ? -.08 : .10,
+  );
+  rightHand.castShadow = true;
+  model.add(rightHand);
 
-const pistolModel = normalizeWeaponModel(rifleModel.clone(true), 'pistol');
-hideRifleBody(pistolModel);
+  const leftArm = new THREE.Group();
+  const rightArm = new THREE.Group();
+  leftArm.name = 'WeaponLeftArm';
+  rightArm.name = 'WeaponRightArm';
 
-const pistolFrame = createMaterial(0x20262b, .78, .34);
-const pistolPolymer = createMaterial(0x161b20, .12, .72);
-const pistolMetal = createMaterial(0x707875, .94, .16);
+  const sleeveL = new THREE.Mesh(
+    new THREE.CapsuleGeometry(.10, .42, 6, 12),
+    sleeve,
+  );
+  sleeveL.rotation.z = -.35;
+  sleeveL.position.set(-.25, -.02, -.57);
+  sleeveL.castShadow = true;
+  leftArm.add(sleeveL);
 
-addVariantBox(
-  pistolModel,
-  'PistolFrame',
-  [.30, .25, .82],
-  [0, -.02, -.25],
-  pistolFrame,
-  [0, 0, 0],
-  .045,
-);
-addVariantBox(
-  pistolModel,
-  'PistolSlide',
-  [.28, .18, 1.10],
-  [0, .18, -1.00],
-  pistolMetal,
-  [0, 0, 0],
-  .028,
-);
-addVariantBox(
-  pistolModel,
-  'PistolGrip',
-  [.24, .52, .38],
-  [0, -.31, .26],
-  pistolPolymer,
-  [0, 0, -.12],
-  .04,
-);
-addVariantBox(
-  pistolModel,
-  'PistolTriggerGuard',
-  [.22, .16, .38],
-  [0, -.16, -.52],
-  pistolFrame,
-  [0, 0, 0],
-  .025,
-);
-addVariantCylinder(
-  pistolModel,
-  'PistolBarrel',
-  .04,
-  .82,
-  [0, .19, -1.76],
-  pistolMetal,
-);
-addVariantBox(
-  pistolModel,
-  'PistolSight',
-  [.08, .10, .14],
-  [0, .30, -1.46],
-  pistolFrame,
-  [0, 0, 0],
-  .012,
-);
-pistolModel.scale.set(.92, .92, .92);
-pistolModel.position.z = .44;
-weaponModels.push(pistolModel);
+  const sleeveR = new THREE.Mesh(
+    new THREE.CapsuleGeometry(.10, .42, 6, 12),
+    sleeve,
+  );
+  sleeveR.rotation.z = .35;
+  sleeveR.position.set(.25, -.02, -.57);
+  sleeveR.castShadow = true;
+  rightArm.add(sleeveR);
 
-const smgModel = normalizeWeaponModel(rifleModel.clone(true), 'smg');
-hideRifleBody(smgModel);
+  model.add(leftArm, rightArm);
+}
 
-const smgBody = createMaterial(0x22292e, .84, .26);
-const smgPolymer = createMaterial(0x30373d, .18, .60);
-const smgAccent = createMaterial(0x899196, .88, .19);
+function addStandaloneMuzzle(model, z, color = 0xffcf6a) {
+  const muzzle = new THREE.Mesh(
+    new THREE.CylinderGeometry(.045, .055, .18, 18),
+    createMaterial(0x111619, .88, .22),
+  );
+  muzzle.name = 'MuzzleDeviceMesh';
+  muzzle.rotation.x = Math.PI / 2;
+  muzzle.position.set(0, .06, z);
+  model.add(muzzle);
 
-addVariantBox(
-  smgModel,
-  'SMGReceiver',
-  [.34, .34, 1.05],
-  [0, .06, -.72],
-  smgBody,
-  [0, 0, 0],
-  .04,
-);
-addVariantBox(
-  smgModel,
-  'SMGTopHousing',
-  [.28, .14, .84],
-  [0, .26, -.60],
-  smgAccent,
-  [0, 0, 0],
-  .025,
-);
-addVariantBox(
-  smgModel,
-  'SMGGrip',
-  [.24, .44, .34],
-  [0, -.22, -.02],
-  smgPolymer,
-  [0, 0, -.16],
-  .035,
-);
-addVariantBox(
-  smgModel,
-  'SMGStock',
-  [.28, .30, .62],
-  [0, .00, .38],
-  smgPolymer,
-  [0, 0, .08],
-  .04,
-);
-addVariantCylinder(
-  smgModel,
-  'SMGBarrel',
-  .052,
-  1.72,
-  [0, .10, -2.02],
-  smgAccent,
-);
-addVariantCylinder(
-  smgModel,
-  'SMGMuzzle',
-  .072,
-  .32,
-  [0, .10, -2.99],
-  smgBody,
-);
-addVariantBox(
-  smgModel,
-  'SMGMagazine',
-  [.16, .58, .34],
-  [0, -.43, -.58],
-  smgPolymer,
-  [0.06, 0, 0],
-  .03,
-);
-smgModel.scale.set(.98, .98, .92);
-smgModel.position.z = .20;
-weaponModels.push(smgModel);
+  const flash = new THREE.PointLight(color, 0, 7, 2);
+  flash.name = 'WeaponMuzzleLight';
+  flash.position.set(0, .06, z - .06);
+  model.add(flash);
+
+  const flashMesh = new THREE.Mesh(
+    new THREE.ConeGeometry(.11, .40, 12),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  flashMesh.name = 'WeaponMuzzleFlash';
+  flashMesh.rotation.x = -Math.PI / 2;
+  flashMesh.position.set(0, .06, z - .12);
+  model.add(flashMesh);
+
+  model.userData.muzzle = muzzle;
+  model.userData.flash = flash;
+  model.userData.flashMesh = flashMesh;
+}
+
+function finishStandaloneWeapon(model, id) {
+  const normalized = normalizeWeaponModel(model, id);
+  normalized.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    child.frustumCulled = false;
+    child.renderOrder = 1000;
+
+    const materials = Array.isArray(child.material)
+      ? child.material
+      : [child.material];
+
+    for (const material of materials) {
+      if (!material) continue;
+      material.transparent = false;
+      material.opacity = 1;
+      material.depthTest = false;
+      material.depthWrite = false;
+      material.side = THREE.DoubleSide;
+    }
+  });
+  return normalized;
+}
+
+// SHOTGUN — broad receiver, tubular feed, pump, compact stock.
+{
+  const model = new THREE.Group();
+  const body = createMaterial(0x343a3d, .84, .27);
+  const polymer = createMaterial(0x242a2e, .12, .70);
+  const metal = createMaterial(0x777f82, .90, .18);
+  const accent = createMaterial(0x5b6469, .72, .28);
+
+  addStandaloneBox(model, 'ShotgunReceiver', [.42, .38, 1.20], [0, .06, -.62], body, [0, 0, 0], .05);
+  addStandaloneBox(model, 'ShotgunStock', [.30, .38, .86], [0, .01, .52], polymer, [0, 0, -.10], .05);
+  addStandaloneBox(model, 'ShotgunGrip', [.24, .48, .34], [0, -.24, .08], polymer, [0, 0, -.10], .04);
+  addStandaloneCylinder(model, 'ShotgunBarrel', .066, 2.72, [0, .18, -2.04], metal);
+  addStandaloneCylinder(model, 'ShotgunTube', .086, 2.08, [0, .025, -1.68], accent);
+  addStandaloneBox(model, 'ShotgunPump', [.34, .21, .58], [0, .08, -1.46], polymer, [0, 0, 0], .035);
+  addStandaloneBox(model, 'ShotgunShellCarrier', [.08, .16, .70], [.23, -.10, -.62], metal, [0, 0, 0], .015);
+  addStandaloneBox(model, 'ShotgunSight', [.08, .11, .18], [0, .30, -1.88], accent, [0, 0, 0], .012);
+  addStandaloneHands(model, 'standard');
+  addStandaloneMuzzle(model, -3.39);
+  weaponModels.push(finishStandaloneWeapon(model, 'shotgun'));
+}
+
+// SNIPER — long chassis, oversized optic, bipod, precision profile.
+{
+  const model = new THREE.Group();
+  const chassis = createMaterial(0x1a1f24, .88, .20);
+  const polymer = createMaterial(0x303a42, .24, .55);
+  const metal = createMaterial(0x7b858b, .92, .16);
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0x0a1820,
+    emissive: 0x1e7896,
+    emissiveIntensity: 1.9,
+    metalness: .72,
+    roughness: .10,
+  });
+
+  addStandaloneBox(model, 'SniperChassis', [.42, .38, 1.72], [0, .06, -.30], chassis, [0, 0, 0], .055);
+  addStandaloneBox(model, 'SniperButtstock', [.30, .34, 1.05], [0, -.01, 1.02], polymer, [0, 0, -.04], .05);
+  addStandaloneBox(model, 'SniperGrip', [.22, .54, .34], [0, -.26, .10], polymer, [0, 0, -.08], .04);
+  addStandaloneCylinder(model, 'SniperBarrel', .048, 3.90, [0, .17, -2.82], metal);
+  addStandaloneCylinder(model, 'SniperMuzzleBrake', .078, .38, [0, .17, -4.66], chassis);
+
+  addStandaloneCylinder(
+    model,
+    'SniperScope',
+    .12,
+    1.22,
+    [0, .43, -.62],
+    chassis,
+    [Math.PI / 2, 0, 0],
+  );
+  addStandaloneBox(model, 'SniperScopeGlass', [.16, .17, .24], [0, .43, -1.18], glass, [0, 0, 0], .03);
+  addStandaloneBox(model, 'SniperBipodL', [.08, .48, .10], [-.15, -.35, -1.18], metal, [.25, 0, 0], .015);
+  addStandaloneBox(model, 'SniperBipodR', [.08, .48, .10], [.15, -.35, -1.18], metal, [-.25, 0, 0], .015);
+  addStandaloneHands(model, 'standard');
+  addStandaloneMuzzle(model, -4.86);
+  weaponModels.push(finishStandaloneWeapon(model, 'sniper'));
+}
+
+// PISTOL — compact slide/frame/grip; no rifle chassis.
+{
+  const model = new THREE.Group();
+  const frame = createMaterial(0x20262b, .74, .34);
+  const polymer = createMaterial(0x151a1e, .10, .75);
+  const metal = createMaterial(0x747c7d, .94, .15);
+
+  addStandaloneBox(model, 'PistolFrame', [.32, .28, .86], [0, -.04, -.28], frame, [0, 0, 0], .045);
+  addStandaloneBox(model, 'PistolSlide', [.28, .19, 1.12], [0, .18, -1.00], metal, [0, 0, 0], .028);
+  addStandaloneBox(model, 'PistolGrip', [.24, .54, .38], [0, -.30, .28], polymer, [0, 0, -.12], .04);
+  addStandaloneBox(model, 'PistolTriggerGuard', [.23, .17, .38], [0, -.14, -.55], frame, [0, 0, 0], .025);
+  addStandaloneBox(model, 'PistolMagazine', [.16, .54, .25], [0, -.58, .27], metal, [0, 0, 0], .025);
+  addStandaloneCylinder(model, 'PistolBarrel', .040, .84, [0, .20, -1.83], metal);
+  addStandaloneBox(model, 'PistolFrontSight', [.07, .10, .12], [0, .30, -1.55], frame, [0, 0, 0], .01);
+  addStandaloneBox(model, 'PistolRearSight', [.08, .11, .13], [0, .30, -.60], frame, [0, 0, 0], .01);
+  addStandaloneHands(model, 'pistol');
+  addStandaloneMuzzle(model, -2.25);
+  model.scale.setScalar(.92);
+  model.position.z = .38;
+  weaponModels.push(finishStandaloneWeapon(model, 'pistol'));
+}
+
+// SMG — compact receiver, folding stock, rail, short barrel, vertical magazine.
+{
+  const model = new THREE.Group();
+  const body = createMaterial(0x242b30, .84, .25);
+  const polymer = createMaterial(0x303940, .15, .58);
+  const metal = createMaterial(0x899297, .88, .18);
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0x0a1d23,
+    emissive: 0x1d7f99,
+    emissiveIntensity: 1.6,
+    metalness: .74,
+    roughness: .12,
+  });
+
+  addStandaloneBox(model, 'SMGReceiver', [.36, .36, 1.18], [0, .06, -.58], body, [0, 0, 0], .045);
+  addStandaloneBox(model, 'SMGTopRail', [.16, .09, .92], [0, .29, -.60], metal, [0, 0, 0], .015);
+  for (let i = 0; i < 6; i += 1) {
+    addStandaloneBox(model, 'SMGRailTooth' + i, [.18, .025, .055], [0, .35, -.22 - i * .13], body, [0, 0, 0], .006);
+  }
+  addStandaloneBox(model, 'SMGGrip', [.23, .46, .34], [0, -.23, .00], polymer, [0, 0, -.16], .035);
+  addStandaloneBox(model, 'SMGStock', [.28, .28, .72], [0, .02, .55], polymer, [0, 0, .08], .04);
+  addStandaloneCylinder(model, 'SMGBarrel', .053, 1.70, [0, .10, -1.98], metal);
+  addStandaloneCylinder(model, 'SMGMuzzle', .073, .31, [0, .10, -2.96], body);
+  addStandaloneBox(model, 'SMGMagazine', [.17, .58, .32], [0, -.43, -.55], polymer, [.08, 0, 0], .03);
+  addStandaloneBox(model, 'SMGOptic', [.18, .15, .30], [0, .44, -.50], body, [0, 0, 0], .025);
+  addStandaloneBox(model, 'SMGOpticLens', [.12, .08, .08], [0, .45, -.69], glass, [0, 0, 0], .01);
+  addStandaloneHands(model, 'standard');
+  addStandaloneMuzzle(model, -3.15);
+  model.scale.setScalar(.98);
+  model.position.z = .18;
+  weaponModels.push(finishStandaloneWeapon(model, 'smg'));
+}
 
 let loadoutOpen = false;
 let selectedLoadoutIndex = 0;
