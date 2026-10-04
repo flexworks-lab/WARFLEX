@@ -3800,10 +3800,7 @@ function installImportedWeaponModel(target, sourceScene, {
 
 window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
   try {
-    const asset = await assetManager.loadGLTFDocument(
-      AK47_GLTF_URL,
-      AK47_RESOURCE_URLS,
-    );
+    const asset = await assetManager.loadGLTF(AK47_GLTF_URL);
 
     installImportedWeaponModel(
       weapon,
@@ -3844,6 +3841,14 @@ window.__WARFLEX_LOAD_AK47__ = async function loadImportedAK47Weapon() {
       '[WARFLEX] Failed to load AK47 glTF model; using fallback weapon.',
       error,
     );
+
+    const status = document.querySelector('#warfex-boot-status');
+    if (status) {
+      status.textContent =
+        'WARFLEX AK47 IMPORT ERROR: ' +
+        (error?.message || String(error));
+      status.style.display = 'block';
+    }
   }
 }
 
