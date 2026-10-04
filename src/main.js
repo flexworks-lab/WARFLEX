@@ -198,6 +198,8 @@ const state = {
   shake: 0,
   selectedWave: 1,
   menuTime: 0,
+  aiming: false,
+  aimBlend: 0,
   slideTimer: 0,
   slideCooldown: 0,
   slideQueued: false,
@@ -2009,6 +2011,8 @@ function resetGame(spawnImmediately = true) {
     muzzleFlash: 0,
     shake: 0,
     selectedWave: selected,
+    aiming: false,
+    aimBlend: 0,
     slideTimer: 0,
     slideCooldown: 0,
     slideQueued: false,
@@ -2619,6 +2623,7 @@ function spawnMuzzleVfx() {
         (Math.random() - .5) * 18,
         (Math.random() - .5) * 18,
       ),
+      resting: false,
       life: 2.4,
     });
   }
@@ -3596,13 +3601,82 @@ function updateWeapon(dt) {
   state.weaponKick = Math.max(0, state.weaponKick - dt * 10);
   state.muzzleFlash = Math.max(0, state.muzzleFlash - dt);
 
+  // Smooth first-person ADS. Hold right mouse to bring the optic toward
+  // the center of the screen and tighten the camera FOV.
+  const targetAim =
+    state.aiming && state.active && !state.over
+      ? 1
+      : 0;
+
+  state.aimBlend = THREE.MathUtils.damp(
+    state.aimBlend,
+    targetAim,
+    15,
+    dt,
+  );
+
   const breathing = Math.sin(t * 1.7) * .006;
-  weapon.position.x = .43 + Math.sin(t * bobSpeed) * bobAmount;
-  weapon.position.y = -.48 + breathing + Math.abs(Math.cos(t * bobSpeed)) * bobAmount - state.weaponKick * .045;
-  weapon.position.z = -1.03 + state.weaponKick * .09;
-  weapon.rotation.x = -.03 - state.weaponKick * .09;
-  weapon.rotation.y = -.04 + Math.sin(t * bobSpeed * .5) * bobAmount * 1.2;
-  weapon.rotation.z = -.015 + Math.sin(t * bobSpeed) * bobAmount * .8;
+  const hipBobX =
+    Math.sin(t * bobSpeed) *
+    bobAmount;
+
+  const hipBobY =
+    breathing +
+    Math.abs(Math.cos(t * bobSpeed)) *
+    bobAmount;
+
+  const hipPosition = new THREE.Vector3(
+    .39 + hipBobX,
+    -.48 + hipBobY - state.weaponKick * .045,
+    -1.01 + state.weaponKick * .09,
+  );
+
+  // Keep the rifle narrow and bring its optic onto the camera centerline.
+  const adsPosition = new THREE.Vector3(
+    -.005,
+    -.405 - state.weaponKick * .015,
+    -.78 + state.weaponKick * .035,
+  );
+
+  weapon.position.lerpVectors(
+    hipPosition,
+    adsPosition,
+    state.aimBlend,
+  );
+
+  const hipRotation = new THREE.Euler(
+    -.025 - state.weaponKick * .09,
+    -.045 + Math.sin(t * bobSpeed * .5) * bobAmount * 1.2,
+    -.012 + Math.sin(t * bobSpeed) * bobAmount * .8,
+  );
+
+  const adsRotation = new THREE.Euler(
+    -.015 - state.weaponKick * .035,
+    -.002,
+    0,
+  );
+
+  weapon.rotation.set(
+    THREE.MathUtils.lerp(hipRotation.x, adsRotation.x, state.aimBlend),
+    THREE.MathUtils.lerp(hipRotation.y, adsRotation.y, state.aimBlend),
+    THREE.MathUtils.lerp(hipRotation.z, adsRotation.z, state.aimBlend),
+  );
+
+  const targetFov =
+    THREE.MathUtils.lerp(
+      CONFIG.defaultFov,
+      54,
+      state.aimBlend,
+    );
+
+  camera.fov =
+    THREE.MathUtils.damp(
+      camera.fov,
+      targetFov,
+      14,
+      dt,
+    );
+  camera.updateProjectionMatrix();
   weapon.children.forEach((child) => {
     if (child.isMesh) child.frustumCulled = false;
   });
@@ -3677,6 +3751,56 @@ function tickEffects(dt) {
     if (tracers[i].life <= 0) {
       scene.remove(tracers[i].mesh);
       tracers.splice(i, 1);
+    }
+  }
+
+  // Brass casing physics. Casings receive gravity, bounce, lose energy,
+  // and reliably settle on the arena floor.
+  for (let i = shellCasings.length - 1; i >= 0; i -= 1) {
+    const shell = shellCasings[i];
+
+    if (!shell.resting) {
+      shell.velocity.y -= 24 * dt;
+
+      shell.mesh.position.addScaledVector(
+        shell.velocity,
+        dt,
+      );
+
+      shell.mesh.rotation.x +=
+        shell.angularVelocity.x * dt;
+      shell.mesh.rotation.y +=
+        shell.angularVelocity.y * dt;
+      shell.mesh.rotation.z +=
+        shell.angularVelocity.z * dt;
+
+      const floorY = .028;
+
+      if (shell.mesh.position.y <= floorY) {
+        shell.mesh.position.y = floorY;
+
+        if (Math.abs(shell.velocity.y) > .55) {
+          shell.velocity.y =
+            Math.abs(shell.velocity.y) * .24;
+
+          shell.velocity.x *= .68;
+          shell.velocity.z *= .68;
+          shell.angularVelocity.multiplyScalar(.58);
+        } else {
+          shell.velocity.set(0, 0, 0);
+          shell.angularVelocity.multiplyScalar(.10);
+          shell.resting = true;
+        }
+      }
+    }
+
+    shell.velocity.x *= Math.exp(-2.3 * dt);
+    shell.velocity.z *= Math.exp(-2.3 * dt);
+
+    if (shell.resting) {
+      shell.angularVelocity.multiplyScalar(
+        Math.exp(-8 * dt),
+      );
     }
   }
 
@@ -3987,7 +4111,10 @@ window.addEventListener('keydown', (event) => {
 });
 
 window.addEventListener('keyup', (event) => keys.delete(event.code));
-window.addEventListener('blur', () => keys.clear());
+window.addEventListener('blur', () => {
+  keys.clear();
+  state.aiming = false;
+});
 
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== renderer.domElement || state.over) return;
@@ -3997,7 +4124,26 @@ window.addEventListener('mousemove', (event) => {
 });
 
 renderer.domElement.addEventListener('mousedown', (event) => {
-  if (event.button === 0 && document.pointerLockElement === renderer.domElement) shoot();
+  if (document.pointerLockElement !== renderer.domElement) return;
+
+  if (event.button === 0) {
+    shoot();
+  }
+
+  if (event.button === 2) {
+    state.aiming = true;
+    event.preventDefault();
+  }
+});
+
+window.addEventListener('mouseup', (event) => {
+  if (event.button === 2) {
+    state.aiming = false;
+  }
+});
+
+renderer.domElement.addEventListener('contextmenu', (event) => {
+  event.preventDefault();
 });
 
 renderer.domElement.addEventListener('click', () => {
