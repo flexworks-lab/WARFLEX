@@ -788,6 +788,8 @@ editorMapRoot.name = 'WARFLEX_EDITOR_MAP_ROOT';
 editorMapRoot.visible = false;
 scene.add(editorMapRoot);
 
+let simpleTerrainMesh = null;
+
 function getSimpleTerrainHeight(x, z) {
   const edgeX = THREE.MathUtils.clamp(1 - Math.max(0, Math.abs(x) - HALF_W * .72) / (HALF_W * .28), 0, 1);
   const edgeZ = THREE.MathUtils.clamp(1 - Math.max(0, Math.abs(z) - HALF_D * .72) / (HALF_D * .28), 0, 1);
@@ -870,10 +872,10 @@ function createSimpleSlopeTerrain() {
     metalness: .02,
   });
 
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.name = 'WARFLEX_SIMPLE_SLOPE_TERRAIN';
-  mesh.receiveShadow = true;
-  fallbackArenaRoot.add(mesh);
+  simpleTerrainMesh = new THREE.Mesh(geometry, material);
+  simpleTerrainMesh.name = 'WARFLEX_SIMPLE_SLOPE_TERRAIN';
+  simpleTerrainMesh.receiveShadow = true;
+  fallbackArenaRoot.add(simpleTerrainMesh);
 }
 
 function makeBox(
@@ -8164,7 +8166,6 @@ function updateWeapon(dt) {
       activeModel.visible = true;
       activeModel.traverse((child) => {
         if (!child.isMesh) return;
-        child.visible = true;
         child.frustumCulled = false;
         child.renderOrder = 1000;
       });
