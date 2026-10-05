@@ -325,7 +325,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.AgXToneMapping;
-renderer.toneMappingExposure = 1.12;
+renderer.toneMappingExposure = 0.78;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
@@ -397,13 +397,13 @@ const assetManager = new AssetManager(renderer);
 const worldHemiLight = new THREE.HemisphereLight(
   0xdce7ee,
   0x34424b,
-  1.65,
+  0.95,
 );
 scene.add(worldHemiLight);
 
 const sun = new THREE.DirectionalLight(
   0xfff7e8,
-  3.6,
+  1.9,
 );
 sun.position.set(-52, 62, 28);
 sun.castShadow = true;
@@ -420,14 +420,14 @@ scene.add(sun);
 
 const daylightFill = new THREE.DirectionalLight(
   0xb8d8ff,
-  0.75,
+  0.35,
 );
 daylightFill.position.set(46, 30, -52);
 scene.add(daylightFill);
 
 const ambientLight = new THREE.AmbientLight(
   0xd9e8f2,
-  0.32,
+  0.14,
 );
 scene.add(ambientLight);
 
