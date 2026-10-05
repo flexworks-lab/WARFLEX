@@ -1,8 +1,0 @@
-Glock-18 model used by PROJECT STRIKE/WARFLEX as the uploaded pistol asset.
-
-Original model: Glock-18
-Author: tumsetman
-Source: https://sketchfab.com/3d-models/glock-18-5a37dbddcca44e3ab2ac82cdfeb56a7a
-License: CC-BY-4.0
-
-The in-game asset is derived from the user's uploaded glock-18.glb and converted to an embedded OBJ payload for browser delivery.
