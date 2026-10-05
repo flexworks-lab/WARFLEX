@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A fast browser FPS shooter built with Three.js." />
+  <title>PROJECT STRIKE</title>
+  <link rel="stylesheet" href="./src/style.css?v=ui-20261004-loadout" />
+</head>
+<body>
+  <div id="damage-overlay" aria-hidden="true"></div>
+  <div id="warfex-copy-error" class="warfex-copy-error hidden" role="alert" aria-live="assertive">
+    <div class="warfex-copy-error-head">
+      <strong id="warfex-copy-error-title">WARFLEX ERROR</strong>
+      <button id="warfex-copy-error-copy" type="button">COPY ERROR</button>
+    </div>
+    <textarea id="warfex-copy-error-text" readonly spellcheck="false" aria-label="WARFLEX error text"></textarea>
+  </div>
+
+  <div id="update-notice" class="update-notice hidden" role="status" aria-live="polite">
+    <div class="update-copy">
+      <strong id="update-title">UPDATE AVAILABLE</strong>
+      <span id="update-message">A new WARFLEX update is ready.</span>
+    </div>
+    <div class="update-actions">
+      <button id="update-reload">RELOAD</button>
+      <button id="update-dismiss" aria-label="Dismiss update">×</button>
+    </div>
+  </div>
+
+  <div id="hud" class="hud hidden">
+    <div class="top-left">
+      <div class="brand">PROJECT STRIKE</div>
+      <div class="status-row"><span>WAVE</span><strong id="wave">1</strong></div>
+    </div>
+    <div id="crosshair" class="crosshair" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+    <div id="hitmarker" class="hitmarker" aria-hidden="true">✕</div>
+    <div id="combat-callout" class="combat-callout hidden" aria-live="polite">
+      <strong id="combo-count">0</strong><span> KILL STREAK</span>
+    </div>
+    <div class="bottom-left">
+      <div class="health-label"><span>HEALTH</span><strong id="health">100</strong></div>
+      <div class="health-bar"><div id="health-fill"></div></div>
+    </div>
+    <div class="bottom-right">
+      <div class="ammo"><strong id="ammo">30</strong><span>/ <b id="reserve">120</b></span></div>
+      <div class="weapon">MK-01 // RIFLE</div>
+      <div id="reload" class="reload hidden">RELOADING...</div>
+    </div>
+    <div id="weapon-selector" class="weapon-selector" aria-label="Weapon selection">
+      <button type="button" data-weapon-slot="0"><b>1</b><span>RIFLE</span></button>
+      <button type="button" data-weapon-slot="1"><b>2</b><span>SHOTGUN</span></button>
+      <button type="button" data-weapon-slot="2"><b>3</b><span>SNIPER</span></button>
+      <button type="button" data-weapon-slot="3"><b>4</b><span>PISTOL</span></button>
+      <button type="button" data-weapon-slot="4"><b>5</b><span>SMG</span></button>
+    </div>
+    <div id="weapon-pickup-prompt" class="weapon-pickup-prompt hidden" aria-live="polite"></div>
+    <div class="scoreboard">
+      <div><span>KILLS</span><strong id="kills">0</strong></div>
+      <div><span>SCORE</span><strong id="score">0</strong></div>
+    </div>
+    <div class="bodycam-overlay" aria-hidden="true">
+      <div class="bodycam-corner bodycam-corner-top">
+        <span class="bodycam-rec"><i></i>REC</span>
+        <span>CAM 01 // LIVE</span>
+      </div>
+      <div class="bodycam-corner bodycam-corner-bottom">
+        <span>WARFLEX // FIELD BODYCAM</span>
+        <span>SYS 01.04</span>
+      </div>
+      <div class="bodycam-center-mark">+</div>
+    </div>
+  </div>
+
+  <div id="player-name-gate" class="screen player-name-gate">
+    <div class="panel player-name-panel">
+      <p class="eyebrow">WARFLEX // PLAYER SETUP</p>
+      <h2>SET PLAYER NAME</h2>
+      <p class="player-name-copy">ENTER YOUR CALLSIGN.</p>
+      <label for="player-name-input">CALLSIGN</label>
+      <input id="player-name-input" type="text" maxlength="16" minlength="3" autocomplete="nickname" spellcheck="false" placeholder="PLAYER" />
+      <p id="player-name-error" class="player-name-error" aria-live="polite"></p>
+      <button id="player-name-confirm" type="button">ENTER</button>
+    </div>
+  </div>
+
+  <div id="start-screen" class="screen gothic-screen">
+    <div class="panel menu-panel gothic-panel">
+      <div class="menu-view" id="menu-main">
+        <p class="eyebrow gothic-eyebrow">A RUINED WORLD // COMBAT SIMULATION</p>
+        <h1 class="gothic-title">PROJECT <span>STRIKE</span></h1>
+        <div class="menu-nav" aria-label="Main menu">
+          <button id="start-button" type="button">START</button>
+          <button id="loadout-button" type="button">LOADOUT</button>
+          <button id="waves-button" type="button">WAVES</button>
+          <button id="multiplayer-button" type="button">MULTIPLAYER</button>
+          <button id="options-button" type="button">OPTIONS</button>
+          <button id="editor-button" type="button" class="dev-only-menu">MAP EDITOR</button>
+        </div>
+        <p class="small menu-hint">WASD MOVE · SHIFT SPRINT · CTRL/C SLIDE · SPACE JUMP · CLICK FIRE · R RELOAD · ESC PAUSE</p>
+      </div>
+
+      <div class="menu-view hidden" id="wave-menu">
+        <p class="eyebrow gothic-eyebrow">SELECT YOUR TRIAL</p>
+        <h2 class="menu-view-title">WAVES</h2>
+        <div class="wave-section">
+          <div class="menu-label">WAVE</div>
+          <div class="wave-list">
+            <button class="wave-choice active" type="button" data-wave-choice="1"><strong>WAVE 01</strong><span>RECRUIT</span></button>
+            <button class="wave-choice" type="button" data-wave-choice="5"><strong>WAVE 05</strong><span>ASSAULT</span></button>
+            <button class="wave-choice" type="button" data-wave-choice="10"><strong>WAVE 10</strong><span>VETERAN</span></button>
+            <button class="wave-choice" type="button" data-wave-choice="20"><strong>WAVE 20</strong><span>HELL</span></button>
+            <button class="wave-choice" type="button" data-wave-choice="endless"><strong>ENDLESS</strong><span>NO END</span></button>
+          </div>
+        </div>
+        <div class="map-section">
+          <div class="menu-label">MAPS</div>
+          <div id="map-list" class="map-list" aria-live="polite"></div>
+          <button id="start-map-button" class="deploy-button" type="button">START SELECTED MAP</button>
+        </div>
+        <button id="back-from-waves" class="back-button" type="button">BACK</button>
+      </div>
+
+
+      <div class="menu-view hidden" id="multiplayer-menu">
+        <p class="eyebrow gothic-eyebrow">LIVE COMBAT // NO WAVES</p>
+        <h2 class="menu-view-title">MULTIPLAYER</h2>
+        <div class="multiplayer-panel">
+          <label for="multiplayer-username">USERNAME</label>
+          <input id="multiplayer-username" maxlength="18" autocomplete="nickname" value="PLAYER" />
+          <p>FREE-FOR-ALL PVP · PLAYER RIGS · LIVE USERNAMES</p>
+          <button id="multiplayer-connect" class="deploy-button" type="button">JOIN PVP</button>
+        </div>
+        <button id="back-from-multiplayer" class="back-button" type="button">BACK</button>
+      </div>
+
+      <div class="menu-view hidden" id="options-menu">
+        <p class="eyebrow gothic-eyebrow">OPTIONS</p>
+        <h2 class="menu-view-title">CONTROLS</h2>
+        <div class="options-list">
+          <span><b>WASD</b><em>MOVE</em></span>
+          <span><b>SHIFT</b><em>SPRINT</em></span>
+          <span><b>SPACE</b><em>JUMP</em></span>
+          <span><b>CLICK</b><em>FIRE</em></span>
+          <span><b>R</b><em>RELOAD</em></span>
+          <span><b>ESC</b><em>PAUSE</em></span>
+        </div>
+        <button id="back-from-options" class="back-button" type="button">BACK</button>
+      </div>
+
+      <span id="selected-wave-label" class="hidden" aria-hidden="true">WAVE 1</span>
+    </div>
+  </div>
+
+  <div id="loadout-screen" class="loadout-screen hidden" aria-label="Loadout selection">
+    <div class="loadout-grid-lines" aria-hidden="true"></div>
+    <div class="loadout-scanline" aria-hidden="true"></div>
+
+    <header class="loadout-header">
+      <div>
+        <p class="eyebrow">WARFLEX // ARMORY SYSTEM</p>
+        <h2>LOADOUT</h2>
+      </div>
+      <div class="loadout-header-status">
+        <span>ARMORY ONLINE</span>
+        <strong>5 WEAPONS READY</strong>
+      </div>
+      <button id="loadout-back" class="loadout-close" type="button">ESC // BACK</button>
+    </header>
+
+    <section class="loadout-stage">
+      <div class="loadout-sidecopy">
+        <span class="loadout-kicker">CURRENT PACKAGE</span>
+        <strong id="loadout-current-name">MK-01 // RIFLE</strong>
+        <span id="loadout-current-role">GENERAL PURPOSE</span>
+        <p id="loadout-current-copy">Balanced automatic rifle built for aggressive mid-range control.</p>
+
+        <div class="loadout-metrics">
+          <div><span>POWER</span><b id="loadout-power">82</b></div>
+          <div><span>CONTROL</span><b id="loadout-control">76</b></div>
+          <div><span>MAG</span><b id="loadout-mag">30</b></div>
+        </div>
+      </div>
+
+      <div class="loadout-weapon-readout">
+        <span>WEAPON CLASS // <b id="loadout-class">RIFLE</b></span>
+        <span>PRIMARY SLOT <b>01</b></span>
+      </div>
+
+      <div class="loadout-card-rail" id="loadout-cards" role="tablist" aria-label="Weapons">
+        <button type="button" class="loadout-card active" data-loadout-slot="0" role="tab">
+          <span class="loadout-slot">01</span><strong>RIFLE</strong><small>MK-01</small>
+        </button>
+        <button type="button" class="loadout-card" data-loadout-slot="1" role="tab">
+          <span class="loadout-slot">02</span><strong>SHOTGUN</strong><small>SG-12</small>
+        </button>
+        <button type="button" class="loadout-card" data-loadout-slot="2" role="tab">
+          <span class="loadout-slot">03</span><strong>SNIPER</strong><small>SR-07</small>
+        </button>
+        <button type="button" class="loadout-card" data-loadout-slot="3" role="tab">
+          <span class="loadout-slot">04</span><strong>PISTOL</strong><small>PX-9</small>
+        </button>
+        <button type="button" class="loadout-card" data-loadout-slot="4" role="tab">
+          <span class="loadout-slot">05</span><strong>SMG</strong><small>SM-5</small>
+        </button>
+      </div>
+
+      <div class="loadout-footerbar">
+        <div><span>SELECT</span><b>1—5 / CLICK</b></div>
+        <div><span>DEPLOYMENT</span><b id="loadout-ready-label">RIFLE READY</b></div>
+        <button id="loadout-deploy" class="loadout-deploy" type="button">DEPLOY WITH LOADOUT</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="pause-screen" class="screen pause-screen hidden">
+    <div class="pause-shell">
+      <div class="pause-main">
+        <p class="eyebrow">WARFLEX // COMBAT PAUSED</p>
+        <h2>PAUSED</h2>
+        <p class="pause-status"><span class="pause-dot"></span> ARENA STATE SAVED IN MEMORY</p>
+        <div class="pause-actions">
+          <button id="resume-button" class="pause-primary" type="button">RESUME</button>
+          <button id="pause-restart-button" type="button">RESTART RUN</button>
+          <button id="pause-quit-button" type="button">QUIT TO MENU</button>
+        </div>
+      </div>
+      <aside class="pause-side">
+        <div class="pause-side-title">FIELD CONTROLS</div>
+        <div class="pause-control"><b>W A S D</b><span>MOVE</span></div>
+        <div class="pause-control"><b>SHIFT</b><span>SPRINT</span></div>
+        <div class="pause-control"><b>SPACE</b><span>JUMP</span></div>
+        <div class="pause-control"><b>CTRL / C</b><span>SLIDE</span></div>
+        <div class="pause-control"><b>LMB</b><span>FIRE</span></div>
+        <div class="pause-control"><b>R</b><span>RELOAD</span></div>
+        <div class="pause-control"><b>ESC</b><span>PAUSE</span></div>
+      </aside>
+      <div class="pause-footer">PROJECT STRIKE <span>//</span> WARFLEX</div>
+    </div>
+  </div>
+
+  <div id="pvp-death-screen" class="pvp-death-screen hidden" aria-live="assertive">
+    <div class="pvp-death-kicker">PLAYER DOWN</div>
+    <div class="pvp-death-title">RESPAWNING</div>
+    <div id="death-countdown" class="pvp-death-countdown">5</div>
+    <div class="pvp-death-sub">YOUR BODY IS DOWN // HOLD POSITION</div>
+  </div>
+
+  <div id="touch-controls" aria-hidden="true">
+    <div id="touch-joystick" class="touch-joystick">
+      <div id="touch-stick-knob"></div>
+    </div>
+    <div class="touch-actions">
+      <button id="touch-reload" type="button">R</button>
+      <button id="touch-slide" type="button">SLIDE</button>
+      <button id="touch-jump" type="button">JUMP</button>
+      <button id="touch-sprint" type="button">RUN</button>
+      <button id="touch-fire" class="touch-fire" type="button">FIRE</button>
+    </div>
+  </div>
+
+  <div id="game-over" class="screen hidden">
+    <div class="panel compact">
+      <p class="eyebrow">SIGNAL LOST</p>
+      <h2>YOU'RE DOWN</h2>
+      <div class="result"><span>WAVE</span><strong id="final-wave">1</strong></div>
+      <div class="result"><span>KILLS</span><strong id="final-kills">0</strong></div>
+      <div class="result"><span>SCORE</span><strong id="final-score">0</strong></div>
+      <button id="restart-button">REDEPLOY</button>
+    </div>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/",
+        "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js",
+        "three-pathfinding": "https://cdn.jsdelivr.net/npm/three-pathfinding@1.3.0/dist/three-pathfinding.module.js"
+      }
+    }
+  </script>
+  <script>
+    (() => {
+      const $ = (selector) => document.querySelector(selector);
+      const start = $('#start-screen');
+      const main = $('#menu-main');
+      const waves = $('#wave-menu');
+      const options = $('#options-menu');
+      const multiplayer = $('#multiplayer-menu');
+      const multiplayerButton = $('#multiplayer-button');
+      const backMultiplayer = $('#back-from-multiplayer');
+      const wavesButton = $('#waves-button');
+      const optionsButton = $('#options-button');
+      const backWaves = $('#back-from-waves');
+      const backOptions = $('#back-from-options');
+      const startButton = $('#start-button');
+      const waveChoices = document.querySelectorAll('[data-wave-choice]');
+
+      if (!start || !main || !waves || !options) return;
+
+      const show = (view) => {
+        main.classList.toggle('hidden', view !== 'main');
+        waves.classList.toggle('hidden', view !== 'waves');
+        options.classList.toggle('hidden', view !== 'options');
+        multiplayer?.classList.toggle('hidden', view !== 'multiplayer');
+      };
+
+      wavesButton?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('waves');
+      });
+
+      multiplayerButton?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('multiplayer');
+      });
+
+      backMultiplayer?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('main');
+      });
+
+      optionsButton?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('options');
+      });
+
+      backWaves?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('main');
+      });
+
+      backOptions?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        show('main');
+      });
+
+      waveChoices.forEach((button) => {
+        button.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          waveChoices.forEach((choice) => choice.classList.remove('active'));
+          button.classList.add('active');
+          window.__WARFLEX_SELECTED_WAVE =
+            button.dataset.waveChoice === 'endless'
+              ? 'endless'
+              : Number(button.dataset.waveChoice);
+        });
+      });
+
+      startButton?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        window.__WARFLEX_START_REQUESTED = true;
+        window.dispatchEvent(new Event('warfex-start-request'));
+      });
+
+      show('main');
+    })();
+  </script>
+  <script>
+    (() => {
+      const bootMessage = document.createElement('div');
+      bootMessage.id = 'warfex-boot-status';
+      Object.assign(bootMessage.style, {
+        position: 'fixed',
+        left: '50%',
+        bottom: '24px',
+        transform: 'translateX(-50%)',
+        zIndex: '2000',
+        maxWidth: 'min(760px, calc(100vw - 32px))',
+        padding: '10px 14px',
+        border: '1px solid rgba(255,255,255,.18)',
+        background: 'rgba(5,7,10,.92)',
+        color: '#f4f6f8',
+        font: '12px/1.45 monospace',
+        textAlign: 'left',
+        display: 'none',
+        pointerEvents: 'auto',
+        userSelect: 'text',
+        WebkitUserSelect: 'text',
+        cursor: 'text',
+      });
+      document.body.appendChild(bootMessage);
+
+      const setBootError = (error) => {
+        console.error('[WARFLEX BOOT]', error);
+        bootMessage.textContent =
+          'WARFLEX failed to start. ' +
+          (error?.message || String(error));
+        bootMessage.style.display = 'block';
+      };
+
+      import('./src/main.js?v=fcd5ff019744a38ca0b509730ee3474b1680bf13')
+        .then(() => {
+          if (window.__WARFLEX_START_REQUESTED &&
+              typeof window.WARFLEX_START_GAME === 'function') {
+            window.__WARFLEX_START_REQUESTED = false;
+            window.WARFLEX_START_GAME();
+          }
+        })
+        .catch(setBootError);
+    })();
+  </script>
+</body>
+</html>
