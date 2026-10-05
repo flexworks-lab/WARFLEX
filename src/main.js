@@ -4809,10 +4809,12 @@ async function loadUploadedGlock18Pistol() {
     imported.scale.setScalar(1.72);
 
     const box = new THREE.Box3().setFromObject(imported);
-    const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    imported.position.sub(center);
-    imported.position.set(0, -0.02, 0.22);
+    imported.position.set(
+      -center.x,
+      -center.y - 0.05,
+      -center.z + 0.22,
+    );
 
     addStandaloneHands(imported, 'pistol');
 
