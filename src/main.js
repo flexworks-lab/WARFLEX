@@ -1622,7 +1622,6 @@ function addArena() {
       z,
     );
     root.rotation.y = rotation;
-    sectionRoots.get(zone)?.add(root);
 
     const wall = texturedMat(color, 'metal', .78, .28, [4.5, 3], .024);
     const roofMat = texturedMat(roof, 'corrugated', .66, .52, [8, 4], .028);
@@ -1778,7 +1777,6 @@ function addArena() {
     );
     root.rotation.y = rotation;
     root.position.y += y ?? 1.24;
-    sectionRoots.get(zone)?.add(root);
 
     const body = texturedMat(color, 'corrugated', .72, .45, [7, 3], .028);
     box(root, [12.2, 2.45, 2.44], [0, 0, 0], body, 0, .025);
@@ -1890,7 +1888,6 @@ function addArena() {
     const root = rootAtGround('TANK', x, z);
     root.rotation.y = rotation;
     root.scale.setScalar(scale);
-    sectionRoots.get(zone)?.add(root);
 
     const hull = texturedMat(0x5b685f, 'metal', .74, .42, [3, 2], .025);
     const dark = mat(0x2a3130, .64, .52);
@@ -1920,7 +1917,6 @@ function addArena() {
     const root = rootAtGround('TRUCK', x, z);
     root.rotation.y = rotation;
     root.scale.setScalar(scale);
-    sectionRoots.get(zone)?.add(root);
 
     const body = texturedMat(0x5a665f, 'metal', .80, .35, [4, 2], .022);
     box(root, [5.8, 1.3, 2.3], [0, 1.05, 0], body, 0, .06);
@@ -2039,7 +2035,6 @@ function addArena() {
     const root = rootAtGround('CRATE', x, z);
     root.rotation.y = rotation;
     root.scale.setScalar(scale);
-    if (zone) sectionRoots.get(zone)?.add(root);
     box(root, [1.35, 1.05, 1.30], [0, .55, 0], wood, 0, .035);
     for (const side of [-1, 1]) {
       for (const yy of [.28, .55, .82]) {
@@ -2067,7 +2062,6 @@ function addArena() {
 
   const addDrum = (x, z, color = 0x4b6049, zone = null) => {
     const root = rootAtGround('FUEL_DRUM', x, z);
-    if (zone) sectionRoots.get(zone)?.add(root);
     const body = new THREE.MeshStandardMaterial({ color, roughness: .62, metalness: .38 });
     cyl(root, .34, .88, [0, .46, 0], body, [0, 0, 0], 24);
     torus(root, .345, .028, [0, .22, 0], steelDark);
