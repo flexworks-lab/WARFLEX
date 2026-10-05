@@ -1,0 +1,11 @@
+{
+  "name": "warfex-web-host",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
