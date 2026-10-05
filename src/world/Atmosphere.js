@@ -153,9 +153,19 @@ export function configureAtmosphere(scene, renderer, camera) {
         new OutputPass(),
       );
 
+      const graphicsFX = new GraphicsFX({
+        scene,
+        camera,
+        width: 270,
+        depth: 160,
+      });
+
       return makeAtmosphereApi(
         composer,
         null,
+        null,
+        null,
+        graphicsFX,
         scene,
         renderer,
         camera,
