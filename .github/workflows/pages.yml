@@ -1,0 +1,59 @@
+name: GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-pages-deploy
+  cancel-in-progress: true
+
+# Queue recovery: keep only the newest Pages deployment in this group.
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write update manifest
+        env:
+          UPDATE_MESSAGE: ${{ github.event.head_commit.message || 'WARFLEX updated' }}
+        run: |
+          node -e 'const fs=require("fs"); const info={version:process.env.GITHUB_SHA,message:process.env.UPDATE_MESSAGE,timestamp:new Date().toISOString()}; fs.writeFileSync("update.json", JSON.stringify(info));'
+
+      - name: Stamp and validate client bundle
+        run: |
+          sed -i "s/__WARFLEX_BUILD__/${GITHUB_SHA}/g" index.html
+          node --check src/main.js
+          node --check src/physics/PhysicsWorld.js
+          node --check src/physics/RagdollController.js
+          node --check src/systems/WaveDirector.js
+          node --check src/systems/SteeringAgent.js
+          node --check src/assets/AssetManager.js
+          node --check src/world/MapLoader.js
+          node --check src/world/PropInstancer.js
+          node --check src/world/BakedLighting.js
+          node --check src/world/Atmosphere.js
+          node --check src/world/GraphicsFX.js
+          node --check src/ai/NavMeshService.js
+          node --check src/ai/NavMeshAgent.js
+          grep -q '"cannon-es":' index.html
+          grep -q '"three-pathfinding":' index.html
+          grep -q '"three/addons/":' index.html
+          grep -q "./src/main.js?v=${GITHUB_SHA}" index.html
+          test -s src/main.js
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: .
+          exclude_assets: '.github'
+          force_orphan: false
