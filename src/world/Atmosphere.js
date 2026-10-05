@@ -112,7 +112,7 @@ export function configureAtmosphere(scene, renderer, camera) {
 
       // Bloom is deliberately restrained: emissive lamps and weapon flashes
       // glow, but the daylight map keeps hard detail instead of looking hazy.
-      bloomPass.threshold = 0.80;
+      bloomPass.threshold = 1.05;
       composer.addPass(bloomPass);
 
       const smaaPass = new SMAAPass(
