@@ -38,6 +38,7 @@ jobs:
           node --check src/world/PropInstancer.js
           node --check src/world/BakedLighting.js
           node --check src/world/Atmosphere.js
+          node --check src/world/GraphicsFX.js
           node --check src/ai/NavMeshService.js
           node --check src/ai/NavMeshAgent.js
           grep -q '"cannon-es":' index.html
