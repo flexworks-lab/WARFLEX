@@ -1250,6 +1250,16 @@ function makeArenaCylinder(
   return mesh;
 }
 
+function addMesh(parent, geometry, material, position = [0, 0, 0], rotation = [0, 0, 0]) {
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(position[0] ?? 0, position[1] ?? 0, position[2] ?? 0);
+  mesh.rotation.set(rotation[0] ?? 0, rotation[1] ?? 0, rotation[2] ?? 0);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
 function addArena() {
   // -------------------------------------------------------------------------
   // WARFLEX MAIN MAP REDESIGN
