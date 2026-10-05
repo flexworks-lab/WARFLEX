@@ -4814,6 +4814,8 @@ async function loadUploadedGlock18Pistol() {
     imported.position.sub(center);
     imported.position.set(0, -0.02, 0.22);
 
+    addStandaloneHands(imported, 'pistol');
+
     imported.traverse((child) => {
       if (!child.isMesh) return;
       child.frustumCulled = false;
