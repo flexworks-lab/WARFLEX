@@ -63,10 +63,28 @@ jobs:
           rsync -a --exclude='.git' --exclude='.github' ./ _site/
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
+
+
+  retry-deploy:
+    name: Retry GitHub Pages deploy
+    if: ${{ always() && needs.deploy.result == 'failure' }}
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.retry_deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Retry Pages deployment
+        id: retry_deployment
+        uses: actions/deploy-pages@v5
