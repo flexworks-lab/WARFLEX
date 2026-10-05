@@ -14,6 +14,7 @@ import { NavMeshService } from './ai/NavMeshService.js?v=wide-map-20261003';
 import { NavMeshAgent } from './ai/NavMeshAgent.js?v=wide-map-20261003';
 import { MapEditor } from './dev/MapEditor.js?v=88daa5da65639c54065c2129254c5168e1bee5fb';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { Multiplayer } from './systems/Multiplayer.js?v=pvp-20261004';
 
 const CONFIG = {
@@ -93,7 +94,7 @@ const WEAPON_DEFS = [
   {
     id: 'pistol',
     label: 'PISTOL',
-    display: 'PX-9 // PISTOL',
+    display: 'GLOCK 18 // PISTOL',
     magSize: 12,
     reserve: 72,
     fireInterval: .22,
@@ -4774,6 +4775,117 @@ const syncWorldWeaponAnchor = () => {
 
 syncWorldWeaponAnchor();
 setActiveWeapon(0);
+
+async function loadUploadedGlock18Pistol() {
+  try {
+    const urls = Array.from({ length: 6 }, (_, i) =>
+      './src/assets/glock18obj/glock18.part0' + (i + 1) + '.b64?v=glock18-20261005'
+    );
+    const parts = await Promise.all(urls.map(async (url) => {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) throw new Error('GLOCK 18 asset part failed: ' + response.status);
+      return response.text();
+    }));
+    const encoded = parts.join('').trim();
+    const binary = atob(encoded);
+    const compressed = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) compressed[i] = binary.charCodeAt(i);
+    if (!('DecompressionStream' in window)) throw new Error('Browser gzip decompression is unavailable.');
+    const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
+    const objText = await new Response(stream).text();
+
+    const imported = await new Promise((resolve, reject) => {
+      try {
+        const model = new OBJLoader().parse(objText);
+        resolve(model);
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    imported.name = 'WeaponModel_pistol_GLOCK18';
+    imported.rotation.set(0, -Math.PI / 2, 0);
+    imported.position.set(0, 0.02, 0);
+    imported.scale.setScalar(1.72);
+
+    const box = new THREE.Box3().setFromObject(imported);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    imported.position.sub(center);
+    imported.position.set(0, -0.02, 0.22);
+
+    addStandaloneHands(imported, 'pistol');
+
+    imported.traverse((child) => {
+      if (!child.isMesh) return;
+      child.frustumCulled = false;
+      child.castShadow = true;
+      child.receiveShadow = true;
+      if (!child.material) {
+        child.material = new THREE.MeshStandardMaterial({
+          color: 0x24272a,
+          roughness: .42,
+          metalness: .62,
+        });
+      }
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of mats) {
+        if (!material) continue;
+        material.depthTest = true;
+        material.depthWrite = true;
+        material.transparent = false;
+        material.opacity = 1;
+        material.side = THREE.FrontSide;
+      }
+    });
+
+    const muzzle = new THREE.Object3D();
+    muzzle.position.set(0, 0.03, -0.88);
+    imported.add(muzzle);
+
+    const flash = new THREE.PointLight(0xffcf6a, 0, 7, 2);
+    flash.position.copy(muzzle.position);
+    imported.add(flash);
+
+    const flashMesh = new THREE.Mesh(
+      new THREE.ConeGeometry(.075, .28, 10),
+      new THREE.MeshBasicMaterial({
+        color: 0xffdc85,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    flashMesh.name = 'WeaponMuzzleFlash';
+    flashMesh.rotation.x = -Math.PI / 2;
+    flashMesh.position.copy(muzzle.position);
+    flashMesh.position.z -= .10;
+    imported.add(flashMesh);
+
+    imported.userData.muzzle = muzzle;
+    imported.userData.flash = flash;
+    imported.userData.flashMesh = flashMesh;
+
+    weaponModels[3]?.parent?.remove(weaponModels[3]);
+    weaponModels[3] = imported;
+    weapon.add(imported);
+    imported.visible = activeWeaponDef?.id === 'pistol';
+
+    if (imported.visible) {
+      weapon.userData.muzzle = imported.userData.muzzle;
+      weapon.userData.flash = imported.userData.flash;
+      weapon.userData.flashMesh = imported.userData.flashMesh;
+      weapon.userData.activeModel = imported;
+      syncWorldWeaponAnchor();
+    }
+
+    console.info('[WARFLEX] Uploaded Glock 18 pistol loaded.');
+  } catch (error) {
+    console.warn('[WARFLEX] Glock 18 asset load failed; keeping procedural pistol fallback.', error);
+  }
+}
+
+loadUploadedGlock18Pistol();
 
 function createDroppedWeaponMesh() {
   const sourceModel =
