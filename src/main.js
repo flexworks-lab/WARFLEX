@@ -325,7 +325,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.AgXToneMapping;
-renderer.toneMappingExposure = 1.82;
+renderer.toneMappingExposure = 1.12;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
@@ -395,15 +395,15 @@ const assetManager = new AssetManager(renderer);
 // Bright outdoor daylight rig: a strong sun plus soft sky/ground fill
 // keeps the arena readable while preserving directional shadows.
 const worldHemiLight = new THREE.HemisphereLight(
-  0xf2f7ff,
+  0xdce7ee,
   0x34424b,
-  3.2,
+  1.65,
 );
 scene.add(worldHemiLight);
 
 const sun = new THREE.DirectionalLight(
   0xfff7e8,
-  6.8,
+  3.6,
 );
 sun.position.set(-52, 62, 28);
 sun.castShadow = true;
@@ -420,14 +420,14 @@ scene.add(sun);
 
 const daylightFill = new THREE.DirectionalLight(
   0xb8d8ff,
-  1.8,
+  0.75,
 );
 daylightFill.position.set(46, 30, -52);
 scene.add(daylightFill);
 
 const ambientLight = new THREE.AmbientLight(
   0xd9e8f2,
-  0.62,
+  0.32,
 );
 scene.add(ambientLight);
 
@@ -4816,7 +4816,7 @@ async function loadUploadedGlock18Pistol() {
     imported.name = 'WeaponModel_pistol_GLOCK18';
     imported.rotation.set(0, -Math.PI / 2, 0);
     imported.position.set(0, 0.02, 0);
-    imported.scale.setScalar(1.72);
+    imported.scale.setScalar(0.96);
 
     const box = new THREE.Box3().setFromObject(imported);
     const center = box.getCenter(new THREE.Vector3());
