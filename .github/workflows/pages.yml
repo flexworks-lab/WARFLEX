@@ -56,4 +56,4 @@ jobs:
           publish_branch: gh-pages
           publish_dir: .
           exclude_assets: '.github'
-          force_orphan: true
+          force_orphan: false
