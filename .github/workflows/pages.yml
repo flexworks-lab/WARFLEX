@@ -12,6 +12,8 @@ concurrency:
   group: github-pages-deploy
   cancel-in-progress: true
 
+# Queue recovery: keep only the newest Pages deployment in this group.
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
