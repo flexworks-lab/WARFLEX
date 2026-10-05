@@ -1251,171 +1251,95 @@ function makeArenaCylinder(
 
 function addArena() {
   // -------------------------------------------------------------------------
-  // WARFLEX: FULL EXTERIOR REDESIGN
-  // Deliberately authored military installation. Major assets are assembled
-  // from dedicated meshes: panels, braces, hardware, lights, vents, seams,
-  // doors, rails, wheels, pipes, cables and surface breakup.
+  // WARFLEX MAIN MAP REDESIGN
+  // Six deliberate districts with a central combat spine. The layout is
+  // authored as a battlefield first, then dressed with procedural detail.
   // -------------------------------------------------------------------------
 
   fallbackArenaRoot.clear();
+  obstacles.length = 0;
+  optimizedGrassChunks.length = 0;
 
-  // Human-scale reference: player eye ~= 1.65m, full body ~= 1.8m.
-  // Major architecture, cover, doors and props are authored around that scale.
-
-  const mat = (color, roughness = 0.78, metalness = 0.08) =>
+  const mat = (color, roughness = .78, metalness = .08) =>
     new THREE.MeshStandardMaterial({ color, roughness, metalness });
 
   const surfaceTextureCache = new Map();
 
-  const makeSurfaceTexture = (kind) => {
+  const textureFor = (kind) => {
     if (surfaceTextureCache.has(kind)) return surfaceTextureCache.get(kind);
 
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
+    canvas.width = 256;
+    canvas.height = 256;
     const ctx = canvas.getContext('2d');
-    const image = ctx.createImageData(canvas.width, canvas.height);
-    const data = image.data;
+    const base = {
+      concrete: '#777d7c',
+      asphalt: '#252c30',
+      metal: '#59666a',
+      corrugated: '#4d5b5f',
+      rust: '#5d4d45',
+      wood: '#6a513a',
+      dirt: '#65543d',
+      sand: '#756a50',
+      grass: '#4e7139',
+      rubber: '#15191b',
+    }[kind] || '#666';
 
-    const hash = (x, y, seed) => {
-      const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 37.719) * 43758.5453;
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, 256, 256);
+
+    const hash = (i, seed) => {
+      const n = Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453;
       return n - Math.floor(n);
     };
 
-    const baseByKind = {
-      grass: [224, 232, 218],
-      concrete: [210, 214, 208],
-      paintedMetal: [226, 230, 228],
-      corrugatedMetal: [220, 224, 223],
-      rustSteel: [218, 218, 211],
-      asphalt: [178, 183, 180],
-      rock: [190, 194, 191],
-      wood: [210, 191, 165],
-      rubber: [105, 108, 108],
-    };
-
-    const base = baseByKind[kind] || baseByKind.paintedMetal;
-
-    for (let y = 0; y < 512; y += 1) {
-      for (let x = 0; x < 512; x += 1) {
-        const coarse = hash(Math.floor(x / 9), Math.floor(y / 9), kind.length);
-        const fine = hash(x, y, 17 + kind.length);
-        const grain = Math.sin((x + y * 0.37) * 0.075) * 5;
-        const v = Math.round(
-          THREE.MathUtils.clamp(
-            0.88 + coarse * 0.16 + fine * 0.035 + grain / 255,
-            0.62,
-            1.08,
-          ) * 255,
-        );
-        const p = (y * 512 + x) * 4;
-        data[p] = Math.min(255, (base[0] * v) / 255);
-        data[p + 1] = Math.min(255, (base[1] * v) / 255);
-        data[p + 2] = Math.min(255, (base[2] * v) / 255);
-        data[p + 3] = 255;
-      }
-    }
-
-    ctx.putImageData(image, 0, 0);
-
-    const seam = 'rgba(20,24,25,.22)';
-    const dirt = 'rgba(40,35,28,.16)';
-    const rust = 'rgba(115,62,38,.24)';
-
-    if (kind === 'paintedMetal' || kind === 'corrugatedMetal' || kind === 'rustSteel') {
-      ctx.fillStyle = seam;
-      const spacing = kind === 'corrugatedMetal' ? 18 : 64;
-      for (let x = 0; x <= 512; x += spacing) {
-        ctx.fillRect(x, 0, kind === 'corrugatedMetal' ? 3 : 2, 512);
-      }
-      for (let y = 0; y <= 512; y += kind === 'paintedMetal' ? 96 : 128) {
-        ctx.fillRect(0, y, 512, 2);
-      }
-
-      if (kind !== 'corrugatedMetal') {
-        ctx.fillStyle = rust;
-        for (let i = 0; i < 34; i += 1) {
-          const x = hash(i, 2, 9) * 512;
-          const y = hash(i, 3, 14) * 512;
-          const w = 8 + hash(i, 4, 18) * 34;
-          const h = 3 + hash(i, 5, 22) * 18;
-          ctx.fillRect(x, y, w, h);
-        }
-      }
+    for (let i = 0; i < 520; i += 1) {
+      const x = hash(i, 3) * 256;
+      const y = hash(i, 7) * 256;
+      const s = .8 + hash(i, 11) * 3.4;
+      const alpha = .045 + hash(i, 17) * .09;
+      ctx.fillStyle = 'rgba(15,18,18,' + alpha.toFixed(3) + ')';
+      ctx.fillRect(x, y, s, s);
     }
 
     if (kind === 'concrete') {
-      ctx.strokeStyle = 'rgba(42,45,43,.17)';
-      ctx.lineWidth = 2;
-      for (let i = 0; i < 26; i += 1) {
-        const x = hash(i, 11, 20) * 512;
-        const y = hash(i, 12, 21) * 512;
+      ctx.strokeStyle = 'rgba(24,28,28,.18)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 18; i += 1) {
+        const x = hash(i, 22) * 256;
+        const y = hash(i, 25) * 256;
         ctx.beginPath();
         ctx.moveTo(x, y);
-        ctx.lineTo(x + 8 + hash(i, 13, 22) * 55, y + (hash(i, 14, 23) - .5) * 34);
+        ctx.lineTo(x + 18 + hash(i, 29) * 38, y + (hash(i, 31) - .5) * 22);
         ctx.stroke();
       }
-      ctx.fillStyle = dirt;
-      for (let i = 0; i < 60; i += 1) {
-        const x = hash(i, 31, 17) * 512;
-        const y = hash(i, 32, 19) * 512;
-        const r = 3 + hash(i, 33, 23) * 12;
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
+    }
+
+    if (kind === 'corrugated') {
+      ctx.fillStyle = 'rgba(12,17,18,.30)';
+      for (let x = 0; x < 256; x += 12) ctx.fillRect(x, 0, 2, 256);
+      ctx.fillStyle = 'rgba(145,151,148,.12)';
+      for (let x = 3; x < 256; x += 12) ctx.fillRect(x, 0, 1, 256);
+    }
+
+    if (kind === 'rust') {
+      ctx.fillStyle = 'rgba(126,67,43,.28)';
+      for (let i = 0; i < 45; i += 1) {
+        const x = hash(i, 41) * 256;
+        const y = hash(i, 43) * 256;
+        ctx.fillRect(x, y, 4 + hash(i, 47) * 18, 2 + hash(i, 51) * 8);
       }
     }
 
     if (kind === 'asphalt') {
-      ctx.fillStyle = 'rgba(30,34,35,.30)';
-      for (let i = 0; i < 900; i += 1) {
-        const x = hash(i, 41, 7) * 512;
-        const y = hash(i, 42, 8) * 512;
-        const s = .6 + hash(i, 43, 9) * 2.2;
-        ctx.fillRect(x, y, s, s);
-      }
-      ctx.strokeStyle = 'rgba(15,18,19,.24)';
-      for (let i = 0; i < 15; i += 1) {
-        const x = hash(i, 51, 13) * 512;
-        const y = hash(i, 52, 14) * 512;
+      ctx.strokeStyle = 'rgba(9,12,13,.25)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 20; i += 1) {
+        const x = hash(i, 61) * 256;
+        const y = hash(i, 63) * 256;
         ctx.beginPath();
         ctx.moveTo(x, y);
-        ctx.lineTo(x + 18 + hash(i, 53, 15) * 85, y + (hash(i, 54, 16) - .5) * 16);
-        ctx.stroke();
-      }
-    }
-
-    if (kind === 'rock') {
-      ctx.fillStyle = 'rgba(34,38,38,.22)';
-      for (let i = 0; i < 180; i += 1) {
-        const x = hash(i, 61, 18) * 512;
-        const y = hash(i, 62, 19) * 512;
-        const r = 2 + hash(i, 63, 20) * 10;
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    if (kind === 'wood') {
-      ctx.strokeStyle = 'rgba(75,48,31,.22)';
-      ctx.lineWidth = 4;
-      for (let y = 12; y < 512; y += 24) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.bezierCurveTo(120, y - 8, 250, y + 12, 512, y - 2);
-        ctx.stroke();
-      }
-    }
-
-    if (kind === 'rubber') {
-      ctx.strokeStyle = 'rgba(220,220,220,.08)';
-      ctx.lineWidth = 3;
-      for (let i = 0; i < 42; i += 1) {
-        const x = i * 13;
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x + 100, 512);
+        ctx.lineTo(x + 4 + hash(i, 67) * 22, y + (hash(i, 71) - .5) * 5);
         ctx.stroke();
       }
     }
@@ -1424,78 +1348,60 @@ function addArena() {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
-    texture.needsUpdate = true;
+    texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 6);
     surfaceTextureCache.set(kind, texture);
     return texture;
   };
 
   const texturedMat = (
     color,
-    kind = 'paintedMetal',
-    roughness = 0.78,
-    metalness = 0.08,
-    repeat = [1, 1],
-    bumpScale = 0.018,
+    kind,
+    roughness = .78,
+    metalness = .08,
+    repeat = [2, 2],
+    bumpScale = .018,
   ) => {
-    const texture = makeSurfaceTexture(kind).clone();
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(repeat[0], repeat[1]);
-    texture.needsUpdate = true;
-
+    const tex = textureFor(kind).clone();
+    tex.repeat.set(repeat[0], repeat[1]);
+    tex.needsUpdate = true;
     return new THREE.MeshStandardMaterial({
       color,
-      map: texture,
-      bumpMap: texture,
+      map: tex,
+      bumpMap: tex,
       bumpScale,
       roughness,
       metalness,
     });
   };
 
-  const asphalt = texturedMat(0x242b2f, 'asphalt', 0.98, 0.02, [8, 5], 0.045);
-  const concrete = texturedMat(0x747879, 'concrete', 0.91, 0.05, [3, 3], 0.032);
-  const concreteDark = texturedMat(0x555b5c, 'concrete', 0.95, 0.04, [3, 3], 0.036);
-  const concreteEdge = texturedMat(0x383e40, 'concrete', 0.92, 0.08, [2.5, 2.5], 0.030);
-  const steel = texturedMat(0x56636a, 'paintedMetal', 0.58, 0.66, [3, 2], 0.016);
-  const steelDark = texturedMat(0x1b2327, 'rustSteel', 0.72, 0.72, [3, 3], 0.020);
-  const black = mat(0x11171a, 0.55, 0.72);
-  const rubber = texturedMat(0x0c1012, 'rubber', 0.97, 0.02, [5, 4], 0.010);
-  const tan = mat(0x766a55, 0.88, 0.04);
-  const hazardYellow = mat(0xc59d3d, 0.68, 0.26);
-  const warningRed = mat(0x8b3d35, 0.72, 0.24);
+  const asphalt = texturedMat(0xffffff, 'asphalt', .98, .02, [12, 6], .025);
+  const concrete = texturedMat(0xb9bfbe, 'concrete', .93, .04, [4, 4], .022);
+  const concreteDark = texturedMat(0x707777, 'concrete', .97, .03, [3, 3], .024);
+  const steel = texturedMat(0x6a7478, 'metal', .62, .62, [3, 2], .018);
+  const steelDark = texturedMat(0x242d31, 'rust', .74, .68, [2, 2], .020);
+  const corrugated = texturedMat(0x5d686c, 'corrugated', .66, .50, [7, 3], .024);
+  const rust = texturedMat(0x654e45, 'rust', .80, .46, [4, 3], .022);
+  const wood = texturedMat(0x75583d, 'wood', .90, .02, [3, 2], .018);
+  const dirt = texturedMat(0x765d3f, 'dirt', .98, .01, [7, 5], .024);
+  const sand = texturedMat(0x806f4e, 'sand', .98, .01, [5, 5], .020);
+  const grassMat = texturedMat(0x53733e, 'grass', 1, 0, [8, 8], .014);
+  const black = mat(0x101518, .72, .50);
+  const warning = mat(0xc29736, .70, .25);
+  const whitePaint = mat(0xd3d0bf, .82, .08);
   const glass = new THREE.MeshStandardMaterial({
-    color: 0x102126,
-    roughness: 0.10,
-    metalness: 0.74,
-    emissive: 0x0e5f73,
-    emissiveIntensity: 1.15,
+    color: 0x16343c,
+    roughness: .12,
+    metalness: .66,
+    emissive: 0x0a4655,
+    emissiveIntensity: .25,
   });
   const warmGlass = new THREE.MeshStandardMaterial({
-    color: 0x30251a,
-    roughness: 0.18,
-    metalness: 0.55,
-    emissive: 0x8a5d26,
-    emissiveIntensity: 0.65,
+    color: 0x5e472c,
+    roughness: .20,
+    metalness: .45,
+    emissive: 0xd48b35,
+    emissiveIntensity: .55,
   });
-
-  const addMesh = (
-    parent,
-    geometry,
-    material,
-    position = [0, 0, 0],
-    rotation = [0, 0, 0],
-    cast = true,
-  ) => {
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(...position);
-    mesh.rotation.set(...rotation);
-    mesh.castShadow = cast;
-    mesh.receiveShadow = true;
-    parent.add(mesh);
-    return mesh;
-  };
 
   const box = (
     parent,
@@ -1511,17 +1417,17 @@ function addArena() {
           size[1],
           size[2],
           2,
-          Math.min(bevel, Math.min(...size) * 0.12),
+          Math.min(bevel, Math.min(...size) * .10),
         )
       : new THREE.BoxGeometry(...size);
 
-    return addMesh(
-      parent,
-      geometry,
-      material,
-      position,
-      [0, rotation, 0],
-    );
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(...position);
+    mesh.rotation.y = rotation;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
   };
 
   const cyl = (
@@ -1531,21 +1437,19 @@ function addArena() {
     position,
     material,
     rotation = [0, 0, 0],
-    segments = 20,
-  ) =>
-    addMesh(
-      parent,
-      new THREE.CylinderGeometry(
-        radius,
-        radius * 0.96,
-        height,
-        segments,
-        2,
-      ),
+    segments = 18,
+  ) => {
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius * .95, height, segments, 1),
       material,
-      position,
-      rotation,
     );
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  };
 
   const torus = (
     parent,
@@ -1553,2252 +1457,781 @@ function addArena() {
     tube,
     position,
     material,
-    rotation = [0, 0, 0],
+    rotation = [Math.PI / 2, 0, 0],
     radial = 10,
-    tubular = 28,
-  ) =>
-    addMesh(
-      parent,
-      new THREE.TorusGeometry(
-        radius,
-        tube,
-        radial,
-        tubular,
-      ),
+    tubular = 24,
+  ) => {
+    const mesh = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, tube, radial, tubular),
       material,
-      position,
-      rotation,
     );
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  };
+
+  const addBolt = (parent, position, scale = 1) => {
+    cyl(parent, .035 * scale, .025 * scale, position, steelDark, [Math.PI / 2, 0, 0], 10);
+  };
 
   const addCollision = (size, position, name = 'MapCollision') => {
-    const collision = new THREE.Mesh(
-      new THREE.BoxGeometry(size[0], size[1], size[2]),
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(...size),
       new THREE.MeshBasicMaterial({
         transparent: true,
         opacity: 0,
         depthWrite: false,
       }),
     );
-    collision.name = name;
-    collision.userData.fallbackCollision = true;
-    collision.position.set(...position);
-    collision.visible = false;
-    fallbackArenaRoot.add(collision);
-    obstacles.push(collision);
-    return collision;
+    mesh.name = name;
+    mesh.userData.fallbackCollision = true;
+    mesh.position.set(...position);
+    mesh.visible = false;
+    fallbackArenaRoot.add(mesh);
+    obstacles.push(mesh);
+    return mesh;
   };
 
-  const mark = (
-    parent,
-    size,
-    position,
-    color = 0xafa56c,
-    rotation = 0,
-  ) =>
-    box(
-      parent,
-      size,
-      position,
-      mat(color, 0.92, 0.01),
-      rotation,
-    );
-
-  const addBolt = (
-    parent,
-    position,
-    scale = 1,
-    material = steelDark,
-  ) =>
-    cyl(
-      parent,
-      0.035 * scale,
-      0.025 * scale,
-      position,
-      material,
-      [Math.PI / 2, 0, 0],
-      10,
-    );
-
-  // -----------------------------------------------------------------------
-  // GROUND: broad, deliberate, readable.
-  // -----------------------------------------------------------------------
-
-  const floor = box(
-    fallbackArenaRoot,
-    [MAP_WIDTH, 1, MAP_DEPTH],
-    [0, -0.52, 0],
-    mat(0x171c1e, 0.99, 0.01),
-  );
-  floor.castShadow = false;
-
-  // The built-in/base map is intentionally blank so the map editor can be
-  // used to author the entire battlefield from scratch. Keep only the floor
-  // and invisible perimeter colliders for a clean playable canvas.
-  if (SIMPLE_SLOPE_MAP) {
-    createSimpleSlopeTerrain();
-
-    addCollision([MAP_WIDTH, 10, 1.5], [0, 5, -HALF_D], 'SlopeNorthBoundary');
-    addCollision([MAP_WIDTH, 10, 1.5], [0, 5, HALF_D], 'SlopeSouthBoundary');
-    addCollision([1.5, 10, MAP_DEPTH], [-HALF_W, 5, 0], 'SlopeWestBoundary');
-    addCollision([1.5, 10, MAP_DEPTH], [HALF_W, 5, 0], 'SlopeEastBoundary');
-
-    const seeded = (seed) => {
-      const n = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-      return n - Math.floor(n);
-    };
-
-    const dirtMat = mat(0x5c4935, .98, .01);
-    const stoneMat = texturedMat(0x56615d, 'rock', .92, .04, [2.2, 2.2], .055);
-    const steelMat = mat(0x4a575d, .58, .70);
-    const steelDarkMat = mat(0x20282c, .72, .72);
-    const rubberMat = mat(0x0d1214, .97, .01);
-    const woodMat = mat(0x6f5238, .92, .03);
-    const hazardMat = mat(0xcda13a, .70, .24);
-    const oliveMat = mat(0x435745, .72, .32);
-    const binMat = mat(0x28353b, .70, .50);
-
-    // Ground breakup: mud, worn paths and tire arcs follow the real terrain height.
-    const addPatch = (x, z, rx, rz, material, rotation = 0) => {
-      const patch = new THREE.Mesh(
-        new THREE.CircleGeometry(1, 28),
-        material,
-      );
-      patch.position.set(x, getSimpleTerrainHeight(x, z) + .018, z);
-      patch.rotation.x = -Math.PI / 2;
-      patch.rotation.z = rotation;
-      patch.scale.set(rx, rz, 1);
-      patch.receiveShadow = true;
-      fallbackArenaRoot.add(patch);
-    };
-
-    for (const patch of [
-      [-20, 56, 28, 4.2, 0.10],
-      [0, 27, 15, 2.6, -0.12],
-      [38, 6, 12, 2.4, 0.34],
-      [-46, -10, 15, 2.8, -0.28],
-      [58, -28, 18, 3.0, 0.08],
-      [-78, 28, 11, 2.6, 0.20],
-      [82, 31, 10, 2.2, -0.48],
-      [70, -48, 16, 2.9, 0.12],
-    ]) {
-      addPatch(patch[0], patch[1], patch[2], patch[3], dirtMat, patch[4]);
-    }
-
-    // High-density rock system: overwhelmingly small field stones and pebbles,
-    // with only a few large hero rocks. This keeps the battlefield grounded
-    // without turning the whole map into giant boulders.
-    stoneMat.vertexColors = true;
-
-    const rockGeometry = new THREE.IcosahedronGeometry(.24, 2);
-    const rocks = new THREE.InstancedMesh(
-      rockGeometry,
-      stoneMat,
-      620,
-    );
-    rocks.name = 'WARFLEX_RockScatter_Small';
-    rocks.castShadow = true;
-    rocks.receiveShadow = true;
-
-    const pebbleGeometry = new THREE.IcosahedronGeometry(.10, 1);
-    const pebbles = new THREE.InstancedMesh(
-      pebbleGeometry,
-      stoneMat,
-      900,
-    );
-    pebbles.name = 'WARFLEX_RockScatter_Pebbles';
-    pebbles.castShadow = true;
-    pebbles.receiveShadow = true;
-
-    const rockDummy = new THREE.Object3D();
-    const rockColor = new THREE.Color();
-
-    const rockClusterCenters = [
-      [-105, 50], [-82, 58], [-55, 52], [-24, 58], [18, 55],
-      [52, 58], [88, 54], [112, 44], [-112, 18], [-103, -10],
-      [-90, -38], [-56, -55], [-15, -62], [22, -58], [58, -61],
-      [92, -50], [111, -24], [116, 8], [-116, -44], [-116, 40],
-    ];
-
-    for (let i = 0; i < rocks.count; i += 1) {
-      const seed = i + 1601.1;
-      const center = rockClusterCenters[i % rockClusterCenters.length];
-      const spread = 4.5 + seeded(seed + 1.8) * 12.5;
-      const angle = seeded(seed + 2.4) * Math.PI * 2;
-      const x = THREE.MathUtils.clamp(
-        center[0] + Math.cos(angle) * spread,
-        -HALF_W + 4,
-        HALF_W - 4,
-      );
-      const z = THREE.MathUtils.clamp(
-        center[1] + Math.sin(angle) * spread,
-        -HALF_D + 4,
-        HALF_D - 4,
-      );
-      const y = getSimpleTerrainHeight(x, z);
-      const s = .10 + seeded(seed + 12.7) * .34;
-
-      rockDummy.position.set(x, y + s * .26, z);
-      rockDummy.rotation.set(
-        seeded(seed + 18.2) * .7,
-        seeded(seed + 21.4) * Math.PI * 2,
-        seeded(seed + 24.7) * .6,
-      );
-      rockDummy.scale.set(
-        s * (0.82 + seeded(seed + 28.7) * .52),
-        s * (.52 + seeded(seed + 29.7) * .58),
-        s * (.78 + seeded(seed + 30.7) * .48),
-      );
-      rockDummy.updateMatrix();
-      rocks.setMatrixAt(i, rockDummy.matrix);
-
-      rockColor.setHSL(
-        .16 + seeded(seed + 31.4) * .06,
-        .07 + seeded(seed + 32.4) * .10,
-        .25 + seeded(seed + 33.4) * .18,
-      );
-      rocks.setColorAt(i, rockColor);
-    }
-
-    for (let i = 0; i < pebbles.count; i += 1) {
-      const seed = i + 3401.4;
-      const center = rockClusterCenters[i % rockClusterCenters.length];
-      const spread = 6 + seeded(seed + 1.8) * 16;
-      const angle = seeded(seed + 2.4) * Math.PI * 2;
-      const x = THREE.MathUtils.clamp(
-        center[0] + Math.cos(angle) * spread,
-        -HALF_W + 3,
-        HALF_W - 3,
-      );
-      const z = THREE.MathUtils.clamp(
-        center[1] + Math.sin(angle) * spread,
-        -HALF_D + 3,
-        HALF_D - 3,
-      );
-      const y = getSimpleTerrainHeight(x, z);
-      const s = .035 + seeded(seed + 12.2) * .085;
-
-      rockDummy.position.set(x, y + s * .22, z);
-      rockDummy.rotation.set(
-        seeded(seed + 18.5) * 1.4,
-        seeded(seed + 21.5) * Math.PI * 2,
-        seeded(seed + 24.5) * 1.2,
-      );
-      rockDummy.scale.set(
-        s * (0.8 + seeded(seed + 28.5) * .7),
-        s * (.55 + seeded(seed + 29.5) * .65),
-        s * (0.8 + seeded(seed + 30.5) * .7),
-      );
-      rockDummy.updateMatrix();
-      pebbles.setMatrixAt(i, rockDummy.matrix);
-      rockColor.setHSL(.17, .08, .30 + seeded(seed + 33.5) * .14);
-      pebbles.setColorAt(i, rockColor);
-    }
-
-    rocks.instanceMatrix.needsUpdate = true;
-    pebbles.instanceMatrix.needsUpdate = true;
-    rocks.instanceColor.needsUpdate = true;
-    pebbles.instanceColor.needsUpdate = true;
-    rocks.computeBoundingSphere();
-    pebbles.computeBoundingSphere();
-    fallbackArenaRoot.add(rocks);
-    fallbackArenaRoot.add(pebbles);
-
-    const largeRockMat = texturedMat(0x4c5552, 'rock', .96, .02, [1.6, 1.6], .085);
-    largeRockMat.vertexColors = true;
-    const largeRockGeometry = new THREE.IcosahedronGeometry(1, 3);
-    const largeRocks = new THREE.InstancedMesh(
-      largeRockGeometry,
-      largeRockMat,
-      18,
-    );
-    largeRocks.name = 'WARFLEX_RockScatter_HeroBoulders';
-    largeRocks.castShadow = true;
-    largeRocks.receiveShadow = true;
-
-    for (let i = 0; i < largeRocks.count; i += 1) {
-      const seed = i + 7701.7;
-      const edgeX = seeded(seed) > .5
-        ? (HALF_W - 12)
-        : -(HALF_W - 12);
-      const x = THREE.MathUtils.clamp(
-        edgeX + (seeded(seed + 1.5) * 2 - 1) * 18,
-        -HALF_W + 6,
-        HALF_W - 6,
-      );
-      const z = (seeded(seed + 2.5) * 2 - 1) * (HALF_D - 9);
-      const y = getSimpleTerrainHeight(x, z);
-      const s = 1.15 + seeded(seed + 4.5) * 1.45;
-
-      rockDummy.position.set(x, y + s * .32, z);
-      rockDummy.rotation.set(
-        seeded(seed + 5.1) * .32,
-        seeded(seed + 6.1) * Math.PI * 2,
-        seeded(seed + 7.1) * .28,
-      );
-      rockDummy.scale.set(
-        s * (1.10 + seeded(seed + 8.1) * .60),
-        s * (.65 + seeded(seed + 9.1) * .48),
-        s * (.95 + seeded(seed + 10.1) * .50),
-      );
-      rockDummy.updateMatrix();
-      largeRocks.setMatrixAt(i, rockDummy.matrix);
-      rockColor.setHSL(
-        .16 + seeded(seed + 11.1) * .045,
-        .06 + seeded(seed + 12.1) * .06,
-        .24 + seeded(seed + 13.1) * .14,
-      );
-      largeRocks.setColorAt(i, rockColor);
-    }
-
-    largeRocks.instanceMatrix.needsUpdate = true;
-    largeRocks.instanceColor.needsUpdate = true;
-    largeRocks.computeBoundingSphere();
-    fallbackArenaRoot.add(largeRocks);
-
-    // A few hero boulders become physical cover; the pebbles and small rocks
-    // stay decorative so they never clutter movement.
-    for (let i = 0; i < 7; i += 1) {
-      const seed = i + 7701.7;
-      const edgeX = seeded(seed) > .5 ? (HALF_W - 12) : -(HALF_W - 12);
-      const x = THREE.MathUtils.clamp(edgeX + (seeded(seed + 1.5) * 2 - 1) * 18, -HALF_W + 6, HALF_W - 6);
-      const z = (seeded(seed + 2.5) * 2 - 1) * (HALF_D - 9);
-      const y = getSimpleTerrainHeight(x, z);
-      const s = 1.15 + seeded(seed + 4.5) * 1.45;
-      addCollision(
-        [s * 2.4, s * 1.4, s * 1.9],
-        [x, y + s * .45, z],
-        'RockCoverCollision',
-      );
-    }
-
-    // Armored cover with layered skirts, bolts and hazard bands.
-    const addFortifiedCover = (x, z, w, d, h, rotation = 0) => {
-      const root = new THREE.Group();
-      root.position.set(x, getSimpleTerrainHeight(x, z), z);
-      root.rotation.y = rotation;
-      fallbackArenaRoot.add(root);
-
-      box(root, [w, h, d], [0, h * .5, 0], stoneMat, 0, .08);
-      box(root, [w * .86, .11, d * 1.04], [0, h - .05, 0], steelDarkMat, 0, .025);
-      box(root, [w * .82, .07, .07], [0, h * .54, -d * .51], hazardMat, 0, .012);
-      box(root, [.05, h * .62, .05], [-w * .26, h * .54, -d * .52], steelMat, 0, .008);
-      box(root, [.05, h * .62, .05], [w * .26, h * .54, -d * .52], steelMat, 0, .008);
-
-      for (const sx of [-1, 1]) {
-        for (const sy of [.34, .72]) {
-          addBolt(
-            root,
-            [sx * w * .36, h * sy, -d * .53],
-            .85,
-            steelMat,
-          );
-        }
-      }
-
-      addCollision(
-        [w, h, d],
-        [x, getSimpleTerrainHeight(x, z) + h * .5, z],
-        'FortifiedCover',
-      );
-    };
-
-    for (const item of [
-      [-46, 13, 8.5, 1.9, 1.6, .04],
-      [35, 9, 10.5, 2.0, 1.8, -.08],
-      [-11, -18, 7.6, 1.7, 1.45, .10],
-      [54, -31, 6.9, 2.1, 1.85, -.14],
-      [-63, -35, 8.8, 1.7, 1.5, .06],
-      [6, 30, 10.5, 1.8, 1.55, -.05],
-    ]) {
-      addFortifiedCover(...item);
-    }
-
-    const addBin = (x, z, scale = 1, rotation = 0) => {
-      const root = new THREE.Group();
-      root.position.set(x, getSimpleTerrainHeight(x, z), z);
-      root.rotation.y = rotation;
-      root.scale.setScalar(scale);
-      fallbackArenaRoot.add(root);
-
-      box(root, [1.12, 1.18, .76], [0, .62, 0], binMat, 0, .045);
-      box(root, [1.00, .10, .67], [0, 1.24, 0], steelDarkMat, 0, .025);
-      box(root, [.76, .34, .035], [0, .66, -.40], oliveMat, 0, .012);
-      box(root, [.58, .05, .038], [0, .86, -.43], hazardMat, 0, .008);
-
-      for (const sx of [-.38, .38]) {
-        cyl(root, .045, .80, [sx, 1.31, .02], steelMat, [0, Math.PI / 2, 0], 12);
-      }
-
-      for (const sx of [-.42, .42]) {
-        for (const sz of [-.24, .24]) {
-          cyl(root, .11, .09, [sx, .14, sz], rubberMat, [0, Math.PI / 2, 0], 16);
-          addBolt(root, [sx, .42, -.35], .65, steelMat);
-        }
-      }
-
-      addCollision(
-        [1.20 * scale, 1.32 * scale, .82 * scale],
-        [x, getSimpleTerrainHeight(x, z) + .66 * scale, z],
-        'DetailBinCollision',
-      );
-    };
-
-    for (const p of [
-      [-103, 37, .9, .1],
-      [-77, 3, 1.0, 1.2],
-      [-38, 41, .88, -.4],
-      [24, 44, .94, .25],
-      [82, 34, 1.0, 2.2],
-      [104, -7, .92, -.2],
-      [70, -38, .98, .6],
-      [-98, -39, .9, -1.0],
-    ]) {
-      addBin(...p);
-    }
-
-    // HESCO-style defensive cells.
-    const addHesco = (x, z, width, rotation = 0) => {
-      const root = new THREE.Group();
-      root.position.set(x, getSimpleTerrainHeight(x, z), z);
-      root.rotation.y = rotation;
-      fallbackArenaRoot.add(root);
-
-      const fill = mat(0x746c50, .98, .01);
-      const cage = mat(0x465153, .70, .56);
-      const count = Math.max(2, Math.floor(width / 1.25));
-
-      for (let i = 0; i < count; i += 1) {
-        const px = (i - (count - 1) * .5) * 1.15;
-        box(root, [1.04, 1.04, .92], [px, .54, 0], fill, 0, .10);
-        for (const zz of [-.49, .49]) {
-          box(root, [.045, .94, .045], [px, .54, zz], cage);
-        }
-      }
-
-      box(root, [width, .05, 1.02], [0, 1.10, 0], cage);
-      addCollision(
-        [width + .1, 1.1, 1.0],
-        [x, getSimpleTerrainHeight(x, z) + .55, z],
-        'DetailHescoCollision',
-      );
-    };
-
-    addHesco(-24, 48, 11, .04);
-    addHesco(31, 42, 9, -.12);
-    addHesco(-86, -5, 10, Math.PI / 2);
-    addHesco(87, -28, 12, Math.PI / 2);
-
-    // Logistics: pallets, military crates and fuel drums.
-    const addPalletStack = (x, z, scale = 1, rotation = 0) => {
-      const root = new THREE.Group();
-      root.position.set(x, getSimpleTerrainHeight(x, z), z);
-      root.rotation.y = rotation;
-      root.scale.setScalar(scale);
-      fallbackArenaRoot.add(root);
-
-      for (let level = 0; level < 2; level += 1) {
-        box(root, [2.55, .15, 1.34], [0, .08 + level * .25, 0], woodMat, 0, .018);
-        for (let px = -.92; px <= .92; px += .46) {
-          box(root, [.24, .12, 1.18], [px, .22 + level * .25, 0], woodMat);
-        }
-        box(root, [.20, .38, 1.16], [-.96, -.12 + level * .25, 0], woodMat);
-        box(root, [.20, .38, 1.16], [.96, -.12 + level * .25, 0], woodMat);
-      }
-    };
-
-    addPalletStack(-98, 24, .94, .12);
-    addPalletStack(50, 39, .84, -.10);
-    addPalletStack(97, 16, .90, .20);
-
-    const addFuelDrum = (x, z, color = 0x3d5a42) => {
-      const root = new THREE.Group();
-      root.position.set(x, getSimpleTerrainHeight(x, z), z);
-      fallbackArenaRoot.add(root);
-
-      const body = mat(color, .67, .44);
-      cyl(root, .34, .92, [0, .46, 0], body, [0, 0, 0], 28);
-      for (const yBand of [.20, .69]) {
-        torus(root, .346, .03, [0, yBand, 0], steelMat, [Math.PI / 2, 0, 0], 9, 26);
-      }
-      cyl(root, .11, .045, [0, .95, 0], steelDarkMat, [0, 0, 0], 18);
-      box(root, [.28, .14, .03], [0, .48, -.35], hazardMat, 0, .008);
-    };
-
-    for (const drum of [
-      [-101, 34, 0x3c5942],
-      [-97, 35, 0x4d6246],
-      [46, 41, 0x485a43],
-      [89, 27, 0x5a4f3b],
-      [77, -42, 0x3f513f],
-      [-67, -42, 0x4b5c44],
-    ]) {
-      addFuelDrum(...drum);
-    }
-
-    // Utility towers create vertical scale and deeper silhouettes.
-    const addLightTower = (x, z, height = 6.8) => {
-      const y = getSimpleTerrainHeight(x, z);
-      const root = new THREE.Group();
-      root.position.set(x, y, z);
-      fallbackArenaRoot.add(root);
-
-      cyl(root, .075, height, [0, height * .5, 0], steelDarkMat, [0, 0, 0], 16);
-      for (const angle of [0, Math.PI / 2]) {
-        box(root, [.08, height * .84, .08], [0, height * .45, .06], steelMat, angle);
-      }
-      box(root, [.58, .12, .22], [0, height - .22, 0], steelDarkMat, 0, .02);
-      addMesh(
-        root,
-        new THREE.SphereGeometry(.11, 16, 10),
-        new THREE.MeshStandardMaterial({
-          color: 0x5a6b6e,
-          emissive: 0xffb85f,
-          emissiveIntensity: 1.7,
-          roughness: .25,
-          metalness: .25,
-        }),
-        [0, height - .30, 0],
-      );
-      box(root, [.62, .035, .035], [0, height - .70, 0], steelMat);
-    };
-
-    for (const pole of [
-      [-116, -4],
-      [116, -4],
-      [-33, 54],
-      [33, 54],
-      [-116, 45],
-      [116, 38],
-    ]) {
-      addLightTower(...pole);
-    }
-
-    // Two focal armored positions.
-    const addBunker = (x, z, rotation = 0, scale = 1) => {
-      const root = new THREE.Group();
-      root.position.set(x, getSimpleTerrainHeight(x, z), z);
-      root.rotation.y = rotation;
-      root.scale.setScalar(scale);
-      fallbackArenaRoot.add(root);
-
-      const wall = mat(0x56615d, .90, .07);
-      const dark = mat(0x1b2327, .74, .62);
-      const darkStoneMat = mat(0x30383a, .88, .12);
-
-      box(root, [12.5, .42, 8.2], [0, .22, 0], darkStoneMat, 0, .07);
-      box(root, [12.5, 3.5, .42], [0, 1.75, -4.0], wall, 0, .05);
-      box(root, [12.5, 3.5, .42], [0, 1.75, 4.0], wall, 0, .05);
-      box(root, [.42, 3.5, 7.7], [-6.0, 1.75, 0], wall, 0, .05);
-      box(root, [.42, 3.5, 7.7], [6.0, 1.75, 0], wall, 0, .05);
-      box(root, [12.8, .26, 8.5], [0, 3.68, 0], dark, 0, .05);
-
-      for (const sx of [-1, 1]) {
-        for (let px = -3.8; px <= 3.8; px += 2.2) {
-          box(root, [1.02, .28, .06], [px, 2.10, sx * 4.22], steelDarkMat);
-          box(root, [1.18, .06, .08], [px, 1.67, sx * 4.25], steelMat);
-        }
-      }
-
-      box(root, [2.2, 2.3, .20], [0, 1.15, -4.25], dark, 0, .02);
-      for (let yy = .38; yy <= 1.96; yy += .38) {
-        box(root, [1.72, .05, .035], [0, yy, -4.39], steelMat);
-      }
-
-      cyl(root, .032, 2.1, [3.2, 4.6, 0], steelMat, [0, 0, 0], 14);
-      torus(root, .22, .025, [3.2, 5.25, 0], steelMat, [Math.PI / 2, 0, 0], 8, 20);
-
-      addCollision(
-        [12.5 * scale, 3.5 * scale, .48 * scale],
-        [x, getSimpleTerrainHeight(x, z) + 1.75 * scale, z - 4.0 * scale],
-        'BunkerFront',
-      );
-      addCollision(
-        [12.5 * scale, 3.5 * scale, .48 * scale],
-        [x, getSimpleTerrainHeight(x, z) + 1.75 * scale, z + 4.0 * scale],
-        'BunkerBack',
-      );
-      addCollision(
-        [.48 * scale, 3.5 * scale, 8.0 * scale],
-        [x - 6.0 * scale, getSimpleTerrainHeight(x, z) + 1.75 * scale, z],
-        'BunkerLeft',
-      );
-      addCollision(
-        [.48 * scale, 3.5 * scale, 8.0 * scale],
-        [x + 6.0 * scale, getSimpleTerrainHeight(x, z) + 1.75 * scale, z],
-        'BunkerRight',
-      );
-    };
-
-    addBunker(-72, 27, .08, 1.0);
-    addBunker(74, 23, -.10, 1.04);
-
-    // ---------------------------------------------------------------------
-    // MAP ZONING: deliberate authored sections instead of one random scatter.
-    // ---------------------------------------------------------------------
-    const mapSections = [
-      { id: 'command', name: 'COMMAND', x: -91, z: 41, w: 70, d: 48, color: 0x596760 },
-      { id: 'training', name: 'TRAINING YARD', x: 0, z: 41, w: 58, d: 48, color: 0x4f6250 },
-      { id: 'logistics', name: 'LOGISTICS', x: 89, z: 41, w: 64, d: 48, color: 0x696458 },
-      { id: 'industrial', name: 'INDUSTRIAL', x: -87, z: -18, w: 72, d: 52, color: 0x5d5f60 },
-      { id: 'vehicle', name: 'VEHICLE HANGARS', x: 0, z: -25, w: 58, d: 48, color: 0x545f61 },
-      { id: 'depot', name: 'MOTOR DEPOT', x: 86, z: -20, w: 68, d: 54, color: 0x655d52 },
-    ];
-
-    const zoneRoots = new Map();
-
-    const makeZoneRoot = (section) => {
-      const root = new THREE.Group();
-      root.name = 'WARFLEX_ZONE_' + section.id.toUpperCase();
-      root.userData.mapSection = section.id;
-      fallbackArenaRoot.add(root);
-      zoneRoots.set(section.id, root);
-
-      // Slightly raised textured foundation makes each area visually read as
-      // an intentional district, not a random collection of props.
-      const foundation = new THREE.Mesh(
-        new THREE.BoxGeometry(section.w, .055, section.d),
-        texturedMat(section.color, 'asphalt', .97, .02, [4, 3], .028),
-      );
-      const centerY = getSimpleTerrainHeight(section.x, section.z) + .025;
-      foundation.position.set(section.x, centerY, section.z);
-      foundation.receiveShadow = true;
-      root.add(foundation);
-
-      for (const side of [-1, 1]) {
-        const curb = new THREE.Mesh(
-          new THREE.BoxGeometry(section.w, .16, .18),
-          concreteEdge,
-        );
-        curb.position.set(
-          section.x,
-          getSimpleTerrainHeight(section.x, section.z + side * section.d * .5),
-          section.z + side * section.d * .5,
-        );
-        root.add(curb);
-      }
-
-      return root;
-    };
-
-    mapSections.forEach(makeZoneRoot);
-
-    // Main roads intentionally align the districts.
-    const addRoadStrip = (x, z, width, depth, rotation = 0) => {
-      const root = new THREE.Group();
-      root.position.set(x, 0, z);
-      root.rotation.y = rotation;
-      fallbackArenaRoot.add(root);
-
-      const road = new THREE.Mesh(
-        new THREE.PlaneGeometry(width, depth, Math.max(2, Math.floor(width / 5)), Math.max(2, Math.floor(depth / 5))),
-        asphalt,
-      );
-      road.rotation.x = -Math.PI / 2;
-      const pos = road.geometry.attributes.position;
-      for (let i = 0; i < pos.count; i += 1) {
-        const localX = pos.getX(i);
-        const localZ = pos.getY(i);
-        pos.setZ(i, getSimpleTerrainHeight(
-          x + localX,
-          z + localZ,
-        ) + .03);
-      }
-      road.geometry.computeVertexNormals();
-      road.receiveShadow = true;
-      root.add(road);
-
-      // Dashed center markings make the circulation layout obvious.
-      for (let p = -Math.floor(width * .42); p < width * .42; p += 5) {
-        const stripe = new THREE.Mesh(
-          new THREE.PlaneGeometry(2.2, .11),
-          hazardMat,
-        );
-        stripe.rotation.x = -Math.PI / 2;
-        stripe.position.set(
-          p,
-          getSimpleTerrainHeight(x + p, z) + .055,
-          0,
-        );
-        root.add(stripe);
-      }
-    };
-
-    addRoadStrip(0, 7, 245, 5.5);
-    addRoadStrip(0, -5, 245, 3.8);
-    addRoadStrip(-45, 0, 78, 4.2, Math.PI / 2);
-    addRoadStrip(45, 0, 78, 4.2, Math.PI / 2);
-    addRoadStrip(0, -49, 236, 4.0);
-
-    // Player-scale textured facility buildings, assigned to specific zones.
-    const addTexturedFacility = ({
-      zone,
-      x,
-      z,
-      width,
-      depth,
-      height,
-      wallColor,
-      roofColor,
-      glassColor = 0x31515b,
-      doors = 1,
-    }) => {
-      const root = new THREE.Group();
-      root.name = 'Facility_' + zone + '_' + Math.round(x) + '_' + Math.round(z);
-      root.position.set(x, getSimpleTerrainHeight(x, z), z);
-      zoneRoots.get(zone)?.add(root);
-
-      const wall = texturedMat(wallColor, 'paintedMetal', .82, .24, [5.5, 3.2], .035);
-      const roof = texturedMat(roofColor, 'corrugatedMetal', .66, .48, [8, 4], .04);
-      const trim = texturedMat(0x777f7e, 'rustSteel', .58, .58, [4, 4], .022);
-      const glassFacade = new THREE.MeshStandardMaterial({
-        color: glassColor,
-        roughness: .10,
-        metalness: .70,
-        emissive: 0x0a3036,
-        emissiveIntensity: .32,
-      });
-
-      box(root, [width + .65, .28, depth + .65], [0, .14, 0], concreteEdge, 0, .025);
-      box(root, [width, height, .42], [0, height * .5, -depth * .5], wall);
-      box(root, [width, height, .42], [0, height * .5, depth * .5], wall);
-      box(root, [.42, height, depth], [-width * .5, height * .5, 0], wall);
-      box(root, [.42, height, depth], [width * .5, height * .5, 0], wall);
-      box(root, [width + .25, .42, depth + .25], [0, height + .21, 0], roof, 0, .025);
-
-      for (let px = -width * .44; px <= width * .44; px += Math.max(3.6, width * .18)) {
-        box(root, [.13, height * .94, .13], [px, height * .48, -depth * .51], trim);
-        box(root, [.13, height * .94, .13], [px, height * .48, depth * .51], trim);
-      }
-
-      for (let px = -width * .40; px <= width * .40; px += 3.2) {
-        box(root, [1.38, 1.05, .07], [px, 3.05, -depth * .525], glassFacade);
-        box(root, [1.38, 1.05, .07], [px, 3.05, depth * .525], glassFacade);
-      }
-
-      const doorSpacing = doors === 1 ? 0 : 4.6;
-      for (let d = 0; d < doors; d += 1) {
-        const dx = (d - (doors - 1) * .5) * doorSpacing;
-        box(root, [3.25, 3.3, .18], [dx, 1.65, -depth * .735], texturedMat(0x252c30, 'rustSteel', .72, .58, [3, 2], .028), 0, .02);
-        box(root, [3.55, 3.55, .25], [dx, 1.78, -depth * .70], trim, 0, .02);
-        for (let y = .35; y < 3.0; y += .55) {
-          box(root, [3.0, .045, .035], [dx, y, -depth * .835], steelDarkMat);
-        }
-      }
-
-      // Surface grime strips keep the architecture from looking like clean
-      // colored blocks even at mid-range.
-      for (const side of [-1, 1]) {
-        box(
-          root,
-          [width * .82, .16, .025],
-          [0, height * .15, side * (depth * .52)],
-          texturedMat(0x4a4c4b, 'concrete', .96, .01, [5, 1], .02),
-        );
-      }
-
-      addCollision(
-        [width, height, .48],
-        [x, getSimpleTerrainHeight(x, z) + height * .5, z - depth * .5],
-        root.name + '_South',
-      );
-      addCollision(
-        [width, height, .48],
-        [x, getSimpleTerrainHeight(x, z) + height * .5, z + depth * .5],
-        root.name + '_North',
-      );
-      addCollision(
-        [.48, height, depth],
-        [x - width * .5, getSimpleTerrainHeight(x, z) + height * .5, z],
-        root.name + '_West',
-      );
-      addCollision(
-        [.48, height, depth],
-        [x + width * .5, getSimpleTerrainHeight(x, z) + height * .5, z],
-        root.name + '_East',
-      );
-    };
-
-    addTexturedFacility({
-      zone: 'command', x: -101, z: 43, width: 27, depth: 18, height: 6.2,
-      wallColor: 0x4d6670, roofColor: 0x252e31, doors: 2,
-    });
-    addTexturedFacility({
-      zone: 'command', x: -72, z: 44, width: 17, depth: 13, height: 4.8,
-      wallColor: 0x55634f, roofColor: 0x29312e, doors: 1,
-    });
-    addTexturedFacility({
-      zone: 'training', x: -4, z: 42, width: 24, depth: 16, height: 5.2,
-      wallColor: 0x626a61, roofColor: 0x252b2d, doors: 1,
-    });
-    addTexturedFacility({
-      zone: 'logistics', x: 72, z: 43, width: 31, depth: 20, height: 6.1,
-      wallColor: 0x7a5d46, roofColor: 0x292d2e, doors: 2,
-    });
-    addTexturedFacility({
-      zone: 'logistics', x: 104, z: 44, width: 17, depth: 14, height: 5.0,
-      wallColor: 0x59616a, roofColor: 0x292d30, doors: 1,
-    });
-    addTexturedFacility({
-      zone: 'industrial', x: -99, z: -19, width: 29, depth: 19, height: 6.0,
-      wallColor: 0x5b6061, roofColor: 0x252b2d, doors: 2,
-    });
-    addTexturedFacility({
-      zone: 'industrial', x: -65, z: -17, width: 20, depth: 15, height: 5.0,
-      wallColor: 0x655d51, roofColor: 0x252a2b, doors: 1,
-    });
-    addTexturedFacility({
-      zone: 'vehicle', x: -7, z: -31, width: 40, depth: 24, height: 9.2,
-      wallColor: 0x4d585b, roofColor: 0x1f282b, doors: 2,
-    });
-    addTexturedFacility({
-      zone: 'depot', x: 70, z: -20, width: 31, depth: 21, height: 6.4,
-      wallColor: 0x6b614f, roofColor: 0x282c2d, doors: 2,
-    });
-    addTexturedFacility({
-      zone: 'depot', x: 104, z: -18, width: 18, depth: 15, height: 5.2,
-      wallColor: 0x655048, roofColor: 0x272c2e, doors: 1,
-    });
-
-    // ---------------------------------------------------------------------
-    // HIGHLY OPTIMIZED GRASS: instanced, chunked, distance-culled.
-    // ---------------------------------------------------------------------
-    const grassMaterial = new THREE.MeshStandardMaterial({
-      color: 0x547d36,
-      roughness: 1,
-      metalness: 0,
-      vertexColors: true,
-    });
-
-    const grassGeometry = new THREE.ConeGeometry(.048, .62, 4, 1);
-    const grassZoneExclusions = [
-      [-130, 4, 130, 10],
-      [-47, -75, 8, 150],
-      [47, -75, 8, 150],
-      [-130, -51, 260, 7],
-      [-130, 66, 260, 7],
-      [-125, 34, 66, 20],
-      [-32, 34, 64, 20],
-      [54, 34, 67, 20],
-      [-123, -42, 70, 20],
-      [-29, -48, 62, 24],
-      [51, -45, 74, 28],
-    ];
-
-    const grassBlocked = (x, z) => {
-      return grassZoneExclusions.some(([cx, cz, w, d]) =>
-        Math.abs(x - cx) < w * .5 &&
-        Math.abs(z - cz) < d * .5
-      );
-    };
-
-    const grassX = 6;
-    const grassZ = 4;
-    const chunkW = MAP_WIDTH / grassX;
-    const chunkD = MAP_DEPTH / grassZ;
-
-    for (let cz = 0; cz < grassZ; cz += 1) {
-      for (let cx = 0; cx < grassX; cx += 1) {
-        const centerX = -HALF_W + chunkW * (cx + .5);
-        const centerZ = -HALF_D + chunkD * (cz + .5);
-        const chunk = new THREE.InstancedMesh(
-          grassGeometry,
-          grassMaterial,
-          650,
-        );
-        chunk.name = 'WARFLEX_GrassChunk_' + cx + '_' + cz;
-        chunk.castShadow = false;
-        chunk.receiveShadow = false;
-        chunk.frustumCulled = true;
-        const dummy = new THREE.Object3D();
-        const instanceColor = new THREE.Color();
-
-        let placed = 0;
-        let attempts = 0;
-
-        while (placed < chunk.count && attempts < chunk.count * 5) {
-          attempts += 1;
-          const seed = (cz * 1013 + cx * 271 + attempts * 17.17);
-          const rx = (Math.sin(seed * 12.9898) * 43758.5453) % 1;
-          const rz = (Math.sin(seed * 78.233) * 24634.6345) % 1;
-          const x = THREE.MathUtils.clamp(
-            centerX + (rx - .5) * chunkW * .94,
-            -HALF_W + 1,
-            HALF_W - 1,
-          );
-          const z = THREE.MathUtils.clamp(
-            centerZ + (rz - .5) * chunkD * .94,
-            -HALF_D + 1,
-            HALF_D - 1,
-          );
-
-          if (grassBlocked(x, z)) continue;
-
-          const h = .38 + Math.abs(Math.sin(seed * 2.7)) * .48;
-          const y = getSimpleTerrainHeight(x, z);
-          dummy.position.set(x, y + h * .48, z);
-          dummy.rotation.y = (Math.sin(seed * 4.1) * Math.PI);
-          const s = .72 + Math.abs(Math.sin(seed * 5.7)) * .62;
-          dummy.scale.set(s, h / .62, s);
-          dummy.updateMatrix();
-          chunk.setMatrixAt(placed, dummy.matrix);
-
-          instanceColor.setHSL(
-            .22 + Math.abs(Math.sin(seed * .17)) * .045,
-            .34 + Math.abs(Math.sin(seed * .23)) * .22,
-            .22 + Math.abs(Math.sin(seed * .31)) * .16,
-          );
-          chunk.setColorAt(placed, instanceColor);
-
-          placed += 1;
-        }
-
-        chunk.instanceMatrix.needsUpdate = true;
-        chunk.instanceColor.needsUpdate = true;
-        chunk.position.set(0, 0, 0);
-        fallbackArenaRoot.add(chunk);
-        optimizedGrassChunks.push({
-          mesh: chunk,
-          x: centerX,
-          z: centerZ,
-          radius: Math.hypot(chunkW, chunkD) * .55,
-        });
-      }
-    }
-
-    // Group the already-authored legacy props into the same section roots so
-    // the scene graph mirrors the visual layout. World transforms are preserved.
-    fallbackArenaRoot.updateMatrixWorld(true);
-    for (const child of [...fallbackArenaRoot.children]) {
-      if (
-        child === simpleTerrainMesh ||
-        child === floor ||
-        child.name.startsWith('WARFLEX_ZONE_') ||
-        child.name.startsWith('WARFLEX_GrassChunk_')
-      ) continue;
-
-      const world = child.getWorldPosition(new THREE.Vector3());
-      let target = null;
-      let bestDistance = Infinity;
-
-      for (const section of mapSections) {
-        const dx = Math.abs(world.x - section.x) / (section.w * .5);
-        const dz = Math.abs(world.z - section.z) / (section.d * .5);
-        const score = dx + dz;
-        if (score < bestDistance) {
-          bestDistance = score;
-          target = zoneRoots.get(section.id);
-        }
-      }
-
-      if (target) target.attach(child);
-    }
-
-    console.info('[WARFLEX] Sectioned military map + textured facilities + optimized grass enabled.');
-    return;
-  }
-  const sectors = [
-    [-93, 39, 52, 38, 0x454b4c],
-    [0, 39, 52, 38, 0x363d3f],
-    [88, 39, 54, 38, 0x4a4e4d],
-    [-91, -20, 60, 40, 0x353b3d],
-    [0, -22, 66, 42, 0x2f3638],
-    [91, -20, 60, 40, 0x3c4243],
-  ];
-
-  for (const [x, z, w, d, color] of sectors) {
-    box(
-      fallbackArenaRoot,
-      [w, 0.06, d],
-      [x, 0.03, z],
-      mat(color, 0.97, 0.015),
-    );
-  }
-
-  const road = (size, position) => {
-    box(fallbackArenaRoot, size, position, asphalt);
-
-    if (size[0] > size[2]) {
-      box(
-        fallbackArenaRoot,
-        [size[0], 0.18, 0.38],
-        [position[0], 0.09, position[2] - size[2] * 0.5],
-        concreteEdge,
-      );
-      box(
-        fallbackArenaRoot,
-        [size[0], 0.18, 0.38],
-        [position[0], 0.09, position[2] + size[2] * 0.5],
-        concreteEdge,
-      );
-    } else {
-      box(
-        fallbackArenaRoot,
-        [0.38, 0.18, size[2]],
-        [position[0] - size[0] * 0.5, 0.09, position[2]],
-        concreteEdge,
-      );
-      box(
-        fallbackArenaRoot,
-        [0.38, 0.18, size[2]],
-        [position[0] + size[0] * 0.5, 0.09, position[2]],
-        concreteEdge,
-      );
-    }
+  // Terrain comes first so every district is grounded against the same height
+  // field. It remains a broad green military training ground rather than a
+  // flat gray slab.
+  createSimpleSlopeTerrain();
+
+  // Perimeter barriers keep AI and ragdolls inside the playable footprint.
+  addCollision([MAP_WIDTH, 10, 1.5], [0, 5, -HALF_D], 'MainMapNorthBoundary');
+  addCollision([MAP_WIDTH, 10, 1.5], [0, 5, HALF_D], 'MainMapSouthBoundary');
+  addCollision([1.5, 10, MAP_DEPTH], [-HALF_W, 5, 0], 'MainMapWestBoundary');
+  addCollision([1.5, 10, MAP_DEPTH], [HALF_W, 5, 0], 'MainMapEastBoundary');
+
+  const rootAtGround = (name, x, z) => {
+    const root = new THREE.Group();
+    root.name = name;
+    root.position.set(x, getSimpleTerrainHeight(x, z), z);
+    fallbackArenaRoot.add(root);
+    return root;
   };
 
-  road([18, 0.07, 142], [0, 0.04, 0]);
-  road([244, 0.07, 13], [0, 0.04, 30]);
-  road([244, 0.07, 13], [0, 0.04, -28]);
-  road([76, 0.07, 11], [-58, 0.04, 3]);
-  road([76, 0.07, 11], [61, 0.04, 6]);
-  road([52, 0.07, 10], [0, 0.04, 52]);
+  const addRoad = (x, z, width, depth, rotation = 0, edge = true) => {
+    const root = new THREE.Group();
+    root.name = 'ROAD_' + x + '_' + z;
+    root.position.set(x, 0, z);
+    root.rotation.y = rotation;
+    fallbackArenaRoot.add(root);
 
-  for (let z = -61; z <= 60; z += 9) {
-    mark(
-      fallbackArenaRoot,
-      [0.17, 0.019, 4.6],
-      [0, 0.09, z],
-      0xb8ad73,
-    );
-  }
+    const segmentsX = Math.max(2, Math.floor(width / 6));
+    const segmentsZ = Math.max(2, Math.floor(depth / 6));
+    const geometry = new THREE.PlaneGeometry(width, depth, segmentsX, segmentsZ);
+    const pos = geometry.attributes.position;
 
-  for (let x = -111; x <= 111; x += 13) {
-    mark(
-      fallbackArenaRoot,
-      [7.2, 0.018, 0.16],
-      [x, 0.088, 30],
-      0x8f8f78,
-    );
-    mark(
-      fallbackArenaRoot,
-      [7.2, 0.018, 0.16],
-      [x, 0.088, -28],
-      0x8f8f78,
-    );
-  }
-
-  const seamMat = mat(0x151a1c, 1, 0.01);
-  for (const [x, z, w, d] of [
-    [-45, 13, 8, 0.08],
-    [-23, 6, 0.08, 7],
-    [39, 18, 11, 0.08],
-    [66, -3, 0.08, 7],
-    [-78, -12, 9, 0.08],
-    [81, 31, 12, 0.08],
-    [15, -46, 0.08, 8],
-  ]) {
-    box(fallbackArenaRoot, [w, 0.01, d], [x, 0.081, z], seamMat);
-  }
-
-  for (const x of [-118, -103, -88, 88, 103, 118]) {
-    box(fallbackArenaRoot, [0.35, 0.10, 28], [x, 0.05, 22], concreteDark);
-    for (let z = 10; z <= 34; z += 6) {
-      box(fallbackArenaRoot, [0.22, 0.16, 0.72], [x, 0.13, z], steelDark);
+    for (let i = 0; i < pos.count; i += 1) {
+      const lx = pos.getX(i);
+      const lz = pos.getY(i);
+      const cos = Math.cos(rotation);
+      const sin = Math.sin(rotation);
+      const wx = x + lx * cos - lz * sin;
+      const wz = z + lx * sin + lz * cos;
+      pos.setZ(i, getSimpleTerrainHeight(wx, wz) + .035);
     }
-  }
+
+    geometry.computeVertexNormals();
+
+    const road = new THREE.Mesh(geometry, asphalt);
+    road.rotation.x = -Math.PI / 2;
+    road.receiveShadow = true;
+    root.add(road);
+
+    if (edge) {
+      const stripe = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, .16),
+        whitePaint,
+      );
+      stripe.rotation.x = -Math.PI / 2;
+      stripe.position.set(0, .045, -depth * .37);
+      root.add(stripe);
+
+      const stripe2 = stripe.clone();
+      stripe2.position.z = depth * .37;
+      root.add(stripe2);
+    }
+
+    return root;
+  };
+
+  // Main movement spine: a wide north/south arterial with two east/west
+  // cross-routes. The central lanes remain open enough for long sightlines.
+  addRoad(0, 2, MAP_WIDTH - 8, 7, 0);
+  addRoad(0, -12, MAP_WIDTH - 8, 5, 0, false);
+  addRoad(-62, 0, 5, 104, 0, false);
+  addRoad(0, 0, 5, 112, 0, false);
+  addRoad(62, 0, 5, 104, 0, false);
+
+  const sectionRoots = new Map();
+  const addSection = (id, label, x, z, width, depth, baseMat) => {
+    const root = rootAtGround('DISTRICT_' + id.toUpperCase(), x, z);
+    root.userData.mapSection = id;
+    root.userData.label = label;
+    sectionRoots.set(id, root);
+
+    const pad = box(
+      root,
+      [width, .12, depth],
+      [0, .06, 0],
+      baseMat,
+      0,
+      .018,
+    );
+    pad.castShadow = false;
+    pad.receiveShadow = true;
+    return root;
+  };
 
   // -----------------------------------------------------------------------
-  // BUILDINGS
+  // NORTH DISTRICTS
   // -----------------------------------------------------------------------
 
-  const addIndustrialBuilding = ({
+  addSection('command', 'COMMAND', -92, 43, 58, 43, concrete);
+  addSection('training', 'TRAINING YARD', 0, 45, 54, 43, dirt);
+  addSection('logistics', 'LOGISTICS', 91, 43, 58, 43, concrete);
+
+  // -----------------------------------------------------------------------
+  // SOUTH DISTRICTS
+  // -----------------------------------------------------------------------
+
+  addSection('industrial', 'INDUSTRIAL', -90, -30, 62, 44, concreteDark);
+  addSection('vehicle', 'VEHICLE HANGARS', 0, -30, 66, 46, asphalt);
+  addSection('depot', 'MOTOR DEPOT', 88, -30, 58, 44, concrete);
+
+  const addBuilding = ({
+    zone,
     x,
     z,
     width,
     depth,
     height,
-    accent,
-    roof = 0x272f33,
-    label = 'FACILITY',
-    entranceSide = 'south',
+    color,
+    roof = 0x272f32,
+    bay = false,
+    rotation = 0,
   }) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    fallbackArenaRoot.add(root);
+    const root = rootAtGround(
+      'BUILDING_' + zone + '_' + Math.round(x) + '_' + Math.round(z),
+      x,
+      z,
+    );
+    root.rotation.y = rotation;
+    sectionRoots.get(zone)?.add(root);
 
-    const wall = texturedMat(accent, 'paintedMetal', 0.74, 0.28, [4.5, 2.8], 0.028);
-    const roofMat = texturedMat(roof, 'corrugatedMetal', 0.64, 0.50, [7, 3], 0.032);
-    const frame = steelDark;
-    const trim = texturedMat(0x7a858b, 'paintedMetal', 0.54, 0.52, [5, 2], 0.018);
-    const darkGlass = glass.clone();
-    const doorMat = texturedMat(0x1f272b, 'rustSteel', 0.58, 0.56, [4, 3], 0.022);
+    const wall = texturedMat(color, 'metal', .78, .28, [4.5, 3], .024);
+    const roofMat = texturedMat(roof, 'corrugated', .66, .52, [8, 4], .028);
+    const trim = steelDark;
+    const doorMat = texturedMat(0x2a3235, 'rust', .70, .58, [3, 3], .024);
 
-    box(root, [width + 0.8, 0.38, depth + 0.8], [0, 0.19, 0], concreteEdge, 0, 0.02);
-    box(root, [width, 0.55, depth], [0, height + 0.28, 0], roofMat, 0, 0.03);
+    box(root, [width + .8, .30, depth + .8], [0, .15, 0], concrete);
+    box(root, [width + .20, .38, depth + .20], [0, height + .19, 0], roofMat, 0, .02);
 
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        box(root, [0.48, height, 0.48], [sx * (width * 0.5 - 0.25), height * 0.5, sz * (depth * 0.5 - 0.25)], frame);
-      }
-    }
+    const wallT = .42;
+    const zFront = -depth * .5;
+    const zBack = depth * .5;
+    const bayWidth = bay ? Math.min(12, width * .46) : 0;
 
-    const wallThickness = 0.42;
-    const frontY = height * 0.5;
-
-    const buildZWall = (side, isEntrance) => {
-      const zSide = side * depth * 0.5;
-      const gap = isEntrance ? 4.1 : 0;
-
-      if (!gap) {
-        box(root, [width, height, wallThickness], [0, frontY, zSide], wall);
+    const addFrontWall = (zSide, openBay) => {
+      if (!openBay) {
+        box(root, [width, height, wallT], [0, height * .5, zSide], wall);
       } else {
-        const panelWidth = (width - gap) * 0.5;
-
-        box(
-          root,
-          [panelWidth, height, wallThickness],
-          [-(gap * 0.5 + panelWidth * 0.5), frontY, zSide],
-          wall,
-        );
-
-        box(
-          root,
-          [panelWidth, height, wallThickness],
-          [gap * 0.5 + panelWidth * 0.5, frontY, zSide],
-          wall,
-        );
-      }
-
-      for (
-        let wx = -width * 0.38;
-        wx <= width * 0.38;
-        wx += Math.max(2.8, width * 0.18)
-      ) {
-        if (isEntrance && Math.abs(wx) < 2.6) continue;
-
-        box(root, [1.45, Math.min(0.95, height * 0.24), 0.08], [wx, Math.min(1.72, height * 0.46), zSide + side * 0.235], darkGlass);
-        box(root, [1.58, 0.08, 0.12], [wx, height * 0.40, zSide + side * 0.26], trim);
-        box(root, [1.58, 0.08, 0.12], [wx, Math.min(2.35, height * 0.68), zSide + side * 0.26], trim);
+        const sideW = (width - bayWidth) * .5;
+        box(root, [sideW, height, wallT], [-(bayWidth + sideW) * .5, height * .5, zSide], wall);
+        box(root, [sideW, height, wallT], [(bayWidth + sideW) * .5, height * .5, zSide], wall);
+        box(root, [bayWidth, .32, wallT], [0, height - .16, zSide], trim);
+        for (let px = -bayWidth * .42; px <= bayWidth * .42; px += 1.4) {
+          box(root, [.12, height * .85, .12], [px, height * .43, zSide - .03], trim);
+        }
       }
     };
 
-    buildZWall(-1, entranceSide === 'north');
-    buildZWall(1, entranceSide === 'south');
+    addFrontWall(zFront, bay);
+    addFrontWall(zBack, false);
+    box(root, [wallT, height, depth], [-width * .5, height * .5, 0], wall);
+    box(root, [wallT, height, depth], [width * .5, height * .5, 0], wall);
 
     for (const side of [-1, 1]) {
-      const xSide = side * width * 0.5;
-
-      box(root, [wallThickness, height, depth], [xSide, frontY, 0], wall);
-
-      for (
-        let wz = -depth * 0.34;
-        wz <= depth * 0.34;
-        wz += Math.max(2.8, depth * 0.24)
-      ) {
-        box(root, [0.08, height * 0.40, 1.45], [xSide + side * 0.235, height * 0.58, wz], darkGlass);
+      for (let px = -width * .40; px <= width * .40; px += 3.4) {
+        if (bay && Math.abs(px) < bayWidth * .55) continue;
+        box(root, [1.35, 1.05, .08], [px, height * .57, side * (depth * .5 + .035)], glass);
       }
     }
 
-    const doorZ =
-      entranceSide === 'south'
-        ? -depth * 0.5 - 0.03
-        : depth * 0.5 + 0.03;
-
-    const doorSign = entranceSide === 'south' ? -1 : 1;
-
-    box(root, [4.2, 0.25, 0.35], [0, 0.12, doorZ], concreteDark);
-    box(root, [0.28, height * 0.86, 0.42], [-2.18, height * 0.46, doorZ], frame);
-    box(root, [0.28, height * 0.86, 0.42], [2.18, height * 0.46, doorZ], frame);
-    box(root, [4.25, 0.30, 0.42], [0, height * 0.92, doorZ], frame);
-    box(root, [3.56, Math.min(2.45, height * 0.58), 0.18], [0, Math.min(1.28, height * 0.34), doorZ + doorSign * 0.23], doorMat);
-
-    for (let i = -2; i <= 2; i += 1) {
-      box(root, [0.05, height * 0.63, 0.22], [i * 0.68, Math.min(1.30, height * 0.34), doorZ + doorSign * 0.34], steelDark);
+    // Tall structural posts create scale and hard edges.
+    for (let px = -width * .44; px <= width * .44; px += 5.2) {
+      box(root, [.16, height * .98, .16], [px, height * .49, -depth * .51], trim);
+      box(root, [.16, height * .98, .16], [px, height * .49, depth * .51], trim);
     }
 
-    mark(root, [3.1, 0.12, 0.09], [0, Math.min(2.85, height * 0.86), doorZ + doorSign * 0.36], accent);
-
-    for (const [hx, hz, size] of [
-      [-width * 0.28, -depth * 0.23, 1.3],
-      [width * 0.28, depth * 0.20, 1.0],
-    ]) {
-      box(root, [size, 0.56, size * 0.78], [hx, height + 0.46, hz], steelDark, 0, 0.04);
-
-      for (let sy = -0.18; sy <= 0.18; sy += 0.12) {
-        box(root, [size * 0.68, 0.025, size * 0.44], [hx, height + 0.48 + sy, hz + size * 0.40], black);
+    // Human-scale service door next to the large bay.
+    const doorX = bay ? bayWidth * .5 + 1.55 : 0;
+    if (Math.abs(doorX) + .9 < width * .46) {
+      box(root, [1.0, 2.2, .16], [doorX, 1.1, zFront - .10], doorMat, 0, .015);
+      box(root, [1.20, 2.45, .12], [doorX, 1.22, zFront - .02], trim, 0, .015);
+      for (let yy = .35; yy < 2.0; yy += .42) {
+        box(root, [.045, .06, .05], [doorX, yy, zFront - .16], steel);
       }
     }
 
-    const conduitMat = mat(0x404a4e, 0.65, 0.52);
-    for (const side of [-1, 1]) {
-      box(root, [0.12, height * 0.72, 0.12], [side * (width * 0.37), height * 0.42, depth * 0.50 + 0.10], conduitMat);
+    const colliderY = getSimpleTerrainHeight(x, z) + height * .5;
+    addCollision([wallT, height, depth], [x - width * .5, colliderY, z], root.name + '_W');
+    addCollision([wallT, height, depth], [x + width * .5, colliderY, z], root.name + '_E');
+    addCollision([width, height, wallT], [x, colliderY, zBack], root.name + '_N');
 
-      for (let y = 1; y < height - 0.6; y += 1) {
-        torus(root, 0.075, 0.018, [side * (width * 0.37), y, depth * 0.50 + 0.12], conduitMat, [Math.PI / 2, 0, 0], 8, 18);
-      }
-    }
-
-    box(root, [3.9, 0.70, 0.09], [0, height * 0.86, doorZ + doorSign * 0.30], black, 0, 0.015);
-
-    for (const lx of [-2.2, 2.2]) {
-      cyl(root, 0.055, 0.50, [lx, height * 0.80, doorZ + doorSign * 0.28], steelDark, [0, 0, 0], 12);
-      addMesh(root, new THREE.SphereGeometry(0.11, 10, 8), warmGlass, [lx, height * 0.74, doorZ + doorSign * 0.33]);
-    }
-
-    for (
-      let xPos = -width * 0.42;
-      xPos <= width * 0.42;
-      xPos += Math.max(2.6, width * 0.18)
-    ) {
-      box(root, [0.10, height * 0.92, 0.10], [xPos, height * 0.48, depth * 0.50 + 0.20], trim);
-      box(root, [0.10, height * 0.92, 0.10], [xPos, height * 0.48, -depth * 0.50 - 0.20], trim);
-    }
-
-    if (entranceSide === 'south') {
-      addCollision([width, height, wallThickness], [x, frontY, z + depth * 0.5], label + '_N');
-      addCollision([width * 0.5 - 2.05, height, wallThickness], [x - width * 0.25 - 1.025, frontY, z - depth * 0.5], label + '_S_left');
-      addCollision([width * 0.5 - 2.05, height, wallThickness], [x + width * 0.25 + 1.025, frontY, z - depth * 0.5], label + '_S_right');
+    if (bay) {
+      const sideW = (width - bayWidth) * .5;
+      addCollision([sideW, height, wallT], [x - (bayWidth + sideW) * .5, colliderY, zFront], root.name + '_S_L');
+      addCollision([sideW, height, wallT], [x + (bayWidth + sideW) * .5, colliderY, zFront], root.name + '_S_R');
     } else {
-      addCollision([width * 0.5 - 2.05, height, wallThickness], [x - width * 0.25 - 1.025, frontY, z + depth * 0.5], label + '_N_left');
-      addCollision([width * 0.5 - 2.05, height, wallThickness], [x + width * 0.25 + 1.025, frontY, z + depth * 0.5], label + '_N_right');
-      addCollision([width, height, wallThickness], [x, frontY, z - depth * 0.5], label + '_S');
+      addCollision([width, height, wallT], [x, colliderY, zFront], root.name + '_S');
     }
 
-    addCollision([wallThickness, height, depth], [x - width * 0.5, frontY, z], label + '_W');
-    addCollision([wallThickness, height, depth], [x + width * 0.5, frontY, z], label + '_E');
+    // Rooftop machinery and warning lamps.
+    for (const px of [-width * .30, width * .30]) {
+      box(root, [1.1, .5, .85], [px, height + .48, 0], steelDark, 0, .03);
+      addBolt(root, [px - .32, height + .74, 0], .7);
+      addBolt(root, [px + .32, height + .74, 0], .7);
+    }
+
+    for (const px of [-width * .44, width * .44]) {
+      addMesh(root, new THREE.SphereGeometry(.11, 12, 8), warmGlass, [px, height + .06, zFront + .18]);
+    }
 
     return root;
   };
 
-  addIndustrialBuilding({
-    x: -86,
-    z: 24,
-    width: 28,
-    depth: 20,
-    height: 5.6,
-    accent: 0x3e6572,
-    roof: 0x1f292d,
-    label: 'COMMAND',
+  addBuilding({
+    zone: 'command', x: -103, z: 42, width: 28, depth: 19, height: 6.5,
+    color: 0x496673, roof: 0x252d31,
+  });
+  addBuilding({
+    zone: 'command', x: -73, z: 43, width: 18, depth: 14, height: 4.8,
+    color: 0x5d6850, roof: 0x2a312f,
+  });
+  addBuilding({
+    zone: 'logistics', x: 78, z: 42, width: 30, depth: 21, height: 6.3,
+    color: 0x806047, roof: 0x292e30, bay: true,
+  });
+  addBuilding({
+    zone: 'logistics', x: 108, z: 43, width: 15, depth: 15, height: 5.1,
+    color: 0x5e6870, roof: 0x292f32,
+  });
+  addBuilding({
+    zone: 'industrial', x: -103, z: -29, width: 30, depth: 20, height: 6.2,
+    color: 0x596164, roof: 0x292f31, bay: true,
+  });
+  addBuilding({
+    zone: 'industrial', x: -70, z: -29, width: 18, depth: 15, height: 5.0,
+    color: 0x6a6153, roof: 0x282e30,
+  });
+  addBuilding({
+    zone: 'depot', x: 74, z: -29, width: 30, depth: 20, height: 6.2,
+    color: 0x6f634f, roof: 0x292e30, bay: true,
+  });
+  addBuilding({
+    zone: 'depot', x: 105, z: -29, width: 16, depth: 16, height: 5.2,
+    color: 0x695049, roof: 0x292e30,
   });
 
-  addIndustrialBuilding({
-    x: -52,
-    z: 31,
-    width: 20,
-    depth: 14,
-    height: 4.7,
-    accent: 0x62644b,
-    roof: 0x28312e,
-    label: 'BARRACKS',
+  // Main vehicle hangar: broad open bay faces the central road.
+  addBuilding({
+    zone: 'vehicle', x: -8, z: -30, width: 42, depth: 24, height: 9.2,
+    color: 0x4d585d, roof: 0x20292c, bay: true,
   });
 
-  addIndustrialBuilding({
-    x: 67,
-    z: 24,
-    width: 31,
-    depth: 22,
-    height: 5.8,
-    accent: 0x8c603b,
-    roof: 0x262c2e,
-    label: 'LOGISTICS',
-  });
+  // Training yard uses low structures, firing lanes and open sightlines.
+  const training = sectionRoots.get('training');
 
-  addIndustrialBuilding({
-    x: 48,
-    z: 42,
-    width: 22,
-    depth: 15,
-    height: 5.0,
-    accent: 0x7a4b3f,
-    roof: 0x252d30,
-    label: 'WORKSHOP',
-  });
-
-  addIndustrialBuilding({
-    x: -102,
-    z: 45,
-    width: 25,
-    depth: 16,
-    height: 5.3,
-    accent: 0x456578,
-    roof: 0x222b30,
-    label: 'ADMIN',
-  });
-
-  addIndustrialBuilding({
-    x: 99,
-    z: -12,
-    width: 26,
-    depth: 20,
-    height: 5.6,
-    accent: 0x6b5945,
-    roof: 0x252b2e,
-    label: 'MOTOR_POOL',
-  });
-
-  // -----------------------------------------------------------------------
-  // LARGE PLAYER-SCALE HANGARS
-  // These are intentionally huge from the outside, but all entrances,
-  // stairs, rails, lights, windows and cover are kept at believable player
-  // scale so the structures do not feel like giant toy buildings.
-  // -----------------------------------------------------------------------
-  const addLargeHangar = ({ x, z, width, depth, height, accent, label, rotation = 0 }) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
+  const addLaneWall = (x, z, length, rotation = 0, height = 1.05) => {
+    const root = rootAtGround('TRAINING_WALL', x, z);
     root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
+    training.add(root);
 
-    const wall = texturedMat(accent, 'paintedMetal', 0.80, 0.24, [5, 3], 0.030);
-    const roof = texturedMat(0x20272a, 'corrugatedMetal', 0.64, 0.54, [8, 4], 0.034);
-    const frame = texturedMat(0x3b464b, 'rustSteel', 0.57, 0.62, [5, 4], 0.021);
-    const dark = texturedMat(0x101619, 'rustSteel', 0.73, 0.72, [4, 4], 0.020);
-    const door = texturedMat(0x252d30, 'paintedMetal', 0.66, 0.58, [4, 4], 0.026);
-    const glassPanel = glass.clone();
-
-    box(root, [width + 1.4, 0.35, depth + 1.4], [0, 0.18, 0], concreteEdge, 0, 0.03);
-    box(root, [width, 0.42, depth], [0, height + 0.20, 0], roof, 0, 0.04);
-
-    // Main wall slabs.
-    box(root, [width, height, 0.48], [0, height * 0.5, depth * 0.5], wall);
-    box(root, [width, height, 0.48], [0, height * 0.5, -depth * 0.5], wall);
-    box(root, [0.48, height, depth], [-width * 0.5, height * 0.5, 0], wall);
-    box(root, [0.48, height, depth], [width * 0.5, height * 0.5, 0], wall);
-
-    // Structural columns are kept narrow enough to read as real construction.
-    for (let xx = -width * 0.46; xx <= width * 0.46; xx += 5.5) {
-      box(root, [0.34, height, 0.34], [xx, height * 0.5, depth * 0.5 + 0.28], frame);
-      box(root, [0.34, height, 0.34], [xx, height * 0.5, -depth * 0.5 - 0.28], frame);
+    box(root, [length, height, .55], [0, height * .5, 0], concreteDark, 0, .035);
+    for (let px = -length * .38; px <= length * .38; px += 2.5) {
+      box(root, [.12, height * .78, .62], [px, height * .50, 0], steelDark);
     }
-
-    // Huge vehicle-sized bay door, with a human-scale personnel door beside it.
-    const bayWidth = Math.min(12, width * 0.38);
-    const bayHeight = Math.min(5.2, height * 0.55);
-    const frontZ = -depth * 0.5 - 0.26;
-    box(root, [bayWidth + 0.7, bayHeight + 0.7, 0.28], [0, bayHeight * 0.5, frontZ], frame, 0, 0.02);
-    box(root, [bayWidth, bayHeight, 0.18], [0, bayHeight * 0.5, frontZ - 0.16], door);
-    for (let yy = 0.45; yy < bayHeight - 0.15; yy += 0.72) {
-      box(root, [bayWidth * 0.94, 0.055, 0.035], [0, yy, frontZ - 0.27], frame);
-    }
-
-    const personnelX = bayWidth * 0.5 + 2.0;
-    box(root, [1.15, 2.45, 0.28], [personnelX, 1.225, frontZ - 0.05], dark, 0, 0.02);
-    box(root, [1.45, 2.75, 0.34], [personnelX, 1.38, frontZ + 0.04], frame, 0, 0.02);
-    addBolt(root, [personnelX - 0.38, 1.23, frontZ - 0.20], 0.7);
-    addBolt(root, [personnelX + 0.38, 1.23, frontZ - 0.20], 0.7);
-
-    // Human-scale windows: repeated 1.4m-wide panels instead of giant walls of glass.
-    for (let xx = -width * 0.40; xx <= width * 0.40; xx += 3.2) {
-      if (Math.abs(xx) < bayWidth * 0.5 + 2.5) continue;
-      box(root, [1.45, 1.05, 0.09], [xx, 3.0, frontZ + 0.12], glassPanel);
-      box(root, [1.58, 0.07, 0.14], [xx, 2.42, frontZ + 0.15], frame);
-      box(root, [1.58, 0.07, 0.14], [xx, 3.58, frontZ + 0.15], frame);
-    }
-
-    // Side windows and ventilation panels.
-    for (const side of [-1, 1]) {
-      for (let zz = -depth * 0.34; zz <= depth * 0.34; zz += 4.0) {
-        box(root, [0.09, 1.15, 1.55], [side * (width * 0.5 + 0.10), 3.1, zz], glassPanel);
-        box(root, [0.13, 1.30, 0.10], [side * (width * 0.5 + 0.16), 3.1, zz - 0.82], frame);
-        box(root, [0.13, 1.30, 0.10], [side * (width * 0.5 + 0.16), 3.1, zz + 0.82], frame);
-      }
-    }
-
-    // Roof trusses and service lights make the scale readable from the ground.
-    for (let zz = -depth * 0.42; zz <= depth * 0.42; zz += 4.5) {
-      box(root, [width * 0.90, 0.16, 0.18], [0, height - 0.18, zz], frame);
-    }
-    for (let zz = -depth * 0.38; zz <= depth * 0.38; zz += 4.5) {
-      cyl(root, 0.09, 0.32, [0, height - 0.46, zz], warmGlass, [0, 0, 0], 12);
-    }
-
-    // Small stairs beside the personnel door reinforce the player reference scale.
-    for (let step = 0; step < 3; step += 1) {
-      box(root, [1.35, 0.16, 0.38], [personnelX, 0.08 + step * 0.16, frontZ - 0.42 - step * 0.30], concreteDark);
-    }
-    box(root, [0.06, 0.95, 0.06], [personnelX - 0.72, 0.55, frontZ - 0.78], steel);
-    box(root, [0.06, 0.95, 0.06], [personnelX + 0.72, 0.55, frontZ - 0.78], steel);
-    box(root, [1.45, 0.06, 0.06], [personnelX, 0.98, frontZ - 0.78], steel);
-
-    // Collision matches the physical wall footprint; the bay opening remains usable.
-    addCollision([width, height, 0.55], [x, height * 0.5, z + depth * 0.5], label + '_N');
-    addCollision([width * 0.5 - bayWidth * 0.5, height, 0.55], [x - (width * 0.25 + bayWidth * 0.25), height * 0.5, z - depth * 0.5], label + '_S_left');
-    addCollision([width * 0.5 - bayWidth * 0.5, height, 0.55], [x + (width * 0.25 + bayWidth * 0.25), height * 0.5, z - depth * 0.5], label + '_S_right');
-    addCollision([0.55, height, depth], [x - width * 0.5, height * 0.5, z], label + '_W');
-    addCollision([0.55, height, depth], [x + width * 0.5, height * 0.5, z], label + '_E');
-
-    return root;
+    addCollision([length, height, .58], [x, getSimpleTerrainHeight(x, z) + height * .5, z], 'TrainingWall');
   };
 
-  addLargeHangar({
-    x: -25,
-    z: -38,
-    width: 52,
-    depth: 30,
-    height: 10.5,
-    accent: 0x4a5659,
-    label: 'MAIN_HANGAR',
-  });
-
-  addLargeHangar({
-    x: 74,
-    z: -39,
-    width: 42,
-    depth: 26,
-    height: 9.0,
-    accent: 0x59614e,
-    label: 'VEHICLE_HANGAR',
-  });
-
-  box(fallbackArenaRoot, [36, 0.08, 27], [19, 0.05, 53], concreteDark);
-  box(fallbackArenaRoot, [44, 0.08, 23], [88, 0.05, 8], concreteDark);
-
-  for (let x = 4; x <= 34; x += 5) {
-    mark(fallbackArenaRoot, [0.14, 0.016, 8], [x, 0.10, 53], 0xaaa679);
-  }
-
-  for (let x = 67; x <= 108; x += 7) {
-    mark(fallbackArenaRoot, [5.0, 0.016, 0.14], [x, 0.10, 8], 0xaaa679);
-  }
+  addLaneWall(-17, 47, 17, 0);
+  addLaneWall(17, 47, 17, 0);
+  addLaneWall(-17, 31, 17, 0);
+  addLaneWall(17, 31, 17, 0);
+  addLaneWall(0, 39, 10, Math.PI / 2, 1.35);
 
   // -----------------------------------------------------------------------
-  // CONTAINERS: sharp real-world shipping-container construction.
+  // LOGISTICS CONTAINER YARD
   // -----------------------------------------------------------------------
 
-  const addContainer = (
-    x,
-    z,
-    color,
-    rotation = 0,
-    stacked = false,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, stacked ? 2.52 : 1.27, z);
+  const addContainer = (zone, x, z, color, rotation = 0, y = null) => {
+    const root = rootAtGround(
+      'CONTAINER_' + Math.round(x) + '_' + Math.round(z),
+      x,
+      z,
+    );
     root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
+    root.position.y += y ?? 1.24;
+    sectionRoots.get(zone)?.add(root);
 
-    const bodyMat = texturedMat(color, 'corrugatedMetal', 0.78, 0.32, [7, 2.6], 0.036);
-    const ribMat = mat(0x20272a, 0.64, 0.66);
-    const floorMat = texturedMat(0x5f6462, 'concrete', 0.88, 0.11, [4, 2], 0.028);
-
-    box(root, [12.2, 2.45, 2.44], [0, 0, 0], bodyMat);
-    box(root, [11.95, 0.10, 2.20], [0, -1.18, 0], floorMat);
+    const body = texturedMat(color, 'corrugated', .72, .45, [7, 3], .028);
+    box(root, [12.2, 2.45, 2.44], [0, 0, 0], body, 0, .025);
+    box(root, [12.0, .08, 2.16], [0, -1.18, 0], concreteDark);
 
     for (let i = -10; i <= 10; i += 1) {
-      box(root, [0.085, 2.08, 0.025], [i * 0.48, 0, 1.235], ribMat);
-      box(root, [0.085, 2.08, 0.025], [i * 0.48, 0, -1.235], ribMat);
+      box(root, [.085, 2.10, .04], [i * .48, 0, 1.24], steelDark);
+      box(root, [.085, 2.10, .04], [i * .48, 0, -1.24], steelDark);
     }
 
     for (const side of [-1, 1]) {
-      box(root, [12.0, 0.09, 0.13], [0, side * 1.15, 1.245], ribMat);
-
-      for (const xPos of [-5.92, 5.92]) {
-        box(root, [0.14, 2.34, 0.14], [xPos, 0, side * 1.24], steelDark);
-
-        for (const y of [-0.92, -0.31, 0.31, 0.92]) {
-          addBolt(root, [xPos, y, side * 1.33], 0.7);
-        }
-      }
+      box(root, [11.9, .10, .16], [0, side * 1.15, 1.27], steelDark);
     }
 
-    box(root, [0.09, 2.26, 2.20], [6.10, 0, 0], steelDark);
-    box(root, [0.12, 2.06, 1.06], [6.18, 0, -0.54], bodyMat);
-    box(root, [0.12, 2.06, 1.06], [6.18, 0, 0.54], bodyMat);
-
-    for (const zz of [-0.54, 0.54]) {
-      for (const yy of [-0.72, 0, 0.72]) {
-        box(root, [0.16, 0.06, 0.84], [6.27, yy, zz], ribMat);
-      }
-
-      cyl(root, 0.06, 1.66, [6.29, 0, zz], steelDark, [0, 0, 0], 12);
-    }
-
-    box(root, [1.25, 0.52, 0.07], [5.98, 0.47, -0.92], black);
-    mark(root, [0.76, 0.12, 0.08], [5.98, 0.47, -0.92], 0xc59d3d);
-
-    for (const xx of [-5.74, 5.74]) {
-      for (const yy of [-0.92, 0.92]) {
-        box(root, [0.24, 0.24, 0.24], [xx, yy, 0], steelDark, 0, 0.02);
-      }
-    }
-
-    for (const zz of [-0.54, 0.54]) {
-      box(root, [2.15, 0.20, 0.18], [0, -1.08, zz], steelDark);
-    }
-
-    addCollision([12.25, 2.55, 2.50], [x, stacked ? 2.55 : 1.27, z], 'ContainerCollision');
-  };
-
-  addContainer(49, 8, 0x48657a);
-  addContainer(62, 8, 0x66734b);
-  addContainer(75, 8, 0x73533e);
-  addContainer(49, -7, 0x7b4b4c);
-  addContainer(62, -7, 0xc3c4bd);
-  addContainer(75, -7, 0x4e6072, Math.PI / 2);
-  addContainer(62, 2.7, 0x5b6d58, 0, true);
-
-  // -----------------------------------------------------------------------
-  // COVER / LOGISTICS / WEAR
-  // -----------------------------------------------------------------------
-
-  const addCrate = (
-    x,
-    y,
-    z,
-    scale = 1,
-    rotation = 0,
-    wood = 0x5b4a38,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, y, z);
-    root.rotation.y = rotation;
-    root.scale.setScalar(scale);
-    fallbackArenaRoot.add(root);
-
-    const woodMat = texturedMat(wood, 'wood', 0.90, 0.06, [2.2, 2.2], 0.028);
-    const darkWood = mat(0x241f1a, 0.86, 0.04);
-
-    box(root, [1.25, 0.95, 1.25], [0, 0, 0], woodMat, 0, 0.035);
-
-    for (const side of [-1, 1]) {
-      for (const yy of [-0.37, 0, 0.37]) {
-        box(root, [0.08, 0.075, 1.30], [side * 0.60, yy, 0], darkWood);
-      }
-    }
-
-    for (const xx of [-0.64, 0.64]) {
-      for (const yy of [-0.46, 0.46]) {
-        box(root, [0.11, 0.11, 0.10], [xx, yy, 0.76], steelDark);
-      }
-    }
-
-    return root;
-  };
-
-  const addPallet = (
-    x,
-    y,
-    z,
-    rotation = 0,
-    scale = 1,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, y, z);
-    root.rotation.y = rotation;
-    root.scale.setScalar(scale);
-    fallbackArenaRoot.add(root);
-
-    const wood = texturedMat(0x6a5036, 'wood', 0.94, 0.02, [2.6, 1.8], 0.026);
-
-    box(root, [2.4, 0.16, 1.25], [0, 0, 0], wood);
-    for (let px = -0.9; px <= 0.9; px += 0.45) {
-      box(root, [0.28, 0.12, 1.12], [px, 0.12, 0], wood);
-    }
-    for (const px of [-0.93, 0, 0.93]) {
-      box(root, [0.20, 0.42, 1.10], [px, -0.18, 0], wood);
-    }
-  };
-
-  for (const p of [
-    [-95, 0.58, 8, 0.05, 1.0],
-    [-69, 0.58, 12, -0.08, 0.9],
-    [40, 0.12, 8, 0.02, 0.9],
-    [84, 0.12, 2, 0.06, 1.0],
-    [90, 0.12, 0, -0.05, 0.82],
-  ]) {
-    addPallet(...p);
-  }
-
-  for (const p of [
-    [-94, 1.24, 10, 1.0, 0],
-    [-71, 1.24, 11, 0.75, 0.1],
-    [41, 1.24, 9, 0.9, -0.06],
-    [88, 1.24, 3, 0.8, 0.08],
-  ]) {
-    addCrate(...p);
-  }
-
-  const addBarrier = (
-    x,
-    z,
-    rotation = 0,
-    length = 3.2,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
-
-    box(root, [length, 0.92, 0.60], [0, 0.54, 0], concreteDark, 0, 0.04);
-
-    for (
-      let px = -length * 0.28;
-      px <= length * 0.28;
-      px += length * 0.28
-    ) {
-      box(root, [0.15, 1.24, 0.70], [px, 0.51, 0], steelDark);
-      cyl(root, 0.07, 0.34, [px, 1.02, 0], steelDark, [0, 0, Math.PI / 2], 12);
-    }
-
-    mark(root, [length * 0.64, 0.09, 0.03], [0, 0.60, -0.31], 0xc59d3d);
+    box(root, [1.2, .54, .08], [5.98, .46, -1.26], black);
+    box(root, [.76, .12, .08], [5.98, .48, -1.31], warning);
 
     addCollision(
-      [length + 0.15, 1.25, 0.72],
-      [x, 0.62, z],
-      'BarrierCollision',
+      [12.35, 2.55, 2.50],
+      [x, (getSimpleTerrainHeight(x, z) + 1.27) + (y ?? 0), z],
+      'ContainerCollision',
     );
   };
 
-  for (const p of [
-    [-12, 43, 0, 3.5],
-    [12, 43, 0, 3.5],
-    [-41, 10, Math.PI / 2, 3.4],
-    [38, -9, Math.PI / 2, 3.4],
-    [103, -29, 0, 4.0],
-    [-103, -30, 0, 4.0],
-    [-72, -46, 0, 3.8],
-    [-48, -46, 0, 3.8],
-    [0, -45, 0, 4.5],
-    [48, -46, 0, 3.8],
-    [72, -46, 0, 3.8],
+  for (const item of [
+    [-106, 58, 0x476477, 0],
+    [-93, 58, 0x66764d, 0],
+    [-80, 58, 0x7a5743, 0],
+    [65, 57, 0x4d6677, 0],
+    [78, 57, 0x5e6b4d, 0],
+    [91, 57, 0x764f42, 0],
+    [104, 57, 0x6f6550, Math.PI / 2],
+    [65, 31, 0x566675, 0],
+    [78, 31, 0x68564a, 0],
+    [91, 31, 0x4f6653, 0],
+    [78, 31, 0x5b6e78, 0, 2.5],
   ]) {
-    addBarrier(...p);
-  }
-
-  const addSandbagWall = (
-    x,
-    z,
-    length,
-    rotation = 0,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
-
-    const bag = mat(0x716b53, 0.95, 0.01);
-
-    for (let i = 0; i < length; i += 1) {
-      const bx = (i - (length - 1) * 0.5) * 0.74;
-
-      addMesh(
-        root,
-        new THREE.CapsuleGeometry(0.32, 0.50, 5, 10),
-        bag,
-        [bx, 0.34 + (i % 2) * 0.04, 0],
-        [0, 0, Math.PI / 2],
-      );
-
-      addMesh(
-        root,
-        new THREE.CapsuleGeometry(0.32, 0.50, 5, 10),
-        bag,
-        [bx, 0.79 + ((i + 1) % 2) * 0.05, 0],
-        [0, 0, Math.PI / 2],
-      );
-    }
-
-    addCollision(
-      [Math.max(1, length * 0.75), 1.55, 0.9],
-      [x, 0.75, z],
-      'SandbagCollision',
-    );
-  };
-
-  addSandbagWall(-8, 11, 11);
-  addSandbagWall(8, -11, 10);
-  addSandbagWall(-32, -7, 8, Math.PI / 2);
-  addSandbagWall(34, 11, 9, Math.PI / 2);
-
-  // -----------------------------------------------------------------------
-  // ARMOR: detailed tanks and transport.
-  // -----------------------------------------------------------------------
-
-  const addTank = (
-    x,
-    z,
-    rotation = 0,
-    scale = 1,
-    accent = 0x536055,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rotation;
-    root.scale.setScalar(scale);
-    fallbackArenaRoot.add(root);
-
-    const hull = mat(accent, 0.72, 0.48);
-    const hullDark = mat(0x2c3431, 0.69, 0.55);
-
-    box(root, [7.8, 1.35, 3.5], [0, 1.02, 0], hull, 0, 0.09);
-    box(root, [8.4, 0.72, 0.62], [0, 0.55, -1.72], rubber, 0, 0.02);
-    box(root, [8.4, 0.72, 0.62], [0, 0.55, 1.72], rubber, 0, 0.02);
-
-    for (const zs of [-1.72, 1.72]) {
-      for (let px = -2.8; px <= 2.8; px += 1.20) {
-        cyl(root, 0.46, 0.25, [px, 0.55, zs], hullDark, [Math.PI / 2, 0, 0], 18);
-        cyl(root, 0.15, 0.27, [px, 0.55, zs], steelDark, [Math.PI / 2, 0, 0], 14);
-      }
-    }
-
-    box(root, [3.35, 0.88, 2.55], [0.10, 1.98, 0], hull, 0, 0.08);
-    torus(root, 1.10, 0.12, [0.10, 2.42, 0], steelDark, [Math.PI / 2, 0, 0], 12, 32);
-    box(root, [1.0, 0.28, 0.80], [-0.18, 2.50, 0], hullDark, 0, 0.04);
-    cyl(root, 0.18, 5.25, [2.80, 2.18, 0], steelDark, [0, 0, Math.PI / 2], 20);
-    cyl(root, 0.27, 0.44, [5.40, 2.18, 0], black, [0, 0, Math.PI / 2], 20);
-    box(root, [1.30, 0.18, 0.66], [-1.15, 2.48, 0], steelDark, 0, 0.03);
-
-    for (const zx of [-2.5, -1.1, 2.2]) {
-      torus(root, 0.18, 0.045, [zx, 1.68, 1.74], steelDark, [Math.PI / 2, 0, 0], 8, 16);
-    }
-
-    for (const lampX of [-2.72, 2.72]) {
-      addMesh(root, new THREE.SphereGeometry(0.13, 10, 8), warmGlass, [lampX, 1.60, -1.45]);
-    }
-
-    addCollision(
-      [9.2 * scale, 2.85 * scale, 4.8 * scale],
-      [x, 1.38 * scale, z],
-      'TankCollision',
-    );
-  };
-
-  addTank(-17, 11, 0.08, 1.32, 0x58675c);
-  addTank(20, -10, -0.14, 1.38, 0x695c4d);
-  addTank(0, 37, Math.PI, 1.16, 0x4b5c56);
-
-  const addTruck = (
-    x,
-    z,
-    rotation = 0,
-    accent = 0x59655e,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
-
-    const body = texturedMat(accent, 'paintedMetal', 0.80, 0.40, [4, 2.5], 0.026);
-
-    box(root, [5.8, 1.35, 2.25], [0, 1.12, 0], body, 0, 0.07);
-    box(root, [1.95, 1.80, 2.05], [1.70, 1.66, 0], body, 0, 0.08);
-    box(root, [1.35, 0.82, 0.08], [1.71, 1.74, -1.04], glass);
-    box(root, [1.35, 0.82, 0.08], [1.71, 1.74, 1.04], glass);
-    box(root, [3.2, 1.55, 2.12], [-0.92, 1.68, 0], tan, 0, 0.05);
-
-    for (const px of [-1.90, -0.10, 1.90]) {
-      for (const pz of [-1.13, 1.13]) {
-        cyl(root, 0.42, 0.28, [px, 0.45, pz], rubber, [Math.PI / 2, 0, 0], 18);
-        cyl(root, 0.15, 0.30, [px, 0.45, pz], steelDark, [Math.PI / 2, 0, 0], 14);
-      }
-    }
-
-    addCollision([6.5, 2.8, 2.6], [x, 1.38, z], 'TruckCollision');
-  };
-
-  addTruck(24, 52, 0.02, 0x59685a);
-  addTruck(78, 1, Math.PI * 0.5, 0x6c5748);
-  addTruck(-73, 16, -0.10, 0x4f5f58);
-
-  // -----------------------------------------------------------------------
-  // DEFENSIVE LINE: bunkers and emplacements.
-  // -----------------------------------------------------------------------
-
-  const addBunker = (
-    x,
-    z,
-    rotation = 0,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
-
-    box(root, [11.0, 2.4, 7.0], [0, 1.20, 0], concreteDark, 0, 0.08);
-    box(root, [8.8, 0.90, 6.2], [0, 2.86, 0], concreteEdge, 0, 0.08);
-    box(root, [9.4, 1.45, 0.42], [0, 1.50, -3.42], concrete, 0, 0.03);
-
-    for (const xx of [-3.6, -1.2, 1.2, 3.6]) {
-      box(root, [1.30, 0.72, 0.20], [xx, 1.66, -3.66], black);
-      box(root, [0.18, 0.78, 0.24], [xx - 0.48, 1.66, -3.75], steelDark);
-      box(root, [0.18, 0.78, 0.24], [xx + 0.48, 1.66, -3.75], steelDark);
-    }
-
-    box(root, [2.10, 0.70, 0.14], [0, 2.42, -3.66], warningRed);
-
-    addCollision([11.4, 3.0, 7.4], [x, 1.50, z], 'BunkerCollision');
-  };
-
-  addBunker(-58, -56);
-  addBunker(-29, -57);
-  addBunker(0, -56);
-  addBunker(30, -57);
-  addBunker(60, -56);
-
-  const addGunEmplacement = (x, z) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    fallbackArenaRoot.add(root);
-
-    const dark = mat(0x242b2d, 0.73, 0.55);
-
-    box(root, [8.2, 0.75, 4.2], [0, 0.38, 0], dark, 0, 0.05);
-    cyl(root, 2.15, 0.42, [0, 0.76, 0], steelDark);
-    cyl(root, 1.22, 0.55, [0, 1.05, 0], dark);
-    cyl(root, 0.14, 4.5, [0, 1.50, 0], steelDark, [0, 0, Math.PI / 2], 18);
-    box(root, [2.1, 0.42, 0.52], [1.22, 1.50, 0], dark, 0, 0.04);
-
-    addCollision([8.8, 1.3, 4.8], [x, 0.65, z], 'GunEmplacementCollision');
-  };
-
-  addGunEmplacement(-48, -44);
-  addGunEmplacement(0, -44);
-  addGunEmplacement(50, -44);
-
-  for (const [x, z, w] of [
-    [-62, -34, 20],
-    [-22, -34, 16],
-    [23, -34, 18],
-    [66, -34, 24],
-  ]) {
-    box(fallbackArenaRoot, [w, 0.60, 2.4], [x, 0.30, z], concreteEdge, 0, 0.04);
-    box(fallbackArenaRoot, [w * 0.84, 0.34, 1.5], [x, 0.76, z], tan, 0, 0.06);
-    addCollision([w, 0.95, 2.5], [x, 0.50, z], 'HescoCollision');
+    addContainer('logistics', ...item);
   }
 
   // -----------------------------------------------------------------------
-  // FUEL FARM
+  // COVER NETWORK
   // -----------------------------------------------------------------------
 
-  const addFuelTank = (
-    x,
-    z,
-    rotation = 0,
-    scale = 1,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
+  const addConcreteBarrier = (x, z, length, rotation = 0, height = 1.0) => {
+    const root = rootAtGround('COVER_BARRIER', x, z);
     root.rotation.y = rotation;
-    root.scale.setScalar(scale);
-    fallbackArenaRoot.add(root);
-
-    const tank = texturedMat(0x4d5656, 'rustSteel', 0.62, 0.55, [4, 3], 0.024);
-
-    cyl(root, 2.7, 5.8, [0, 3.10, 0], tank, [0, 0, Math.PI / 2], 28);
-
-    for (const xx of [-2.55, 2.55]) {
-      cyl(root, 2.45, 0.16, [xx, 3.10, 0], steelDark, [0, 0, Math.PI / 2], 28);
+    box(root, [length, height, .62], [0, height * .5, 0], concreteDark, 0, .04);
+    box(root, [length * .78, .07, .03], [0, height * .58, -.32], warning);
+    for (let px = -length * .30; px <= length * .30; px += Math.max(1.8, length * .26)) {
+      box(root, [.12, height + .20, .68], [px, height * .52, 0], steelDark);
     }
-
-    for (const xx of [-1.75, 0, 1.75]) {
-      torus(root, 2.74, 0.10, [xx, 3.10, 0], steelDark, [0, Math.PI / 2, 0], 12, 28);
-    }
-
-    for (const zz of [-1.75, 1.75]) {
-      for (const xx of [-1.75, 1.75]) {
-        box(root, [0.22, 2.45, 0.22], [xx, 1.20, zz], steelDark);
-        box(root, [0.62, 0.16, 0.62], [xx, 0.10, zz], concreteEdge);
-      }
-    }
-
-    box(root, [5.4, 0.12, 1.0], [0, 5.85, 0], steelDark);
-    box(root, [5.1, 0.12, 0.18], [0, 5.78, -0.43], steel);
-    box(root, [5.1, 0.12, 0.18], [0, 5.78, 0.43], steel);
-
-    for (let xx = -2.1; xx <= 2.1; xx += 0.52) {
-      box(root, [0.08, 0.72, 0.08], [xx, 5.98, -0.43], steelDark);
-      box(root, [0.08, 0.72, 0.08], [xx, 5.98, 0.43], steelDark);
-    }
-
-    box(root, [0.95, 1.25, 1.10], [-1.70, 6.62, 0], steelDark, 0, 0.04);
-    mark(root, [0.42, 0.28, 0.06], [-1.70, 6.80, -0.56], 0xc59d3d);
-    box(root, [5.9, 0.22, 0.22], [0, 0.85, 3.35], steelDark);
-
-    for (const xx of [-2.4, 0, 2.4]) {
-      box(root, [0.18, 1.25, 0.18], [xx, 1.35, 3.35], steelDark);
-    }
-
-    addCollision(
-      [6.0 * scale, 6.0 * scale, 5.8 * scale],
-      [x, 3.10 * scale, z],
-      'FuelTankCollision',
-    );
+    addCollision([length + .08, height + .18, .68], [x, getSimpleTerrainHeight(x, z) + height * .55, z], 'BarrierCollision');
   };
 
-  addFuelTank(87, -29);
-  addFuelTank(102, -29);
-
-  // -----------------------------------------------------------------------
-  // LIGHTING + POWER + COMMUNICATIONS
-  // -----------------------------------------------------------------------
-
-  const addStreetLight = (
-    x,
-    z,
-    height = 7.5,
-    rotation = 0,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
-
-    cyl(root, 0.12, height, [0, height * 0.5, 0], steelDark, [0, 0, 0], 18);
-    box(root, [0.85, 0.10, 0.18], [0.38, height - 0.35, 0], steelDark, -0.18, 0.015);
-    box(root, [0.62, 0.18, 0.34], [0.75, height - 0.44, 0], black, 0, 0.02);
-    box(root, [0.40, 0.08, 0.19], [0.75, height - 0.57, 0], warmGlass);
-    box(root, [0.65, 0.16, 0.65], [0, 0.08, 0], concreteEdge, 0, 0.03);
-
-    const light = new THREE.PointLight(0xffdfac, 0.55, 11, 1.9);
-    light.position.set(0.75, height - 0.52, 0);
-    root.add(light);
-  };
-
-  for (const [x, z, h] of [
-    [-14, 52, 8.4],
-    [14, 52, 8.4],
-    [-48, 17, 7.6],
-    [-25, 31, 7.3],
-    [29, 29, 7.6],
-    [58, 14, 8.0],
-    [96, 15, 8.5],
-    [114, -8, 8.0],
-  ]) {
-    addStreetLight(x, z, h);
-  }
-
-  const addUtilityPole = (
-    x,
-    z,
-    height = 10,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    fallbackArenaRoot.add(root);
-
-    cyl(root, 0.16, height, [0, height * 0.5, 0], steelDark, [0, 0, 0], 16);
-    box(root, [2.25, 0.16, 0.16], [0, height - 0.55, 0], steelDark);
-
-    for (const xx of [-0.85, 0, 0.85]) {
-      cyl(root, 0.07, 0.45, [xx, height - 0.78, 0], steelDark, [0, 0, 0], 12);
-    }
-  };
-
-  for (const p of [
-    [-116, 10],
-    [-116, 30],
-    [116, 13],
-    [116, 32],
-    [84, 52],
-    [52, 52],
-  ]) {
-    addUtilityPole(...p);
-  }
-
-  const addCable = (
-    a,
-    b,
-    y = 8.7,
-    radius = 0.035,
-  ) => {
-    const startPoint = new THREE.Vector3(a[0], y, a[1]);
-    const endPoint = new THREE.Vector3(b[0], y, b[1]);
-    const mid = startPoint.clone().add(endPoint).multiplyScalar(0.5);
-    const dir = endPoint.clone().sub(startPoint);
-    const length = dir.length();
-
-    const cable = cyl(
-      fallbackArenaRoot,
-      radius,
-      length,
-      mid.toArray(),
-      black,
-      [0, 0, 0],
-      10,
-    );
-
-    cable.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      dir.normalize(),
-    );
-  };
-
-  addCable([-102, 45], [-86, 24], 7.7, 0.045);
-  addCable([-86, 24], [-52, 31], 7.4, 0.040);
-  addCable([67, 24], [48, 42], 7.8, 0.045);
-  addCable([67, 24], [99, -12], 7.6, 0.045);
-  addCable([84, 52], [67, 24], 9.0, 0.040);
-  addCable([52, 52], [19, 53], 9.0, 0.040);
-
-  // -----------------------------------------------------------------------
-  // GUARD TOWERS + RADAR
-  // -----------------------------------------------------------------------
-
-  const addGuardTower = (
-    x,
-    z,
-    rotation = 0,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
-
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        box(root, [0.28, 8.4, 0.28], [sx * 1.65, 4.2, sz * 1.65], steelDark);
-      }
-    }
-
-    box(root, [4.1, 0.20, 4.1], [0, 3.35, 0], steelDark);
-    box(root, [4.2, 0.22, 4.2], [0, 7.0, 0], steelDark);
-    box(root, [3.7, 1.3, 3.7], [0, 7.62, 0], glass, 0, 0.03);
-
-    for (const side of [-1, 1]) {
-      box(root, [3.8, 0.12, 0.16], [0, 7.15, side * 1.87], steel);
-      box(root, [0.12, 0.90, 0.16], [side * 1.87, 7.55, 0], steel);
-    }
-
-    for (let i = -3; i <= 3; i += 1) {
-      box(root, [0.12, 1.3, 0.12], [i * 0.54, 7.65, 1.87], steelDark);
-    }
-
-    for (let y = 0.9; y <= 6.2; y += 0.62) {
-      box(root, [0.16, 0.09, 2.1], [1.98, y, 0], steelDark);
-    }
-
-    addMesh(root, new THREE.SphereGeometry(0.15, 10, 8), warningRed, [0, 8.38, 0]);
-
-    addCollision([4.3, 7.5, 4.3], [x, 3.75, z], 'GuardTowerCollision');
-  };
-
-  addGuardTower(-123, 68);
-  addGuardTower(123, 68, Math.PI);
-  addGuardTower(-123, -62);
-  addGuardTower(123, -62, Math.PI);
-
-  const radarRoot = new THREE.Group();
-  radarRoot.position.set(-22, 0, -57);
-  fallbackArenaRoot.add(radarRoot);
-
-  cyl(radarRoot, 0.18, 9.0, [0, 4.5, 0], steelDark, [0, 0, 0], 16);
-  cyl(radarRoot, 1.25, 0.22, [0, 9.05, 0], steel, [0, 0, 0], 24);
-
-  const dish = new THREE.Mesh(
-    new THREE.SphereGeometry(
-      2.0,
-      24,
-      12,
-      0,
-      Math.PI * 2,
-      0,
-      Math.PI * 0.52,
-    ),
-    steel,
-  );
-  dish.rotation.x = -0.45;
-  dish.position.set(0, 10.2, 0);
-  dish.scale.set(1.0, 0.55, 1.0);
-  dish.castShadow = true;
-  radarRoot.add(dish);
-
-  cyl(radarRoot, 0.08, 3.1, [0, 10.9, -0.2], steelDark, [0.45, 0, 0], 12);
-
-  // -----------------------------------------------------------------------
-  // MAINTENANCE + VEHICLE STORYTELLING
-  // -----------------------------------------------------------------------
-
-  const addBarrel = (
-    x,
-    z,
-    color = 0x31536b,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0.65, z);
-    fallbackArenaRoot.add(root);
-
-    const c = mat(color, 0.54, 0.40);
-
-    cyl(root, 0.48, 1.25, [0, 0, 0], c);
-    torus(root, 0.48, 0.055, [0, 0.50, 0], steelDark);
-    torus(root, 0.48, 0.055, [0, -0.50, 0], steelDark);
-
-    for (const angle of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
-      box(
-        root,
-        [0.07, 1.02, 0.05],
-        [Math.cos(angle) * 0.48, 0, Math.sin(angle) * 0.48],
-        steelDark,
-        angle,
-      );
-    }
-  };
-
-  addBarrel(30, 50, 0x31556b);
-  addBarrel(32, 50, 0x6c3e35);
-  addBarrel(35, 49, 0x556b48);
-  addBarrel(89, 3, 0x6b4d32);
-  addBarrel(92, 3, 0x32566c);
-
-  const addGenerator = (
-    x,
-    z,
-    scale = 1,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.scale.setScalar(scale);
-    fallbackArenaRoot.add(root);
-
-    box(root, [2.8, 1.75, 1.55], [0, 0.88, 0], steelDark, 0, 0.04);
-
-    for (const side of [-1, 1]) {
-      box(root, [0.18, 1.18, 1.10], [side * 1.45, 0.95, 0], black);
-      for (let y = 0.56; y <= 1.40; y += 0.18) {
-        box(root, [0.035, 0.04, 0.98], [side * 1.55, y, 0], steel);
-      }
-    }
-
-    addMesh(root, new THREE.SphereGeometry(0.11, 10, 8), warningRed, [0.96, 1.46, -0.79]);
-    mark(root, [0.58, 0.30, 0.08], [-0.78, 1.50, -0.80], 0xc59d3d);
-  };
-
-  addGenerator(43, 53, 1.0);
-  addGenerator(96, 4, 0.9);
-  addGenerator(-73, 6, 0.85);
-
-  const addWreck = (
-    x,
-    z,
-    rotation = 0,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    root.rotation.y = rotation;
-    fallbackArenaRoot.add(root);
-
-    const burnt = texturedMat(0x292c2c, 'rustSteel', 0.96, 0.13, [3, 2], 0.032);
-
-    box(root, [4.8, 0.95, 2.0], [0, 0.78, 0], burnt, 0, 0.05);
-    box(root, [1.8, 1.25, 1.9], [1.25, 1.40, 0], burnt, 0, 0.06);
-
-    for (const px of [-1.55, 1.55]) {
-      for (const pz of [-1.02, 1.02]) {
-        cyl(root, 0.40, 0.24, [px, 0.43, pz], rubber, [Math.PI / 2, 0, 0], 16);
-      }
-    }
-
-    addMesh(root, new THREE.SphereGeometry(0.55, 12, 10), warningRed, [0.3, 2.25, 0]);
-  };
-
-  addWreck(-36, 2, -0.18);
-  addWreck(31, 33, 0.20);
-
-  // -----------------------------------------------------------------------
-  // LOADING RIG
-  // -----------------------------------------------------------------------
-
-  const addLoadingFrame = (
-    x,
-    z,
-  ) => {
-    const root = new THREE.Group();
-    root.position.set(x, 0, z);
-    fallbackArenaRoot.add(root);
-
-    for (const sx of [-1, 1]) {
-      box(root, [0.38, 6.5, 0.38], [sx * 4.6, 3.25, 0], steelDark);
-      box(root, [0.30, 0.30, 0.30], [sx * 4.6, 0.15, 0], concreteEdge);
-    }
-
-    box(root, [9.5, 0.34, 0.40], [0, 6.32, 0], steelDark);
-    box(root, [8.7, 0.12, 0.16], [0, 5.95, 0], steel);
-
-    for (let xx = -3.6; xx <= 3.6; xx += 0.9) {
-      box(root, [0.08, 0.72, 0.08], [xx, 6.10, 0], steelDark);
-    }
-
-    cyl(root, 0.10, 2.0, [0, 5.28, 0], black);
-    box(root, [0.56, 0.38, 0.56], [0, 4.15, 0], steelDark, 0, 0.03);
-
-    addCollision([9.8, 6.6, 0.9], [x, 3.25, z], 'LoadingFrameCollision');
-  };
-
-  addLoadingFrame(88, 25);
-  addLoadingFrame(53, 9);
-
-  // -----------------------------------------------------------------------
-  // PERIMETER: invisible physical boundary; subtle physical installation.
-  // -----------------------------------------------------------------------
-
-  const border = [
-    [[MAP_WIDTH, 10, 1.5], [0, 5, -HALF_D]],
-    [[MAP_WIDTH, 10, 1.5], [0, 5, HALF_D]],
-    [[1.5, 10, MAP_DEPTH], [-HALF_W, 5, 0]],
-    [[1.5, 10, MAP_DEPTH], [HALF_W, 5, 0]],
+  const coverLines = [
+    [-40, 14, 16, 0, 1.10],
+    [40, 14, 16, 0, 1.10],
+    [-46, -1, 13, Math.PI / 2, 1.00],
+    [46, -1, 13, Math.PI / 2, 1.00],
+    [-38, -47, 18, 0, 1.15],
+    [0, -47, 18, 0, 1.15],
+    [38, -47, 18, 0, 1.15],
+    [-108, -4, 11, Math.PI / 2, 1.05],
+    [108, -4, 11, Math.PI / 2, 1.05],
   ];
+  for (const item of coverLines) addConcreteBarrier(...item);
 
-  for (const [size, position] of border) {
-    const boundary = new THREE.Mesh(
-      new THREE.BoxGeometry(...size),
-      new THREE.MeshBasicMaterial({
-        transparent: true,
-        opacity: 0,
-      }),
-    );
-    boundary.position.set(...position);
-    boundary.visible = false;
-    fallbackArenaRoot.add(boundary);
-    obstacles.push(boundary);
+  const addSandbags = (x, z, count, rotation = 0) => {
+    const root = rootAtGround('SANDBAGS', x, z);
+    root.rotation.y = rotation;
+    for (let i = 0; i < count; i += 1) {
+      const px = (i - (count - 1) * .5) * .62;
+      const bag = new THREE.Mesh(
+        new THREE.CapsuleGeometry(.29, .46, 5, 10),
+        sand,
+      );
+      bag.position.set(px, .31 + (i % 2) * .04, 0);
+      bag.rotation.z = Math.PI / 2;
+      bag.castShadow = true;
+      bag.receiveShadow = true;
+      root.add(bag);
+    }
+    for (let i = 0; i < count - 1; i += 2) {
+      const px = (i - (count - 1) * .5) * .62;
+      const bag = new THREE.Mesh(
+        new THREE.CapsuleGeometry(.29, .46, 5, 10),
+        sand,
+      );
+      bag.position.set(px + .31, .78, 0);
+      bag.rotation.z = Math.PI / 2;
+      bag.castShadow = true;
+      bag.receiveShadow = true;
+      root.add(bag);
+    }
+    addCollision([Math.max(1, count * .58), 1.35, .85], [x, getSimpleTerrainHeight(x, z) + .65, z], 'SandbagCollision');
+  };
+
+  addSandbags(-18, 8, 13);
+  addSandbags(18, 8, 13);
+  addSandbags(-26, -16, 11, Math.PI / 2);
+  addSandbags(25, -16, 11, Math.PI / 2);
+
+  // -----------------------------------------------------------------------
+  // ARMOR / VEHICLE PARK
+  // -----------------------------------------------------------------------
+
+  const addTank = (zone, x, z, rotation = 0, scale = 1) => {
+    const root = rootAtGround('TANK', x, z);
+    root.rotation.y = rotation;
+    root.scale.setScalar(scale);
+    sectionRoots.get(zone)?.add(root);
+
+    const hull = texturedMat(0x5b685f, 'metal', .74, .42, [3, 2], .025);
+    const dark = mat(0x2a3130, .64, .52);
+    box(root, [7.8, 1.3, 3.6], [0, 1.05, 0], hull, 0, .07);
+    box(root, [7.6, .58, .58], [0, .55, -1.75], dark, 0, .03);
+    box(root, [7.6, .58, .58], [0, .55, 1.75], dark, 0, .03);
+
+    for (const zz of [-1.74, 1.74]) {
+      for (let px = -2.6; px <= 2.6; px += 1.1) {
+        cyl(root, .43, .25, [px, .55, zz], dark, [Math.PI / 2, 0, 0], 18);
+      }
+    }
+
+    box(root, [3.2, .85, 2.55], [.05, 1.98, 0], hull, 0, .07);
+    torus(root, 1.05, .12, [.05, 2.43, 0], steelDark);
+    cyl(root, .18, 5.1, [2.75, 2.18, 0], steelDark, [0, 0, Math.PI / 2], 20);
+    cyl(root, .28, .42, [5.32, 2.18, 0], black, [0, 0, Math.PI / 2], 20);
+
+    addCollision([8.5 * scale, 2.8 * scale, 4.7 * scale], [x, getSimpleTerrainHeight(x, z) + 1.4 * scale, z], 'TankCollision');
+  };
+
+  addTank('vehicle', -13, -45, .06, 1.05);
+  addTank('vehicle', 9, -45, Math.PI, 1.10);
+  addTank('depot', 86, -18, -.18, .96);
+
+  const addTruck = (zone, x, z, rotation = 0, scale = 1) => {
+    const root = rootAtGround('TRUCK', x, z);
+    root.rotation.y = rotation;
+    root.scale.setScalar(scale);
+    sectionRoots.get(zone)?.add(root);
+
+    const body = texturedMat(0x5a665f, 'metal', .80, .35, [4, 2], .022);
+    box(root, [5.8, 1.3, 2.3], [0, 1.05, 0], body, 0, .06);
+    box(root, [1.95, 1.8, 2.05], [1.75, 1.68, 0], body, 0, .06);
+    box(root, [3.15, 1.55, 2.12], [-.9, 1.65, 0], rust, 0, .04);
+    for (const px of [-1.9, -.1, 1.9]) {
+      for (const pz of [-1.15, 1.15]) {
+        cyl(root, .42, .28, [px, .46, pz], black, [Math.PI / 2, 0, 0], 18);
+      }
+    }
+    addCollision([6.5 * scale, 2.8 * scale, 2.7 * scale], [x, getSimpleTerrainHeight(x, z) + 1.35 * scale, z], 'TruckCollision');
+  };
+
+  addTruck('logistics', 96, 19, Math.PI * .5, 1.0);
+  addTruck('depot', 96, -13, Math.PI * .5, .95);
+  addTruck('industrial', -82, -11, -.05, 1.0);
+
+  // -----------------------------------------------------------------------
+  // SOUTH DEFENSIVE RIDGE
+  // -----------------------------------------------------------------------
+
+  const addBunker = (x, z, rotation = 0) => {
+    const root = rootAtGround('BUNKER', x, z);
+    root.rotation.y = rotation;
+    const wall = texturedMat(0x66706c, 'concrete', .96, .03, [4, 3], .024);
+    const dark = mat(0x202729, .72, .55);
+    box(root, [12, 3.2, .48], [0, 1.60, 3.8], wall, 0, .05);
+    box(root, [12, 3.2, .48], [0, 1.60, -3.8], wall, 0, .05);
+    box(root, [.48, 3.2, 7.2], [-5.8, 1.60, 0], wall, 0, .05);
+    box(root, [.48, 3.2, 7.2], [5.8, 1.60, 0], wall, 0, .05);
+    box(root, [12.4, .28, 8.0], [0, 3.35, 0], dark, 0, .04);
+
+    for (const px of [-4.2, -2.1, 0, 2.1, 4.2]) {
+      box(root, [1.15, .26, .10], [px, 2.12, -4.05], steelDark);
+      box(root, [1.28, .06, .12], [px, 1.65, -4.06], steel);
+    }
+
+    box(root, [2.4, 2.2, .18], [0, 1.10, -4.06], black, 0, .02);
+    for (let y = .35; y < 2.0; y += .38) {
+      box(root, [1.85, .05, .03], [0, y, -4.17], steel);
+    }
+
+    addCollision([12.3, 3.4, .55], [x, getSimpleTerrainHeight(x, z) + 1.7, z + 3.8], 'BunkerNorth');
+    addCollision([12.3, 3.4, .55], [x, getSimpleTerrainHeight(x, z) + 1.7, z - 3.8], 'BunkerSouth');
+    addCollision([.55, 3.4, 7.2], [x - 5.8, getSimpleTerrainHeight(x, z) + 1.7, z], 'BunkerWest');
+    addCollision([.55, 3.4, 7.2], [x + 5.8, getSimpleTerrainHeight(x, z) + 1.7, z], 'BunkerEast');
+  };
+
+  addBunker(-78, -55, .08);
+  addBunker(-26, -56, -.06);
+  addBunker(26, -56, .04);
+  addBunker(78, -55, -.10);
+
+  // HESCO line breaks the southern skyline without becoming a continuous
+  // artificial wall.
+  const addHesco = (x, z, width, rotation = 0) => {
+    const root = rootAtGround('HESCO', x, z);
+    root.rotation.y = rotation;
+    const count = Math.max(3, Math.floor(width / 1.2));
+    for (let i = 0; i < count; i += 1) {
+      const px = (i - (count - 1) * .5) * 1.16;
+      box(root, [1.02, 1.02, .92], [px, .55, 0], sand, 0, .08);
+      box(root, [.045, .95, .045], [px, .55, -.49], steelDark);
+      box(root, [.045, .95, .045], [px, .55, .49], steelDark);
+    }
+    addCollision([width + .15, 1.1, 1.0], [x, getSimpleTerrainHeight(x, z) + .55, z], 'HescoCollision');
+  };
+
+  addHesco(-104, -49, 13, 0);
+  addHesco(-50, -48, 10, 0);
+  addHesco(50, -48, 10, 0);
+  addHesco(104, -49, 13, 0);
+
+  // -----------------------------------------------------------------------
+  // FUEL / SERVICE
+  // -----------------------------------------------------------------------
+
+  const addFuelTank = (x, z, scale = 1) => {
+    const root = rootAtGround('FUEL_TANK', x, z);
+    root.scale.setScalar(scale);
+    sectionRoots.get('depot')?.add(root);
+
+    const tank = texturedMat(0x5a615c, 'rust', .66, .46, [4, 3], .022);
+    cyl(root, 2.4, 5.3, [0, 2.8, 0], tank, [0, 0, Math.PI / 2], 24);
+    for (const px of [-2.25, 0, 2.25]) {
+      torus(root, 2.42, .09, [px, 2.8, 0], steelDark, [0, Math.PI / 2, 0], 10, 24);
+    }
+    for (const pz of [-1.7, 1.7]) {
+      for (const px of [-1.65, 1.65]) {
+        box(root, [.18, 2.3, .18], [px, 1.2, pz], steelDark);
+        box(root, [.6, .16, .6], [px, .1, pz], concrete);
+      }
+    }
+    addCollision([5.8 * scale, 5.7 * scale, 5.4 * scale], [x, getSimpleTerrainHeight(x, z) + 2.85 * scale, z], 'FuelTankCollision');
+  };
+
+  addFuelTank(73, -42, .88);
+  addFuelTank(97, -42, 1.0);
+
+  const addServicePad = (x, z, width, depth) => {
+    const root = rootAtGround('SERVICE_PAD', x, z);
+    box(root, [width, .10, depth], [0, .05, 0], concrete, 0, .01);
+    for (let px = -width * .4; px <= width * .4; px += 4) {
+      box(root, [.12, .025, depth * .72], [px, .075, 0], warning);
+    }
+  };
+
+  addServicePad(94, -5, 28, 12);
+  addServicePad(70, 6, 19, 10);
+
+  // -----------------------------------------------------------------------
+  // SMALL PROPS THAT GIVE EACH DISTRICT PURPOSE
+  // -----------------------------------------------------------------------
+
+  const addCrate = (x, z, scale = 1, rotation = 0, zone = null) => {
+    const root = rootAtGround('CRATE', x, z);
+    root.rotation.y = rotation;
+    root.scale.setScalar(scale);
+    if (zone) sectionRoots.get(zone)?.add(root);
+    box(root, [1.35, 1.05, 1.30], [0, .55, 0], wood, 0, .035);
+    for (const side of [-1, 1]) {
+      for (const yy of [.28, .55, .82]) {
+        box(root, [.08, .08, 1.36], [side * .64, yy, 0], steelDark);
+      }
+    }
+    addBolt(root, [-.52, .88, .68], .7);
+    addBolt(root, [.52, .88, .68], .7);
+    addCollision([1.45 * scale, 1.15 * scale, 1.40 * scale], [x, getSimpleTerrainHeight(x, z) + .58 * scale, z], 'CrateCollision');
+  };
+
+  const crateList = [
+    [-106, 28, .90, .05, 'command'],
+    [-95, 29, .78, -.10, 'command'],
+    [-74, 34, .74, .08, 'command'],
+    [61, 28, .90, 0, 'logistics'],
+    [74, 27, .78, .10, 'logistics'],
+    [104, 29, .82, -.08, 'logistics'],
+    [-110, -17, .88, .05, 'industrial'],
+    [-81, -19, .72, .14, 'industrial'],
+    [51, -14, .84, .04, 'depot'],
+    [106, -15, .90, -.04, 'depot'],
+  ];
+  for (const item of crateList) addCrate(...item);
+
+  const addDrum = (x, z, color = 0x4b6049, zone = null) => {
+    const root = rootAtGround('FUEL_DRUM', x, z);
+    if (zone) sectionRoots.get(zone)?.add(root);
+    const body = new THREE.MeshStandardMaterial({ color, roughness: .62, metalness: .38 });
+    cyl(root, .34, .88, [0, .46, 0], body, [0, 0, 0], 24);
+    torus(root, .345, .028, [0, .22, 0], steelDark);
+    torus(root, .345, .028, [0, .70, 0], steelDark);
+    box(root, [.32, .14, .035], [0, .46, -.35], warning);
+  };
+
+  for (const item of [
+    [-110, 35, 0x475d44, 'command'],
+    [-103, 35, 0x596a48, 'command'],
+    [56, 38, 0x4f6246, 'logistics'],
+    [65, 38, 0x596345, 'logistics'],
+    [108, 35, 0x66543e, 'logistics'],
+    [-108, -8, 0x4c5f44, 'industrial'],
+    [58, -40, 0x4b5c43, 'depot'],
+    [104, -41, 0x515b43, 'depot'],
+  ]) {
+    addDrum(...item);
   }
 
-  for (const side of [-1, 1]) {
-    box(
-      fallbackArenaRoot,
-      [MAP_WIDTH, 0.55, 2.8],
-      [0, 0.28, side * (HALF_D - 2.2)],
-      concreteEdge,
-    );
+  // -----------------------------------------------------------------------
+  // VERTICAL LANDMARKS / LIGHTING
+  // -----------------------------------------------------------------------
 
-    for (let x = -120; x <= 120; x += 8) {
-      box(
-        fallbackArenaRoot,
-        [4.4, 0.22, 0.62],
-        [x, 0.66, side * (HALF_D - 3.2)],
-        tan,
-        0,
-        0.05,
+  const addTower = (x, z, height = 7.2) => {
+    const root = rootAtGround('LIGHT_TOWER', x, z);
+    cyl(root, .07, height, [0, height * .5, 0], steelDark, [0, 0, 0], 14);
+    box(root, [.09, height * .82, .09], [0, height * .45, .05], steel);
+    box(root, [.65, .10, .24], [0, height - .18, 0], steelDark, 0, .02);
+    const lamp = new THREE.Mesh(
+      new THREE.SphereGeometry(.12, 12, 8),
+      warmGlass,
+    );
+    lamp.position.set(0, height - .33, 0);
+    root.add(lamp);
+  };
+
+  for (const item of [
+    [-117, 5, 7.5],
+    [117, 5, 7.5],
+    [-34, 62, 7.0],
+    [34, 62, 7.0],
+    [-117, -15, 7.5],
+    [117, -15, 7.5],
+  ]) addTower(...item);
+
+  // Utility cable runs are only between actual structures and stay above the
+  // playable space. Nothing is strung across the whole map.
+  const addCable = (a, b, y = 6.5) => {
+    const start = new THREE.Vector3(a[0], getSimpleTerrainHeight(a[0], a[1]) + y, a[1]);
+    const end = new THREE.Vector3(b[0], getSimpleTerrainHeight(b[0], b[1]) + y, b[1]);
+    const mid = start.clone().add(end).multiplyScalar(.5);
+    const length = start.distanceTo(end);
+    const root = new THREE.Group();
+    root.position.copy(mid);
+    const cable = new THREE.Mesh(
+      new THREE.CylinderGeometry(.025, .025, length, 8),
+      steelDark,
+    );
+    cable.rotation.z = Math.PI / 2;
+    cable.rotation.y = -Math.atan2(end.y - start.y, Math.hypot(end.x - start.x, end.z - start.z));
+    cable.rotation.x = Math.atan2(end.z - start.z, end.x - start.x);
+    root.add(cable);
+    fallbackArenaRoot.add(root);
+  };
+
+  addCable([-103, 42], [-73, 43], 5.8);
+  addCable([78, 42], [108, 43], 5.9);
+  addCable([-103, -29], [-70, -29], 5.7);
+  addCable([74, -29], [105, -29], 5.7);
+
+  // -----------------------------------------------------------------------
+  // OPTIMIZED GRASS: only the open strips, never the roads or districts.
+  // -----------------------------------------------------------------------
+
+  const grassGeometry = new THREE.ConeGeometry(.055, .70, 4, 1);
+  const grassMaterial = new THREE.MeshStandardMaterial({
+    color: 0x58793d,
+    roughness: 1,
+    metalness: 0,
+  });
+
+  const blocked = (x, z) => {
+    const blocks = [
+      [-92, 43, 60, 45],
+      [0, 45, 56, 45],
+      [91, 43, 60, 45],
+      [-90, -30, 64, 46],
+      [0, -30, 68, 48],
+      [88, -30, 60, 46],
+      [0, 2, 252, 13],
+      [0, -12, 252, 8],
+      [-62, 0, 8, 110],
+      [62, 0, 8, 110],
+    ];
+    return blocks.some(([cx, cz, w, d]) =>
+      Math.abs(x - cx) < w * .5 &&
+      Math.abs(z - cz) < d * .5
+    );
+  };
+
+  const gx = 7;
+  const gz = 4;
+  const chunkW = MAP_WIDTH / gx;
+  const chunkD = MAP_DEPTH / gz;
+
+  for (let iz = 0; iz < gz; iz += 1) {
+    for (let ix = 0; ix < gx; ix += 1) {
+      const centerX = -HALF_W + (ix + .5) * chunkW;
+      const centerZ = -HALF_D + (iz + .5) * chunkD;
+      const chunk = new THREE.InstancedMesh(
+        grassGeometry,
+        grassMaterial,
+        460,
       );
+      chunk.name = 'WARFLEX_GrassChunk_Redesign_' + ix + '_' + iz;
+      const dummy = new THREE.Object3D();
+      let placed = 0;
+
+      for (let attempt = 0; attempt < 3200 && placed < chunk.count; attempt += 1) {
+        const seed = attempt + ix * 101.7 + iz * 907.3;
+        const rx = (Math.sin(seed * 12.9898) * 43758.5453) % 1;
+        const rz = (Math.sin(seed * 78.233) * 24634.6345) % 1;
+        const x = THREE.MathUtils.clamp(
+          centerX + (rx - .5) * chunkW * .95,
+          -HALF_W + 1,
+          HALF_W - 1,
+        );
+        const z = THREE.MathUtils.clamp(
+          centerZ + (rz - .5) * chunkD * .95,
+          -HALF_D + 1,
+          HALF_D - 1,
+        );
+
+        if (blocked(x, z)) continue;
+
+        const h = .34 + Math.abs(Math.sin(seed * 2.1)) * .45;
+        dummy.position.set(x, getSimpleTerrainHeight(x, z) + h * .45, z);
+        dummy.rotation.y = seed * 1.73;
+        const s = .7 + Math.abs(Math.sin(seed * 4.9)) * .65;
+        dummy.scale.set(s, h / .70, s);
+        dummy.updateMatrix();
+        chunk.setMatrixAt(placed, dummy.matrix);
+        placed += 1;
+      }
+
+      chunk.instanceMatrix.needsUpdate = true;
+      chunk.frustumCulled = true;
+      fallbackArenaRoot.add(chunk);
+      optimizedGrassChunks.push({
+        mesh: chunk,
+        x: centerX,
+        z: centerZ,
+        radius: Math.hypot(chunkW, chunkD) * .52,
+      });
     }
   }
 
-  // Spawn / deployment pad.
-  box(
-    fallbackArenaRoot,
-    [35, 0.12, 22],
-    [18, 0.07, 54],
-    concrete,
-  );
+  // Keep the map visually grouped in the scene graph; this also gives the
+  // dev editor clean district roots to work with.
+  fallbackArenaRoot.updateMatrixWorld(true);
 
-  mark(
-    fallbackArenaRoot,
-    [8.0, 0.016, 0.16],
-    [11, 0.15, 54],
-    0xbcb170,
-  );
-  mark(
-    fallbackArenaRoot,
-    [8.0, 0.016, 0.16],
-    [25, 0.15, 54],
-    0xbcb170,
-  );
-
-  addMesh(
-    fallbackArenaRoot,
-    new THREE.CylinderGeometry(1.1, 1.1, 0.10, 24),
-    steelDark,
-    [18, 0.18, 54],
-  );
-
-  addMesh(
-    fallbackArenaRoot,
-    new THREE.CylinderGeometry(0.82, 0.82, 0.12, 24),
-    hazardYellow,
-    [18, 0.25, 54],
-  );
-
-  console.info('[WARFLEX] Full exterior battlefield rebuilt.');
+  console.info('[WARFLEX] Main map redesigned: six districts + central combat spine + optimized detail.');
 }
-
 addArena();
 
 const boundaryGridRoot = new THREE.Group();
