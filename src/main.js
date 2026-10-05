@@ -4039,6 +4039,10 @@ function replaceLoadoutPreview(index, source) {
   loadoutPreviewModels[index] = preview;
 }
 
+window.__WARFLEX_ON_GLOCK_LOADED = (model) => {
+  replaceLoadoutPreview(3, model);
+};
+
 if (loadedGlock18Model) {
   replaceLoadoutPreview(3, loadedGlock18Model);
 }
@@ -4904,6 +4908,7 @@ async function loadUploadedGlock18Pistol() {
     weaponModels[3]?.parent?.remove(weaponModels[3]);
     weaponModels[3] = imported;
     loadedGlock18Model = imported;
+    window.__WARFLEX_ON_GLOCK_LOADED?.(imported);
     weapon.add(imported);
     imported.visible = activeWeaponDef?.id === 'pistol';
 
