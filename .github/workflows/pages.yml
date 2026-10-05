@@ -6,17 +6,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: github-pages-deploy
+  group: github-pages
   cancel-in-progress: true
-
-# Queue recovery: keep only the newest Pages deployment in this group.
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,11 +50,20 @@ jobs:
           grep -q "./src/main.js?v=${GITHUB_SHA}" index.html
           test -s src/main.js
 
-      - name: Deploy to gh-pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare Pages artifact
+        run: |
+          rm -rf _site
+          mkdir _site
+          rsync -a --exclude='.git' --exclude='.github' ./ _site/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: .
-          exclude_assets: '.github'
-          force_orphan: false
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
