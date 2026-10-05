@@ -325,7 +325,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.AgXToneMapping;
-renderer.toneMappingExposure = 0.78;
+renderer.toneMappingExposure = 0.62;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
@@ -395,15 +395,15 @@ const assetManager = new AssetManager(renderer);
 // Bright outdoor daylight rig: a strong sun plus soft sky/ground fill
 // keeps the arena readable while preserving directional shadows.
 const worldHemiLight = new THREE.HemisphereLight(
-  0xdce7ee,
-  0x34424b,
-  0.95,
+  0xcbd7de,
+  0x28343c,
+  0.62,
 );
 scene.add(worldHemiLight);
 
 const sun = new THREE.DirectionalLight(
-  0xfff7e8,
-  1.9,
+  0xfff5e5,
+  1.22,
 );
 sun.position.set(-52, 62, 28);
 sun.castShadow = true;
@@ -3935,6 +3935,7 @@ let loadoutDestination = 'waves';
 let loadoutReturnView = 'main';
 let loadoutPreviewRoot = null;
 const loadoutPreviewModels = [];
+let loadedGlock18Model = null;
 
 loadoutPreviewRoot = new THREE.Group();
 loadoutPreviewRoot.name = 'WARFLEX_LOADOUT_PREVIEW';
@@ -4018,6 +4019,28 @@ const stripPreviewModel = (source, index) => {
 
 for (let i = 0; i < weaponModels.length; i += 1) {
   stripPreviewModel(weaponModels[i], i);
+}
+
+function replaceLoadoutPreview(index, source) {
+  if (!loadoutPreviewRoot || !source || !WEAPON_DEFS[index]) return;
+
+  const old = loadoutPreviewModels[index];
+  if (old) {
+    loadoutPreviewRoot.remove(old);
+    old.traverse((node) => {
+      if (!node.isMesh) return;
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      for (const material of materials) material?.dispose?.();
+    });
+    old.clear();
+  }
+
+  const preview = stripPreviewModel(source, index);
+  loadoutPreviewModels[index] = preview;
+}
+
+if (loadedGlock18Model) {
+  replaceLoadoutPreview(3, loadedGlock18Model);
 }
 
 function updateLoadoutPreview(dt) {
@@ -4880,6 +4903,7 @@ async function loadUploadedGlock18Pistol() {
 
     weaponModels[3]?.parent?.remove(weaponModels[3]);
     weaponModels[3] = imported;
+    loadedGlock18Model = imported;
     weapon.add(imported);
     imported.visible = activeWeaponDef?.id === 'pistol';
 
