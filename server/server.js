@@ -1,19 +1,77 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT || 8080);
 const MAX_PLAYERS = 16;
 const players = new Map();
 
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.b64': 'text/plain; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json',
+  '.ico': 'image/x-icon',
+};
+
+function sendFile(res, filePath) {
+  try {
+    const data = fs.readFileSync(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    res.writeHead(200, {
+      'content-type': MIME_TYPES[ext] || 'application/octet-stream',
+      'cache-control': 'no-cache',
+    });
+    res.end(data);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const server = http.createServer((req,res)=>{
-  if(req.url === '/health'){
+  const requestUrl = new URL(req.url || '/', 'http://warfex.local');
+  if(requestUrl.pathname === '/health'){
     res.writeHead(200, {'content-type':'application/json'});
     res.end(JSON.stringify({ok:true,players:players.size}));
     return;
   }
-  res.writeHead(200, {'content-type':'text/plain'});
-  res.end('WARFLEX multiplayer server');
+
+  let pathname;
+  try {
+    pathname = decodeURIComponent(requestUrl.pathname);
+  } catch {
+    res.writeHead(400, {'content-type':'text/plain; charset=utf-8'});
+    res.end('Bad request');
+    return;
+  }
+
+  const relativePath = pathname === '/' ? 'index.html' : pathname.replace(/^\\/+/, '');
+  const filePath = path.resolve(PROJECT_ROOT, relativePath);
+
+  if (!filePath.startsWith(PROJECT_ROOT + path.sep) && filePath !== PROJECT_ROOT) {
+    res.writeHead(403, {'content-type':'text/plain; charset=utf-8'});
+    res.end('Forbidden');
+    return;
+  }
+
+  if (sendFile(res, filePath)) return;
+
+  res.writeHead(404, {'content-type':'text/plain; charset=utf-8'});
+  res.end('Not found');
 });
 
 const wss = new WebSocketServer({server});
